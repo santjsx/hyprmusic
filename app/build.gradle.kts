@@ -68,6 +68,11 @@ dependencies {
   implementation(libs.androidx.media3.session)
   implementation(libs.androidx.media3.common)
   implementation(libs.androidx.media3.ui)
+  implementation("androidx.media3:media3-datasource:1.5.1")
+  implementation("androidx.media3:media3-database:1.5.1")
+
+  // Networking (OkHttp)
+  implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
   // Coil Image Loading
   implementation(libs.coil.compose)

@@ -100,7 +100,8 @@ class HyprAudioPlayer private constructor(private val context: Context) {
         val extractorsFactory = DefaultExtractorsFactory()
             .setConstantBitrateSeekingEnabled(true)
 
-        val mediaSourceFactory = DefaultMediaSourceFactory(context, extractorsFactory)
+        val dataSourceFactory = com.example.hyprmusic.core.cloud.telegram.TelegramMediaSource.buildDataSourceFactory(context)
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
 
         ExoPlayer.Builder(context, renderersFactory)
             .setMediaSourceFactory(mediaSourceFactory)

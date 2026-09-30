@@ -71,12 +71,14 @@ import com.example.hyprmusic.ui.screens.HomeScreen
 import com.example.hyprmusic.ui.screens.LibraryScreen
 import com.example.hyprmusic.ui.screens.NowPlayingScreen
 import com.example.hyprmusic.ui.screens.SettingsScreen
+import com.example.hyprmusic.core.cloud.telegram.TelegramMusicRepository
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var audioPlayer: HyprAudioPlayer
     private lateinit var musicRepository: MusicRepository
+    private lateinit var telegramRepository: TelegramMusicRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -85,6 +87,7 @@ class MainActivity : ComponentActivity() {
         ThemeManager.init(applicationContext)
         audioPlayer = HyprAudioPlayer.getInstance(applicationContext)
         musicRepository = MusicRepository(applicationContext)
+        telegramRepository = TelegramMusicRepository(applicationContext, musicRepository)
 
         try {
             HyprEqualizer.init(applicationContext, audioPlayer.audioSessionId)
@@ -100,7 +103,8 @@ class MainActivity : ComponentActivity() {
                 ) {
                     HyprMusicApp(
                         audioPlayer = audioPlayer,
-                        musicRepository = musicRepository
+                        musicRepository = musicRepository,
+                        telegramRepository = telegramRepository
                     )
                 }
             }
@@ -116,7 +120,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun HyprMusicApp(
     audioPlayer: HyprAudioPlayer,
-    musicRepository: MusicRepository
+    musicRepository: MusicRepository,
+    telegramRepository: TelegramMusicRepository
 ) {
     val themeConfig by ThemeManager.themeConfig.collectAsState()
     val playbackState by audioPlayer.playbackState.collectAsState()
@@ -183,8 +188,16 @@ fun HyprMusicApp(
             // Dynamic Workspace Content or Live Search Results
             Box(modifier = Modifier.weight(1f)) {
                 if (isSearchActive && searchQuery.isNotBlank()) {
-                    val searchResults = remember(searchQuery, tracks) {
-                        musicRepository.search(searchQuery)
+                    val cloudTracks by telegramRepository.cloudTracks.collectAsState()
+                    val searchResults = remember(searchQuery, tracks, cloudTracks) {
+                        val localMatches = musicRepository.search(searchQuery)
+                        val q = searchQuery.trim().lowercase()
+                        val cloudMatches = cloudTracks.filter {
+                            it.title.lowercase().contains(q) ||
+                            it.artist.lowercase().contains(q) ||
+                            it.album.lowercase().contains(q)
+                        }
+                        localMatches + cloudMatches
                     }
 
                     LazyColumn(
@@ -251,14 +264,34 @@ fun HyprMusicApp(
                                     Spacer(modifier = Modifier.width(12.dp))
 
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = track.title,
-                                            color = if (isCurrent) themeConfig.accentColor else themeConfig.textPrimaryColor,
-                                            fontSize = 13.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = track.title,
+                                                color = if (isCurrent) themeConfig.accentColor else themeConfig.textPrimaryColor,
+                                                fontSize = 13.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f, fill = false)
+                                            )
+                                            if (track.isCloudTrack) {
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .background(themeConfig.accentColor.copy(alpha = 0.2f))
+                                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "CLOUD",
+                                                        color = themeConfig.accentColor,
+                                                        fontSize = 9.sp,
+                                                        fontFamily = FontFamily.Monospace,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+                                        }
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = "${track.artist} • ${track.album}",
@@ -325,7 +358,8 @@ fun HyprMusicApp(
                                 onToggleFavorite = { trackId ->
                                     val isFav = musicRepository.toggleFavorite(trackId)
                                     audioPlayer.updateFavoriteStatus(trackId, isFav)
-                                }
+                                },
+                                telegramRepository = telegramRepository
                             )
                         }
 
@@ -360,7 +394,8 @@ fun HyprMusicApp(
                                 theme = themeConfig,
                                 isScanning = isScanning,
                                 onRescanMedia = { coroutineScope.launch { musicRepository.scanLocalMedia() } },
-                                onOpenEqualizer = { showEqualizerDialog = true }
+                                onOpenEqualizer = { showEqualizerDialog = true },
+                                telegramRepository = telegramRepository
                             )
                         }
                     }

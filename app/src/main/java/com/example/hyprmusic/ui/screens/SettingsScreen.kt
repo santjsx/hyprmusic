@@ -23,6 +23,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
@@ -81,6 +84,7 @@ fun SettingsScreen(
     isScanning: Boolean,
     onRescanMedia: () -> Unit,
     onOpenEqualizer: () -> Unit,
+    telegramRepository: com.example.hyprmusic.core.cloud.telegram.TelegramMusicRepository? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -92,6 +96,18 @@ fun SettingsScreen(
     val downloadProgress by HyprUpdateManager.downloadProgress.collectAsState()
     val eqEnabled by HyprEqualizer.isEnabled.collectAsState()
     val eqPreset by HyprEqualizer.currentPreset.collectAsState()
+
+    val cloudSettings = telegramRepository?.config?.settings?.collectAsState()?.value
+    val isSyncingCloud = telegramRepository?.isSyncing?.collectAsState()?.value ?: false
+    val isWakingServer = telegramRepository?.isWakingServer?.collectAsState()?.value ?: false
+    val serverHealth = telegramRepository?.serverHealth?.collectAsState()?.value
+    val syncError = telegramRepository?.syncError?.collectAsState()?.value
+
+    var serverHostInput by remember(cloudSettings?.serverUrl) { mutableStateOf(cloudSettings?.serverUrl ?: "http://10.0.2.2:8080") }
+    var userIdInput by remember(cloudSettings?.userId) { mutableStateOf(if ((cloudSettings?.userId ?: 0L) > 0L) cloudSettings!!.userId.toString() else "") }
+    var apiKeyInput by remember(cloudSettings?.apiSecretKey) { mutableStateOf(cloudSettings?.apiSecretKey ?: "") }
+    var testResultText by remember { mutableStateOf<String?>(null) }
+    var isTestingConnection by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = modifier
@@ -382,6 +398,333 @@ fun SettingsScreen(
                             checkedTrackColor = theme.accentColor
                         )
                     )
+                }
+            }
+        }
+
+        // Section: Telegram Personal Music Cloud (TPMC)
+        item {
+            Column {
+                Text(
+                    text = "TELEGRAM CLOUD STORAGE // TPMC",
+                    color = theme.textSecondaryColor,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .hyprTile(theme = theme)
+                        .padding(14.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Telegram Music Gateway",
+                                    color = theme.textPrimaryColor,
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Stream & download from your private channel",
+                                    color = theme.textSecondaryColor,
+                                    fontSize = 11.sp
+                                )
+                            }
+
+                            Switch(
+                                checked = cloudSettings?.isEnabled ?: false,
+                                onCheckedChange = { enabled ->
+                                    telegramRepository?.config?.updateSettings(
+                                        serverUrl = serverHostInput,
+                                        userId = userIdInput.toLongOrNull() ?: 0L,
+                                        apiSecretKey = apiKeyInput,
+                                        isEnabled = enabled
+                                    )
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = theme.backgroundColor,
+                                    checkedTrackColor = theme.accentColor
+                                )
+                            )
+                        }
+
+                        // Server Host Input
+                        Column {
+                            Text(
+                                text = "SERVER HOST (URL / IP:PORT)",
+                                color = theme.textSecondaryColor,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(theme.surfaceVariantColor)
+                                    .border(1.dp, theme.inactiveBorderColor, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                            ) {
+                                BasicTextField(
+                                    value = serverHostInput,
+                                    onValueChange = { serverHostInput = it },
+                                    textStyle = TextStyle(
+                                        color = theme.textPrimaryColor,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 12.5.sp
+                                    ),
+                                    cursorBrush = SolidColor(theme.accentColor),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    decorationBox = { innerTextField ->
+                                        if (serverHostInput.isEmpty()) {
+                                            Text(
+                                                text = "https://tpmc-music-cloud.onrender.com",
+                                                color = theme.textSecondaryColor.copy(alpha = 0.5f),
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 12.5.sp
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                )
+                            }
+                        }
+
+                        // User ID & API Secret Inputs
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "USER ID (TELEGRAM)",
+                                    color = theme.textSecondaryColor,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(theme.surfaceVariantColor)
+                                        .border(1.dp, theme.inactiveBorderColor, RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                                ) {
+                                    BasicTextField(
+                                        value = userIdInput,
+                                        onValueChange = { userIdInput = it.filter { ch -> ch.isDigit() } },
+                                        textStyle = TextStyle(
+                                            color = theme.textPrimaryColor,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 12.5.sp
+                                        ),
+                                        cursorBrush = SolidColor(theme.accentColor),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        decorationBox = { innerTextField ->
+                                            if (userIdInput.isEmpty()) {
+                                                Text(
+                                                    text = "123456789",
+                                                    color = theme.textSecondaryColor.copy(alpha = 0.5f),
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 12.5.sp
+                                                )
+                                            }
+                                            innerTextField()
+                                        }
+                                    )
+                                }
+                            }
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "API SECRET (OPTIONAL)",
+                                    color = theme.textSecondaryColor,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(theme.surfaceVariantColor)
+                                        .border(1.dp, theme.inactiveBorderColor, RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                                ) {
+                                    BasicTextField(
+                                        value = apiKeyInput,
+                                        onValueChange = { apiKeyInput = it },
+                                        textStyle = TextStyle(
+                                            color = theme.textPrimaryColor,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 12.5.sp
+                                        ),
+                                        cursorBrush = SolidColor(theme.accentColor),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        decorationBox = { innerTextField ->
+                                            if (apiKeyInput.isEmpty()) {
+                                                Text(
+                                                    text = "secret_token",
+                                                    color = theme.textSecondaryColor.copy(alpha = 0.5f),
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 12.5.sp
+                                                )
+                                            }
+                                            innerTextField()
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        // Status banner
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(theme.backgroundColor)
+                                .padding(10.dp)
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                if (isWakingServer) {
+                                    Text(
+                                        text = "⏳ [TPMC WAKING UP... Render cold boot in progress]",
+                                        color = Color(0xFFFFB74D),
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                } else if (serverHealth != null) {
+                                    Text(
+                                        text = "● CONNECTED (Status: ${serverHealth.status} | MTProto: ${serverHealth.telegram} | Bot: ${serverHealth.bot})",
+                                        color = Color(0xFF4CAF50),
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Catalog: ${serverHealth.totalTracks} tracks • Server RAM: ${"%.1f".format(serverHealth.memoryMb)}MB",
+                                        color = theme.textSecondaryColor,
+                                        fontSize = 10.5.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                } else if (testResultText != null) {
+                                    Text(
+                                        text = testResultText ?: "",
+                                        color = if (testResultText?.startsWith("FAIL") == true) Color(0xFFEF5350) else Color(0xFF4CAF50),
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                } else if (syncError != null) {
+                                    Text(
+                                        text = "▲ $syncError",
+                                        color = Color(0xFFEF5350),
+                                        fontSize = 10.5.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                } else {
+                                    Text(
+                                        text = "○ Cloud Status: ${if (cloudSettings?.isEnabled == true) "Active (${cloudSettings.cachedTrackCount} cached)" else "Inactive"}",
+                                        color = theme.textSecondaryColor,
+                                        fontSize = 10.5.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
+
+                        // Action Buttons: Save & Test, Sync
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(theme.surfaceVariantColor)
+                                    .clickable(enabled = !isTestingConnection && !isWakingServer) {
+                                        coroutineScope.launch {
+                                            isTestingConnection = true
+                                            testResultText = "Pinging..."
+                                            telegramRepository?.config?.updateSettings(
+                                                serverUrl = serverHostInput,
+                                                userId = userIdInput.toLongOrNull() ?: 0L,
+                                                apiSecretKey = apiKeyInput,
+                                                isEnabled = true
+                                            )
+                                            val result = telegramRepository?.testConnection()
+                                            testResultText = if (result?.isSuccess == true) {
+                                                "OK: Connected to ${result.getOrNull()?.status} gateway"
+                                            } else {
+                                                "FAIL: ${result?.exceptionOrNull()?.localizedMessage ?: "Unreachable"}"
+                                            }
+                                            isTestingConnection = false
+                                        }
+                                    }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isTestingConnection || isWakingServer) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = theme.accentColor)
+                                } else {
+                                    Text(
+                                        text = "[ TEST CONNECTION ]",
+                                        color = theme.accentColor,
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(theme.accentColor.copy(alpha = 0.15f))
+                                    .border(1.dp, theme.accentColor.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                    .clickable(enabled = !isSyncingCloud) {
+                                        coroutineScope.launch {
+                                            telegramRepository?.config?.updateSettings(
+                                                serverUrl = serverHostInput,
+                                                userId = userIdInput.toLongOrNull() ?: 0L,
+                                                apiSecretKey = apiKeyInput,
+                                                isEnabled = true
+                                            )
+                                            telegramRepository?.syncLibrary(force = true)
+                                        }
+                                    }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isSyncingCloud) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = theme.accentColor)
+                                } else {
+                                    Text(
+                                        text = "[ SYNC NOW ]",
+                                        color = theme.accentColor,
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -1,0 +1,315 @@
+package com.example.hyprmusic.core.cloud.telegram
+
+import android.content.ContentValues
+import android.content.Context
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import com.example.hyprmusic.core.data.MusicRepository
+import com.example.hyprmusic.core.model.Album
+import com.example.hyprmusic.core.model.Artist
+import com.example.hyprmusic.core.model.Track
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.File
+import java.io.FileOutputStream
+import java.util.concurrent.TimeUnit
+
+class TelegramMusicRepository(
+    private val context: Context,
+    private val localMusicRepository: MusicRepository
+) {
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    val config = TelegramCloudConfig.getInstance(context)
+
+    private val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        coerceInputValues = true
+    }
+
+    private val cacheFile = File(context.filesDir, "tpmc_cached_catalog.json")
+
+    private val _cloudTracks = MutableStateFlow<List<Track>>(emptyList())
+    val cloudTracks: StateFlow<List<Track>> = _cloudTracks.asStateFlow()
+
+    private val _cloudAlbums = MutableStateFlow<List<Album>>(emptyList())
+    val cloudAlbums: StateFlow<List<Album>> = _cloudAlbums.asStateFlow()
+
+    private val _cloudArtists = MutableStateFlow<List<Artist>>(emptyList())
+    val cloudArtists: StateFlow<List<Artist>> = _cloudArtists.asStateFlow()
+
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
+
+    private val _isWakingServer = MutableStateFlow(false)
+    val isWakingServer: StateFlow<Boolean> = _isWakingServer.asStateFlow()
+
+    private val _syncError = MutableStateFlow<String?>(null)
+    val syncError: StateFlow<String?> = _syncError.asStateFlow()
+
+    private val _serverHealth = MutableStateFlow<ServerHealthInfo?>(null)
+    val serverHealth: StateFlow<ServerHealthInfo?> = _serverHealth.asStateFlow()
+
+    private val _downloadingProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
+    val downloadingProgress: StateFlow<Map<String, Float>> = _downloadingProgress.asStateFlow()
+
+    private val _downloadedTrackIds = MutableStateFlow<Set<String>>(emptySet())
+    val downloadedTrackIds: StateFlow<Set<String>> = _downloadedTrackIds.asStateFlow()
+
+    init {
+        // Hydrate from disk cache immediately (0ms perceived latency)
+        loadCachedCatalog()
+
+        // Observe local tracks to keep downloaded set accurate
+        scope.launch {
+            localMusicRepository.tracks.collect { localTracks ->
+                updateDownloadedStatus(localTracks)
+            }
+        }
+
+        // Auto-sync if configured and enabled
+        if (config.settings.value.autoSyncOnStartup && config.isConfigured()) {
+            scope.launch {
+                syncLibrary()
+            }
+        }
+    }
+
+    private fun loadCachedCatalog() {
+        if (!cacheFile.exists() || cacheFile.length() == 0L) return
+        try {
+            val content = cacheFile.readText()
+            val dto = json.decodeFromString<TelegramLibraryResponseDto>(content)
+            val settings = config.settings.value
+            val mappedTracks = dto.tracks.map { it.toTrack(settings.serverUrl, settings.userId, settings.apiSecretKey) }
+            val mappedAlbums = dto.albums.map { it.toAlbum(settings.serverUrl, settings.userId, settings.apiSecretKey) }
+            val mappedArtists = dto.artists.map { it.toArtist() }
+
+            _cloudTracks.value = mappedTracks
+            _cloudAlbums.value = mappedAlbums
+            _cloudArtists.value = mappedArtists
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun updateDownloadedStatus(localTracks: List<Track>) {
+        val localKeys = localTracks.map { "${it.title.trim().lowercase()}_${it.artist.trim().lowercase()}" }.toSet()
+        val currentCloud = _cloudTracks.value
+        val downloaded = currentCloud.filter { ct ->
+            val key = "${ct.title.trim().lowercase()}_${ct.artist.trim().lowercase()}"
+            localKeys.contains(key)
+        }.map { it.id }.toSet()
+
+        _downloadedTrackIds.value = downloaded
+    }
+
+    suspend fun testConnection(): Result<ServerHealthInfo> = withContext(Dispatchers.IO) {
+        val settings = config.settings.value
+        if (settings.serverUrl.isBlank()) {
+            return@withContext Result.failure(IllegalArgumentException("Server URL is empty"))
+        }
+
+        _isWakingServer.value = true
+        var result: Result<ServerHealthInfo> = Result.failure(Exception("Not started"))
+
+        // Retry up to 3 times with progressive delay in case Render is cold-starting
+        for (attempt in 1..3) {
+            result = TelegramMusicApi.checkHealth(settings.serverUrl)
+            if (result.isSuccess) break
+            if (attempt < 3) delay(4000L)
+        }
+
+        _isWakingServer.value = false
+        result.onSuccess { _serverHealth.value = it }
+        result
+    }
+
+    suspend fun syncLibrary(force: Boolean = false) = withContext(Dispatchers.IO) {
+        val settings = config.settings.value
+        if (!config.isConfigured()) {
+            _syncError.value = "TPMC Cloud is not configured. Go to Settings > Telegram Cloud."
+            return@withContext
+        }
+
+        _isSyncing.value = true
+        _syncError.value = null
+
+        // Check health / wake instance if necessary
+        val healthResult = TelegramMusicApi.checkHealth(settings.serverUrl)
+        if (healthResult.isFailure) {
+            _isWakingServer.value = true
+            // Allow up to 35 seconds for Render instance wake-up
+            var wokeUp = false
+            for (i in 1..7) {
+                delay(5000L)
+                val check = TelegramMusicApi.checkHealth(settings.serverUrl)
+                if (check.isSuccess) {
+                    wokeUp = true
+                    _serverHealth.value = check.getOrNull()
+                    break
+                }
+            }
+            _isWakingServer.value = false
+            if (!wokeUp) {
+                _isSyncing.value = false
+                _syncError.value = "Server unreachable. If on Render free tier, server may still be booting."
+                return@withContext
+            }
+        } else {
+            _serverHealth.value = healthResult.getOrNull()
+        }
+
+        val libResult = TelegramMusicApi.fetchLibrary(
+            serverUrl = settings.serverUrl,
+            userId = settings.userId,
+            apiSecretKey = settings.apiSecretKey
+        )
+
+        libResult.fold(
+            onSuccess = { dto ->
+                val mappedTracks = dto.tracks.map { it.toTrack(settings.serverUrl, settings.userId, settings.apiSecretKey) }
+                val mappedAlbums = dto.albums.map { it.toAlbum(settings.serverUrl, settings.userId, settings.apiSecretKey) }
+                val mappedArtists = dto.artists.map { it.toArtist() }
+
+                _cloudTracks.value = mappedTracks
+                _cloudAlbums.value = mappedAlbums
+                _cloudArtists.value = mappedArtists
+                config.recordSyncSuccess(mappedTracks.size)
+
+                // Persist to disk cache
+                try {
+                    cacheFile.writeText(json.encodeToString(dto))
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+
+                updateDownloadedStatus(localMusicRepository.tracks.value)
+                _syncError.value = null
+            },
+            onFailure = { err ->
+                _syncError.value = err.localizedMessage ?: "Sync failed"
+            }
+        )
+
+        _isSyncing.value = false
+    }
+
+    suspend fun downloadTrack(track: Track): Boolean = withContext(Dispatchers.IO) {
+        if (_downloadingProgress.value.containsKey(track.id)) return@withContext false
+        val downloadUrl = if (track.contentUri.contains("?")) {
+            "${track.contentUri}&download=true"
+        } else {
+            "${track.contentUri}?download=true"
+        }
+
+        _downloadingProgress.update { it + (track.id to 0.01f) }
+
+        val downloadClient = OkHttpClient.Builder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .build()
+
+        var success = false
+        var targetUri: Uri? = null
+
+        try {
+            val request = Request.Builder()
+                .url(downloadUrl)
+                .get()
+                .header("User-Agent", "HyprMusic/1.2.0 (Android)")
+                .build()
+
+            downloadClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    _downloadingProgress.update { it - track.id }
+                    return@withContext false
+                }
+
+                val body = response.body ?: run {
+                    _downloadingProgress.update { it - track.id }
+                    return@withContext false
+                }
+
+                val totalBytes = body.contentLength().let { if (it > 0) it else 1L }
+                val ext = track.audioFormat.lowercase().let { if (it.isNotBlank()) it else "mp3" }
+                val filename = "${track.title.replace("[^a-zA-Z0-9.-]".toRegex(), "_")}_${track.artist.replace("[^a-zA-Z0-9.-]".toRegex(), "_")}.$ext"
+
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.Audio.Media.DISPLAY_NAME, filename)
+                    put(MediaStore.Audio.Media.TITLE, track.title)
+                    put(MediaStore.Audio.Media.ARTIST, track.artist)
+                    put(MediaStore.Audio.Media.ALBUM, track.album)
+                    put(MediaStore.Audio.Media.MIME_TYPE, track.mimeType)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        put(MediaStore.Audio.Media.RELATIVE_PATH, Environment.DIRECTORY_MUSIC + "/HyprMusic")
+                        put(MediaStore.Audio.Media.IS_PENDING, 1)
+                    }
+                }
+
+                val resolver = context.contentResolver
+                val audioUri = resolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, contentValues)
+                    ?: run {
+                        _downloadingProgress.update { it - track.id }
+                        return@withContext false
+                    }
+                targetUri = audioUri
+
+                resolver.openOutputStream(audioUri)?.use { output ->
+                    body.byteStream().use { input ->
+                        val buffer = ByteArray(64 * 1024)
+                        var bytesRead: Int
+                        var accumulated = 0L
+
+                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                            output.write(buffer, 0, bytesRead)
+                            accumulated += bytesRead
+                            val progress = (accumulated.toFloat() / totalBytes.toFloat()).coerceIn(0.01f, 0.99f)
+                            _downloadingProgress.update { it + (track.id to progress) }
+                        }
+                        output.flush()
+                    }
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val finishValues = ContentValues().apply {
+                        put(MediaStore.Audio.Media.IS_PENDING, 0)
+                    }
+                    resolver.update(audioUri, finishValues, null, null)
+                }
+
+                success = true
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            targetUri?.let { uri ->
+                try {
+                    context.contentResolver.delete(uri, null, null)
+                } catch (ignored: Exception) {}
+            }
+        } finally {
+            _downloadingProgress.update { it - track.id }
+        }
+
+        if (success) {
+            _downloadedTrackIds.update { it + track.id }
+            localMusicRepository.scanLocalMedia()
+        }
+
+        return@withContext success
+    }
+}

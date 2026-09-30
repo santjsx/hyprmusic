@@ -17,8 +17,19 @@ data class Track(
     val mimeType: String = "audio/mpeg",
     val isFavorite: Boolean = false,
     val playCount: Int = 0,
-    val dateAdded: Long = System.currentTimeMillis()
+    val dateAdded: Long = System.currentTimeMillis(),
+    val fileSize: Long = 0L
 ) {
+    val isCloudTrack: Boolean
+        get() = contentUri.startsWith("http://") || contentUri.startsWith("https://")
+
+    val formattedFileSize: String
+        get() {
+            if (fileSize <= 0) return ""
+            val mb = fileSize.toDouble() / (1024.0 * 1024.0)
+            return "%.1f MB".format(mb)
+        }
+
     val formattedDuration: String
         get() {
             val totalSeconds = durationMs / 1000
