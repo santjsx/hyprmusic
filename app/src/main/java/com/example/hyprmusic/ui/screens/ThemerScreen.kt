@@ -1,0 +1,366 @@
+package com.example.hyprmusic.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.hyprmusic.core.theming.HyprThemeConfig
+import com.example.hyprmusic.core.theming.ThemeManager
+import com.example.hyprmusic.core.theming.ThemePreset
+import com.example.hyprmusic.core.theming.hyprAnimatedGlow
+import com.example.hyprmusic.core.theming.hyprTile
+
+@Composable
+fun ThemerScreen(
+    theme: HyprThemeConfig,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = theme.windowGapsDp.dp),
+        verticalArrangement = Arrangement.spacedBy(theme.windowGapsDp.dp)
+    ) {
+        // Section: Live Interactive Ricing Preview Tile
+        item {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "LIVE RICE PREVIEW",
+                        color = theme.textSecondaryColor,
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "hyprland.conf",
+                        color = theme.accentColor,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .hyprTile(theme = theme, isActive = true)
+                        .hyprAnimatedGlow(theme = theme)
+                        .padding(16.dp)
+                ) {
+                    Column {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Active Window Tile",
+                                color = theme.textPrimaryColor,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(theme.surfaceVariantColor)
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = "GLOW_ENABLED",
+                                    color = theme.accentColor,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Gaps: ${theme.windowGapsDp}px • Radius: ${theme.borderRadiusDp}px • Border: ${theme.borderThicknessDp}px • Blur: ${theme.blurRadiusDp}px",
+                            color = theme.textSecondaryColor,
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+        }
+
+        // Section: Theme Presets Selector
+        item {
+            Column {
+                Text(
+                    text = "PALETTE PRESETS",
+                    color = theme.textSecondaryColor,
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)
+                )
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(ThemePreset.values()) { preset ->
+                        val isSelected = theme.preset == preset
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(10).dp))
+                                .background(if (isSelected) theme.accentColor.copy(alpha = 0.25f) else theme.surfaceColor)
+                                .clickable { ThemeManager.setPreset(preset) }
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = theme.accentColor,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                }
+                                Text(
+                                    text = preset.displayName,
+                                    color = if (isSelected) theme.accentColor else theme.textPrimaryColor,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Section: Sliders Configuration Tile
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .hyprTile(theme = theme)
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(
+                        text = "WINDOW GEOMETRY & COMPOSITOR",
+                        color = theme.textPrimaryColor,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+
+                    // Window Gaps
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Window Gaps",
+                                color = theme.textSecondaryColor,
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                text = "${theme.windowGapsDp} dp",
+                                color = theme.accentColor,
+                                fontSize = 13.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Slider(
+                            value = theme.windowGapsDp.toFloat(),
+                            onValueChange = { ThemeManager.updateGaps(it.toInt()) },
+                            valueRange = 0f..24f,
+                            steps = 24,
+                            colors = SliderDefaults.colors(
+                                thumbColor = theme.accentColor,
+                                activeTrackColor = theme.accentColor,
+                                inactiveTrackColor = theme.surfaceVariantColor
+                            )
+                        )
+                    }
+
+                    // Border Radius
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Squircle Border Radius",
+                                color = theme.textSecondaryColor,
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                text = "${theme.borderRadiusDp} dp",
+                                color = theme.accentColor,
+                                fontSize = 13.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Slider(
+                            value = theme.borderRadiusDp.toFloat(),
+                            onValueChange = { ThemeManager.updateRadius(it.toInt()) },
+                            valueRange = 0f..28f,
+                            steps = 28,
+                            colors = SliderDefaults.colors(
+                                thumbColor = theme.accentColor,
+                                activeTrackColor = theme.accentColor,
+                                inactiveTrackColor = theme.surfaceVariantColor
+                            )
+                        )
+                    }
+
+                    // Border Thickness
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Border Thickness",
+                                color = theme.textSecondaryColor,
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                text = "${theme.borderThicknessDp} dp",
+                                color = theme.accentColor,
+                                fontSize = 13.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Slider(
+                            value = theme.borderThicknessDp.toFloat(),
+                            onValueChange = { ThemeManager.updateBorderThickness(it.toInt()) },
+                            valueRange = 1f..6f,
+                            steps = 5,
+                            colors = SliderDefaults.colors(
+                                thumbColor = theme.accentColor,
+                                activeTrackColor = theme.accentColor,
+                                inactiveTrackColor = theme.surfaceVariantColor
+                            )
+                        )
+                    }
+
+                    // Blur Radius
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Frosted Glass Blur (Android 12+)",
+                                color = theme.textSecondaryColor,
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                text = "${theme.blurRadiusDp} dp",
+                                color = theme.accentColor,
+                                fontSize = 13.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Slider(
+                            value = theme.blurRadiusDp.toFloat(),
+                            onValueChange = { ThemeManager.updateBlur(it.toInt()) },
+                            valueRange = 0f..40f,
+                            steps = 40,
+                            colors = SliderDefaults.colors(
+                                thumbColor = theme.accentColor,
+                                activeTrackColor = theme.accentColor,
+                                inactiveTrackColor = theme.surfaceVariantColor
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        // Section: OLED & Reset Actions
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .hyprTile(theme = theme)
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "OLED Pure Black Mode",
+                            color = theme.textPrimaryColor,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Turns background #000000 to save battery",
+                            color = theme.textSecondaryColor,
+                            fontSize = 11.sp
+                        )
+                    }
+                    Switch(
+                        checked = theme.isOledMode,
+                        onCheckedChange = { ThemeManager.toggleOled(it) },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = theme.accentColor,
+                            checkedTrackColor = theme.accentColor.copy(alpha = 0.4f),
+                            uncheckedThumbColor = theme.textSecondaryColor,
+                            uncheckedTrackColor = theme.surfaceVariantColor
+                        )
+                    )
+                }
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(90.dp)) }
+    }
+}
