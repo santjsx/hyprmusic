@@ -13,8 +13,12 @@ data class ServerHealthInfo(
     val bot: String = "unknown",
     val index: String = "unknown",
     @SerialName("total_tracks") val totalTracks: Int = 0,
+    @SerialName("tracks") val tracks: Int = 0,
     @SerialName("memory_mb") val memoryMb: Double = 0.0
-)
+) {
+    val displayTracks: Int
+        get() = if (totalTracks > 0) totalTracks else tracks
+}
 
 @Serializable
 data class TelegramTrackDto(

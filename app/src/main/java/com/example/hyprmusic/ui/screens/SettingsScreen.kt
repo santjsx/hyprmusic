@@ -103,7 +103,15 @@ fun SettingsScreen(
     val serverHealth = telegramRepository?.serverHealth?.collectAsState()?.value
     val syncError = telegramRepository?.syncError?.collectAsState()?.value
 
-    var serverHostInput by remember(cloudSettings?.serverUrl) { mutableStateOf(cloudSettings?.serverUrl ?: "http://10.0.2.2:8080") }
+    var serverHostInput by remember(cloudSettings?.serverUrl) {
+        mutableStateOf(
+            if (cloudSettings?.serverUrl.isNullOrBlank() || cloudSettings?.serverUrl == "http://10.0.2.2:8080") {
+                "https://tpmc-music-cloud.onrender.com"
+            } else {
+                cloudSettings!!.serverUrl
+            }
+        )
+    }
     var userIdInput by remember(cloudSettings?.userId) { mutableStateOf(if ((cloudSettings?.userId ?: 0L) > 0L) cloudSettings!!.userId.toString() else "") }
     var apiKeyInput by remember(cloudSettings?.apiSecretKey) { mutableStateOf(cloudSettings?.apiSecretKey ?: "") }
     var testResultText by remember { mutableStateOf<String?>(null) }
@@ -616,7 +624,7 @@ fun SettingsScreen(
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = "Catalog: ${serverHealth.totalTracks} tracks • Server RAM: ${"%.1f".format(serverHealth.memoryMb)}MB",
+                                        text = "Catalog: ${serverHealth.displayTracks} tracks • Status: ${serverHealth.status}",
                                         color = theme.textSecondaryColor,
                                         fontSize = 10.5.sp,
                                         fontFamily = FontFamily.Monospace

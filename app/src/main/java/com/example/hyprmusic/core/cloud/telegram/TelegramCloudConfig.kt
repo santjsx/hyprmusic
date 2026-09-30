@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 data class TelegramCloudSettings(
-    val serverUrl: String = "http://10.0.2.2:8080",
+    val serverUrl: String = "https://tpmc-music-cloud.onrender.com",
     val userId: Long = 0L,
     val apiSecretKey: String = "",
     val autoSyncOnStartup: Boolean = true,
@@ -44,8 +44,14 @@ class TelegramCloudConfig private constructor(context: Context) {
     val settings: StateFlow<TelegramCloudSettings> = _settings.asStateFlow()
 
     private fun loadSettings(): TelegramCloudSettings {
+        val storedUrl = prefs.getString(KEY_SERVER_URL, null)
+        val serverUrl = if (storedUrl.isNullOrBlank() || storedUrl == "http://10.0.2.2:8080") {
+            "https://tpmc-music-cloud.onrender.com"
+        } else {
+            storedUrl
+        }
         return TelegramCloudSettings(
-            serverUrl = prefs.getString(KEY_SERVER_URL, "http://10.0.2.2:8080") ?: "http://10.0.2.2:8080",
+            serverUrl = serverUrl,
             userId = prefs.getLong(KEY_USER_ID, 0L),
             apiSecretKey = prefs.getString(KEY_API_SECRET_KEY, "") ?: "",
             autoSyncOnStartup = prefs.getBoolean(KEY_AUTO_SYNC, true),
