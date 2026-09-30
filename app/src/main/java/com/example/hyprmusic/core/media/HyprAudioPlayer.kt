@@ -21,6 +21,7 @@ import androidx.media3.exoplayer.audio.DefaultAudioTrackBufferSizeProvider
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.session.MediaSession
+import com.example.hyprmusic.core.data.PlaybackStatsRepository
 import com.example.hyprmusic.core.model.PlaybackState
 import com.example.hyprmusic.core.model.RepeatMode
 import com.example.hyprmusic.core.model.Track
@@ -35,15 +36,24 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-class HyprAudioPlayer(private val context: Context) {
+class HyprAudioPlayer private constructor(private val context: Context) {
 
     companion object {
-        var activeMediaSession: MediaSession? = null
+        @Volatile
+        private var instance: HyprAudioPlayer? = null
+
+        fun getInstance(context: Context): HyprAudioPlayer {
+            return instance ?: synchronized(this) {
+                instance ?: HyprAudioPlayer(context.applicationContext).also { instance = it }
+            }
+        }
     }
 
     private val applicationScope = CoroutineScope(Dispatchers.Main + Job())
     private var progressJob: Job? = null
     private var mediaSession: MediaSession? = null
+    private val playbackStatsRepo = PlaybackStatsRepository(context)
+    private var hasRecordedPlayForCurrent = false
 
     private val exoPlayer: ExoPlayer by lazy {
         val audioAttributes = AudioAttributes.Builder()
@@ -62,7 +72,9 @@ class HyprAudioPlayer(private val context: Context) {
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
-        // Native 16-bit PCM AudioSink with generous hardware buffers to prevent HAL stalls & I/O errors
+        val visualizerProcessor = HyprVisualizerProcessor()
+
+        // Native 16-bit PCM AudioSink with hardware buffers to prevent HAL stalls & I/O errors
         val renderersFactory = object : DefaultRenderersFactory(context) {
             override fun buildAudioSink(
                 context: Context,
@@ -71,6 +83,7 @@ class HyprAudioPlayer(private val context: Context) {
             ): AudioSink? {
                 return DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(false)
+                    .setAudioProcessors(arrayOf(visualizerProcessor))
                     .setAudioTrackBufferSizeProvider(
                         DefaultAudioTrackBufferSizeProvider.Builder()
                             .setMinPcmBufferDurationUs(500_000)
@@ -107,6 +120,8 @@ class HyprAudioPlayer(private val context: Context) {
     val audioSessionId: Int
         get() = exoPlayer.audioSessionId
 
+    fun getMediaSession(): MediaSession? = mediaSession
+
     init {
         try {
             val sessionActivityIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
@@ -124,7 +139,6 @@ class HyprAudioPlayer(private val context: Context) {
                     sessionActivityPendingIntent?.let { setSessionActivity(it) }
                 }
                 .build()
-            activeMediaSession = mediaSession
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -147,7 +161,21 @@ class HyprAudioPlayer(private val context: Context) {
         }
     }
 
+    private fun ensureServiceRunning() {
+        try {
+            val intent = Intent(context, HyprPlaybackService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     fun playTrack(track: Track, queue: List<Track> = listOf(track), autoPlay: Boolean = true) {
+        hasRecordedPlayForCurrent = false
         val index = queue.indexOfFirst { it.id == track.id }.let { if (it >= 0) it else 0 }
         _playbackState.update {
             it.copy(
@@ -180,6 +208,7 @@ class HyprAudioPlayer(private val context: Context) {
             exoPlayer.volume = HyprEqualizer.getHeadroomVolumeFactor()
             if (autoPlay) {
                 exoPlayer.play()
+                ensureServiceRunning()
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -206,6 +235,7 @@ class HyprAudioPlayer(private val context: Context) {
 
     fun resume() {
         exoPlayer.play()
+        ensureServiceRunning()
     }
 
     fun seekTo(positionMs: Long) {
@@ -213,6 +243,20 @@ class HyprAudioPlayer(private val context: Context) {
         val target = positionMs.coerceIn(0L, if (duration > 0) duration else Long.MAX_VALUE)
         exoPlayer.seekTo(target)
         _playbackState.update { it.copy(currentPositionMs = target) }
+    }
+
+    fun updateFavoriteStatus(trackId: String, isFav: Boolean) {
+        _playbackState.update { state ->
+            val updatedCurrent = if (state.currentTrack?.id == trackId) {
+                state.currentTrack.copy(isFavorite = isFav)
+            } else {
+                state.currentTrack
+            }
+            val updatedQueue = state.queue.map {
+                if (it.id == trackId) it.copy(isFavorite = isFav) else it
+            }
+            state.copy(currentTrack = updatedCurrent, queue = updatedQueue)
+        }
     }
 
     fun skipNext() {
@@ -225,8 +269,8 @@ class HyprAudioPlayer(private val context: Context) {
             (state.currentIndex + 1) % state.queue.size
         }
 
-        val nextTrack = state.queue.getOrNull(nextIndex) ?: return
-        playTrack(nextTrack, state.queue)
+        val nextTrack = state.queue[nextIndex]
+        playTrack(nextTrack, state.queue, autoPlay = true)
     }
 
     fun skipPrevious() {
@@ -234,19 +278,19 @@ class HyprAudioPlayer(private val context: Context) {
         if (state.queue.isEmpty()) return
 
         // If played more than 3 seconds, restart current track
-        if (state.currentPositionMs > 3000) {
+        if (state.currentPositionMs > 3000L) {
             seekTo(0)
             return
         }
 
-        val prevIndex = if (state.isShuffle) {
-            state.queue.indices.random()
+        val prevIndex = if (state.currentIndex - 1 < 0) {
+            state.queue.lastIndex
         } else {
-            if (state.currentIndex - 1 < 0) state.queue.size - 1 else state.currentIndex - 1
+            state.currentIndex - 1
         }
 
-        val prevTrack = state.queue.getOrNull(prevIndex) ?: return
-        playTrack(prevTrack, state.queue)
+        val prevTrack = state.queue[prevIndex]
+        playTrack(prevTrack, state.queue, autoPlay = true)
     }
 
     fun toggleShuffle() {
@@ -254,18 +298,16 @@ class HyprAudioPlayer(private val context: Context) {
     }
 
     fun toggleRepeat() {
-        _playbackState.update {
-            val nextMode = when (it.repeatMode) {
-                RepeatMode.OFF -> RepeatMode.ALL
-                RepeatMode.ALL -> RepeatMode.ONE
-                RepeatMode.ONE -> RepeatMode.OFF
-            }
-            it.copy(repeatMode = nextMode)
+        val nextMode = when (_playbackState.value.repeatMode) {
+            RepeatMode.OFF -> RepeatMode.ALL
+            RepeatMode.ALL -> RepeatMode.ONE
+            RepeatMode.ONE -> RepeatMode.OFF
         }
+        _playbackState.update { it.copy(repeatMode = nextMode) }
     }
 
     private fun startProgressTracker() {
-        progressJob?.cancel()
+        stopProgressTracker()
         progressJob = applicationScope.launch {
             while (isActive) {
                 if (exoPlayer.isPlaying) {
@@ -276,6 +318,15 @@ class HyprAudioPlayer(private val context: Context) {
                             currentPositionMs = currentPos,
                             durationMs = duration
                         )
+                    }
+
+                    // Record play count for Heavy Rotation if listened for >10 seconds
+                    if (currentPos >= 10_000L && !hasRecordedPlayForCurrent) {
+                        val current = _playbackState.value.currentTrack
+                        if (current != null) {
+                            playbackStatsRepo.recordPlay(current.id)
+                            hasRecordedPlayForCurrent = true
+                        }
                     }
                 }
                 delay(120L)
@@ -293,7 +344,6 @@ class HyprAudioPlayer(private val context: Context) {
         try {
             mediaSession?.release()
             mediaSession = null
-            activeMediaSession = null
         } catch (_: Exception) {}
         exoPlayer.release()
     }
@@ -321,6 +371,7 @@ class HyprAudioPlayer(private val context: Context) {
                 startProgressTracker()
             } else {
                 stopProgressTracker()
+                HyprVisualizerState.reset()
             }
         }
 
@@ -343,6 +394,12 @@ class HyprAudioPlayer(private val context: Context) {
         override fun onPlaybackStateChanged(playbackState: Int) {
             when (playbackState) {
                 Player.STATE_ENDED -> {
+                    val current = _playbackState.value.currentTrack
+                    if (current != null && !hasRecordedPlayForCurrent) {
+                        playbackStatsRepo.recordPlay(current.id)
+                        hasRecordedPlayForCurrent = true
+                    }
+
                     when (_playbackState.value.repeatMode) {
                         RepeatMode.ONE -> {
                             seekTo(0)

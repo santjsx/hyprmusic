@@ -1,7 +1,6 @@
 package com.example.hyprmusic
 
 import android.Manifest
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -14,14 +13,30 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -31,15 +46,25 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.hyprmusic.core.data.MusicRepository
 import com.example.hyprmusic.core.media.HyprAudioPlayer
 import com.example.hyprmusic.core.media.HyprEqualizer
 import com.example.hyprmusic.core.theming.HyprThemeProvider
 import com.example.hyprmusic.core.theming.ThemeManager
+import com.example.hyprmusic.core.theming.hyprBounceClick
+import com.example.hyprmusic.core.theming.hyprTile
 import com.example.hyprmusic.ui.components.EqualizerDialog
-import com.example.hyprmusic.ui.components.HyprTopBar
+import com.example.hyprmusic.ui.components.HyprBottomDock
+import com.example.hyprmusic.ui.components.HyprBottomSearchRunner
+import com.example.hyprmusic.ui.components.HyprWaybarHeader
 import com.example.hyprmusic.ui.components.HyprWorkspace
 import com.example.hyprmusic.ui.components.MiniPlayer
 import com.example.hyprmusic.ui.screens.HomeScreen
@@ -57,7 +82,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        audioPlayer = HyprAudioPlayer(applicationContext)
+        ThemeManager.init(applicationContext)
+        audioPlayer = HyprAudioPlayer.getInstance(applicationContext)
         musicRepository = MusicRepository(applicationContext)
 
         try {
@@ -83,7 +109,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        audioPlayer.release()
+        // Do not release audioPlayer here: allows audio to keep playing uninterrupted in background
     }
 }
 
@@ -102,6 +128,8 @@ fun HyprMusicApp(
     var currentWorkspace by remember { mutableStateOf(HyprWorkspace.HOME) }
     var isNowPlayingExpanded by remember { mutableStateOf(false) }
     var showEqualizerDialog by remember { mutableStateOf(false) }
+    var isSearchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
 
     // Permissions check
@@ -130,119 +158,264 @@ fun HyprMusicApp(
         musicRepository.scanLocalMedia()
     }
 
-    BackHandler(enabled = isNowPlayingExpanded) {
-        isNowPlayingExpanded = false
+    BackHandler(enabled = isNowPlayingExpanded || isSearchActive) {
+        if (isNowPlayingExpanded) {
+            isNowPlayingExpanded = false
+        } else if (isSearchActive) {
+            isSearchActive = false
+            searchQuery = ""
+        }
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .safeDrawingPadding()
+            .statusBarsPadding()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Hyprland Terminal Workspace Bar
-            HyprTopBar(
+            // Linux Waybar Top Status Header
+            HyprWaybarHeader(
                 theme = themeConfig,
-                currentWorkspace = if (isNowPlayingExpanded) HyprWorkspace.PLAYING else currentWorkspace,
-                onWorkspaceSelected = { ws ->
-                    if (ws == HyprWorkspace.PLAYING) {
-                        if (playbackState.currentTrack == null && tracks.isNotEmpty()) {
-                            audioPlayer.prepareTrack(tracks.first(), tracks)
-                        }
-                        isNowPlayingExpanded = true
-                    } else {
-                        isNowPlayingExpanded = false
-                        currentWorkspace = ws
-                    }
-                }
+                title = "~ / hypr / ${currentWorkspace.label}",
+                onOpenEqualizer = { showEqualizerDialog = true }
             )
 
-            // Dynamic Workspace Content
+            // Dynamic Workspace Content or Live Search Results
             Box(modifier = Modifier.weight(1f)) {
-                when (currentWorkspace) {
-                    HyprWorkspace.HOME -> {
-                        HomeScreen(
-                            theme = themeConfig,
-                            playbackState = playbackState,
-                            tracks = tracks,
-                            onTrackSelected = { track, queue ->
-                                audioPlayer.playTrack(track, queue)
-                            },
-                            onTogglePlayPause = { audioPlayer.togglePlayPause() },
-                            onRandomMix = {
-                                if (tracks.isNotEmpty()) {
-                                    val shuffled = tracks.shuffled()
-                                    audioPlayer.playTrack(shuffled.first(), shuffled)
+                if (isSearchActive && searchQuery.isNotBlank()) {
+                    val searchResults = remember(searchQuery, tracks) {
+                        musicRepository.search(searchQuery)
+                    }
+
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = themeConfig.windowGapsDp.dp),
+                        verticalArrangement = Arrangement.spacedBy(themeConfig.windowGapsDp.dp)
+                    ) {
+                        item {
+                            Text(
+                                text = "SEARCH RESULTS: ${searchResults.size} MATCHES",
+                                color = themeConfig.textSecondaryColor,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)
+                            )
+                        }
+
+                        items(
+                            items = searchResults,
+                            key = { "search_${it.id}" }
+                        ) { track ->
+                            val isPlaying = playbackState.currentTrack?.id == track.id && playbackState.isPlaying
+                            val isCurrent = playbackState.currentTrack?.id == track.id
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .hyprTile(theme = themeConfig, isActive = isCurrent)
+                                    .hyprBounceClick {
+                                        audioPlayer.playTrack(track, searchResults)
+                                    }
+                                    .padding(10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(46.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(themeConfig.surfaceVariantColor),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (track.albumArtUri != null) {
+                                            AsyncImage(
+                                                model = track.albumArtUri,
+                                                contentDescription = null,
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        } else {
+                                            Icon(
+                                                imageVector = Icons.Default.MusicNote,
+                                                contentDescription = null,
+                                                tint = themeConfig.accentColor,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = track.title,
+                                            color = if (isCurrent) themeConfig.accentColor else themeConfig.textPrimaryColor,
+                                            fontSize = 13.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "${track.artist} • ${track.album}",
+                                            color = themeConfig.textSecondaryColor,
+                                            fontSize = 11.5.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+
+                                    if (isPlaying) {
+                                        Icon(
+                                            imageVector = Icons.Default.GraphicEq,
+                                            contentDescription = null,
+                                            tint = themeConfig.accentColor,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
                             }
-                        )
-                    }
+                        }
 
-                    HyprWorkspace.LIBRARY -> {
-                        LibraryScreen(
-                            theme = themeConfig,
-                            playbackState = playbackState,
-                            tracks = tracks,
-                            albums = albums,
-                            artists = artists,
-                            isScanning = isScanning,
-                            onRescan = { coroutineScope.launch { musicRepository.scanLocalMedia() } },
-                            onTrackSelected = { track, queue ->
-                                audioPlayer.playTrack(track, queue)
-                            },
-                            onToggleFavorite = { musicRepository.toggleFavorite(it) }
-                        )
+                        item { Spacer(modifier = Modifier.height(80.dp)) }
                     }
+                } else {
+                    when (currentWorkspace) {
+                        HyprWorkspace.HOME -> {
+                            val heavyRotation = remember(tracks, musicRepository.playbackStatsRepository.playCountsChanged) {
+                                musicRepository.getHeavyRotationTracks(10)
+                            }
 
-                    HyprWorkspace.PLAYING -> {
-                        // Handled by fullscreen overlay or switch
-                        NowPlayingScreen(
-                            theme = themeConfig,
-                            playbackState = playbackState,
-                            onPlayPause = { audioPlayer.togglePlayPause() },
-                            onSkipNext = { audioPlayer.skipNext() },
-                            onSkipPrevious = { audioPlayer.skipPrevious() },
-                            onSeekTo = { audioPlayer.seekTo(it) },
-                            onToggleShuffle = { audioPlayer.toggleShuffle() },
-                            onToggleRepeat = { audioPlayer.toggleRepeat() },
-                            onToggleFavorite = { musicRepository.toggleFavorite(it) },
-                            onOpenEqualizer = { showEqualizerDialog = true },
-                            onBrowseLibrary = { currentWorkspace = HyprWorkspace.LIBRARY },
-                            onRandomMix = {
-                                if (tracks.isNotEmpty()) {
-                                    val shuffled = tracks.shuffled()
-                                    audioPlayer.playTrack(shuffled.first(), shuffled)
+                            HomeScreen(
+                                theme = themeConfig,
+                                playbackState = playbackState,
+                                tracks = tracks,
+                                heavyRotationTracks = heavyRotation,
+                                onTrackSelected = { track, queue ->
+                                    audioPlayer.playTrack(track, queue)
+                                },
+                                onTogglePlayPause = { audioPlayer.togglePlayPause() },
+                                onRandomMix = {
+                                    if (tracks.isNotEmpty()) {
+                                        val shuffled = tracks.shuffled()
+                                        audioPlayer.playTrack(shuffled.first(), shuffled)
+                                    }
+                                },
+                                onRescan = { coroutineScope.launch { musicRepository.scanLocalMedia() } }
+                            )
+                        }
+
+                        HyprWorkspace.LIBRARY -> {
+                            LibraryScreen(
+                                theme = themeConfig,
+                                playbackState = playbackState,
+                                tracks = tracks,
+                                albums = albums,
+                                artists = artists,
+                                isScanning = isScanning,
+                                onRescan = { coroutineScope.launch { musicRepository.scanLocalMedia() } },
+                                onTrackSelected = { track, queue ->
+                                    audioPlayer.playTrack(track, queue)
+                                },
+                                onToggleFavorite = { trackId ->
+                                    val isFav = musicRepository.toggleFavorite(trackId)
+                                    audioPlayer.updateFavoriteStatus(trackId, isFav)
                                 }
-                            },
-                            onDismiss = { currentWorkspace = HyprWorkspace.HOME }
-                        )
-                    }
+                            )
+                        }
 
-                    HyprWorkspace.SETTINGS -> {
-                        SettingsScreen(
-                            theme = themeConfig,
-                            isScanning = isScanning,
-                            onRescanMedia = { coroutineScope.launch { musicRepository.scanLocalMedia() } },
-                            onOpenEqualizer = { showEqualizerDialog = true }
-                        )
+                        HyprWorkspace.PLAYING -> {
+                            NowPlayingScreen(
+                                theme = themeConfig,
+                                playbackState = playbackState,
+                                onPlayPause = { audioPlayer.togglePlayPause() },
+                                onSkipNext = { audioPlayer.skipNext() },
+                                onSkipPrevious = { audioPlayer.skipPrevious() },
+                                onSeekTo = { audioPlayer.seekTo(it) },
+                                onToggleShuffle = { audioPlayer.toggleShuffle() },
+                                onToggleRepeat = { audioPlayer.toggleRepeat() },
+                                onToggleFavorite = { trackId ->
+                                    val isFav = musicRepository.toggleFavorite(trackId)
+                                    audioPlayer.updateFavoriteStatus(trackId, isFav)
+                                },
+                                onOpenEqualizer = { showEqualizerDialog = true },
+                                onBrowseLibrary = { currentWorkspace = HyprWorkspace.LIBRARY },
+                                onRandomMix = {
+                                    if (tracks.isNotEmpty()) {
+                                        val shuffled = tracks.shuffled()
+                                        audioPlayer.playTrack(shuffled.first(), shuffled)
+                                    }
+                                },
+                                onDismiss = { currentWorkspace = HyprWorkspace.HOME }
+                            )
+                        }
+
+                        HyprWorkspace.SETTINGS -> {
+                            SettingsScreen(
+                                theme = themeConfig,
+                                isScanning = isScanning,
+                                onRescanMedia = { coroutineScope.launch { musicRepository.scanLocalMedia() } },
+                                onOpenEqualizer = { showEqualizerDialog = true }
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        // Persistent Floating Mini-Player Dock
-        if (playbackState.currentTrack != null && !isNowPlayingExpanded && currentWorkspace != HyprWorkspace.PLAYING) {
-            Box(
+            // Bottom Section: Search Runner, MiniPlayer & Waybar Bottom Dock
+            Column(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 6.dp)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
             ) {
-                MiniPlayer(
+                // Bottom Quick Search Runner
+                if (isSearchActive) {
+                    HyprBottomSearchRunner(
+                        theme = themeConfig,
+                        query = searchQuery,
+                        onQueryChange = { searchQuery = it },
+                        onClose = {
+                            isSearchActive = false
+                            searchQuery = ""
+                        }
+                    )
+                }
+
+                // Persistent Floating Mini-Player Dock
+                if (playbackState.currentTrack != null && !isNowPlayingExpanded && currentWorkspace != HyprWorkspace.PLAYING) {
+                    MiniPlayer(
+                        theme = themeConfig,
+                        playbackState = playbackState,
+                        onPlayPause = { audioPlayer.togglePlayPause() },
+                        onSkipNext = { audioPlayer.skipNext() },
+                        onSkipPrevious = { audioPlayer.skipPrevious() },
+                        onClick = { isNowPlayingExpanded = true },
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+                }
+
+                // Bottom Hyprland Workspace Dock
+                HyprBottomDock(
                     theme = themeConfig,
-                    playbackState = playbackState,
-                    onPlayPause = { audioPlayer.togglePlayPause() },
-                    onSkipNext = { audioPlayer.skipNext() },
-                    onClick = { isNowPlayingExpanded = true }
+                    currentWorkspace = if (isNowPlayingExpanded) HyprWorkspace.PLAYING else currentWorkspace,
+                    onWorkspaceSelected = { ws ->
+                        if (ws == HyprWorkspace.PLAYING) {
+                            if (playbackState.currentTrack == null && tracks.isNotEmpty()) {
+                                audioPlayer.prepareTrack(tracks.first(), tracks)
+                            }
+                            isNowPlayingExpanded = true
+                        } else {
+                            isNowPlayingExpanded = false
+                            currentWorkspace = ws
+                        }
+                    },
+                    onToggleSearch = { isSearchActive = !isSearchActive },
+                    isSearchActive = isSearchActive
                 )
             }
         }
@@ -262,7 +435,10 @@ fun HyprMusicApp(
                 onSeekTo = { audioPlayer.seekTo(it) },
                 onToggleShuffle = { audioPlayer.toggleShuffle() },
                 onToggleRepeat = { audioPlayer.toggleRepeat() },
-                onToggleFavorite = { musicRepository.toggleFavorite(it) },
+                onToggleFavorite = { trackId ->
+                    val isFav = musicRepository.toggleFavorite(trackId)
+                    audioPlayer.updateFavoriteStatus(trackId, isFav)
+                },
                 onOpenEqualizer = { showEqualizerDialog = true },
                 onBrowseLibrary = {
                     isNowPlayingExpanded = false
@@ -288,4 +464,3 @@ fun HyprMusicApp(
         }
     }
 }
-

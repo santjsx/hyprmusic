@@ -1,11 +1,22 @@
 package com.example.hyprmusic.ui.components
 
+import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,145 +34,339 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.hyprmusic.core.media.HyprVisualizerState
 import com.example.hyprmusic.core.model.LyricLine
 import com.example.hyprmusic.core.model.PlaybackState
 import com.example.hyprmusic.core.theming.HyprThemeConfig
 import com.example.hyprmusic.core.theming.hyprAnimatedGlow
+import com.example.hyprmusic.core.theming.hyprBounceClick
 import com.example.hyprmusic.core.theming.hyprTile
 
 enum class HyprWorkspace(val index: Int, val label: String) {
     HOME(1, "home"),
     LIBRARY(2, "lib"),
     PLAYING(3, "player"),
-    SETTINGS(4, "config")
+    SETTINGS(4, "rice")
 }
 
+/**
+ * Top Waybar telemetry header: Displays terminal path, live bit-perfect audio spec, and EQ quick toggle.
+ */
 @Composable
-fun HyprTopBar(
+fun HyprWaybarHeader(
     theme: HyprThemeConfig,
-    currentWorkspace: HyprWorkspace,
-    onWorkspaceSelected: (HyprWorkspace) -> Unit,
+    title: String = "~ / hypr / audio",
+    onOpenEqualizer: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = theme.windowGapsDp.dp, vertical = 5.dp),
+            .padding(horizontal = (theme.windowGapsDp + 4).dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Workspace Indicator Tiles
+        // Linux terminal path identifier
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(theme.accentColor)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = title,
+                color = theme.textPrimaryColor,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        // Bit-perfect Audio & Equalizer Telemetry Pill
         Row(
-            modifier = Modifier.weight(1f, fill = false),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(8).dp))
+                    .background(theme.surfaceVariantColor)
+                    .padding(horizontal = 7.dp, vertical = 4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.GraphicEq,
+                    contentDescription = null,
+                    tint = theme.accentColor,
+                    modifier = Modifier.size(12.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "16-BIT/44.1k",
+                    color = theme.textSecondaryColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(8).dp))
+                    .background(theme.accentColor.copy(alpha = 0.15f))
+                    .border(1.dp, theme.accentColor.copy(alpha = 0.4f), RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(8).dp))
+                    .clickable { onOpenEqualizer() }
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "[EQ]",
+                    color = theme.accentColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Ergonomic Bottom Waybar Dock: Houses thumb-friendly workspace navigation & quick-search launcher.
+ */
+@Composable
+fun HyprBottomDock(
+    theme: HyprThemeConfig,
+    currentWorkspace: HyprWorkspace,
+    onWorkspaceSelected: (HyprWorkspace) -> Unit,
+    onToggleSearch: () -> Unit = {},
+    isSearchActive: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = theme.windowGapsDp.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(theme.borderRadiusDp.dp))
+            .background(theme.surfaceColor.copy(alpha = 0.95f))
+            .border(theme.borderThicknessDp.dp, theme.inactiveBorderColor, RoundedCornerShape(theme.borderRadiusDp.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Workspaces [1:home] [2:lib] [3:player] [4:rice]
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
             HyprWorkspace.values().forEach { ws ->
                 val isActive = ws == currentWorkspace
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(8).dp))
+                        .clip(RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(10)).dp))
                         .background(
-                            if (isActive) theme.accentColor.copy(alpha = 0.25f)
-                            else theme.surfaceVariantColor
+                            if (isActive) theme.accentColor.copy(alpha = 0.22f)
+                            else Color.Transparent
                         )
-                        .clickable { onWorkspaceSelected(ws) }
-                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                        .border(
+                            width = if (isActive) 1.dp else 0.dp,
+                            color = if (isActive) theme.accentColor else Color.Transparent,
+                            shape = RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(10)).dp)
+                        )
+                        .hyprBounceClick { onWorkspaceSelected(ws) }
+                        .padding(horizontal = 10.dp, vertical = 7.dp)
                 ) {
                     Text(
                         text = "[${ws.index}:${ws.label}]",
                         color = if (isActive) theme.accentColor else theme.textSecondaryColor,
                         fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp,
-                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                        maxLines = 1,
-                        softWrap = false
+                        fontSize = 11.sp,
+                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.width(6.dp))
-
-        // System telemetry badge (Bit-perfect Wayland Audio)
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        // Quick Search runner trigger button
+        Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(8).dp))
-                .background(theme.surfaceVariantColor)
-                .padding(horizontal = 7.dp, vertical = 4.dp)
+                .clip(RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(10)).dp))
+                .background(
+                    if (isSearchActive) theme.accentColor
+                    else theme.surfaceVariantColor
+                )
+                .border(
+                    width = 1.dp,
+                    color = if (isSearchActive) theme.accentColor else theme.inactiveBorderColor,
+                    shape = RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(10)).dp)
+                )
+                .hyprBounceClick { onToggleSearch() }
+                .padding(horizontal = 8.dp, vertical = 7.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.GraphicEq,
-                contentDescription = null,
-                tint = theme.accentColor,
-                modifier = Modifier.size(12.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = "WAYLAND.FLAC",
-                color = theme.textSecondaryColor,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                softWrap = false
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "Search",
+                    tint = if (isSearchActive) theme.backgroundColor else theme.accentColor,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
         }
     }
 }
 
+/**
+ * Animated frequency visualizer bars for MiniPlayer & NowPlaying.
+ */
+@Composable
+fun MiniEqualizerBars(
+    theme: HyprThemeConfig,
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val amplitudes by HyprVisualizerState.amplitudes.collectAsState()
+
+    val raw1 = if (isPlaying) amplitudes.getOrElse(1) { 0.2f } else 0.15f
+    val raw2 = if (isPlaying) amplitudes.getOrElse(5) { 0.4f } else 0.15f
+    val raw3 = if (isPlaying) amplitudes.getOrElse(9) { 0.25f } else 0.15f
+
+    val h1 by animateFloatAsState(targetValue = (0.2f + raw1 * 0.8f).coerceIn(0.2f, 1f), label = "m_eq1")
+    val h2 by animateFloatAsState(targetValue = (0.2f + raw2 * 0.8f).coerceIn(0.2f, 1f), label = "m_eq2")
+    val h3 by animateFloatAsState(targetValue = (0.2f + raw3 * 0.8f).coerceIn(0.2f, 1f), label = "m_eq3")
+
+    Row(
+        modifier = modifier.height(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.5.dp),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        val bar1 = if (isPlaying) h1 else 0.2f
+        val bar2 = if (isPlaying) h2 else 0.2f
+        val bar3 = if (isPlaying) h3 else 0.2f
+
+        Box(
+            modifier = Modifier
+                .width(2.5.dp)
+                .height((14 * bar1).dp.coerceAtLeast(2.5.dp))
+                .clip(RoundedCornerShape(1.dp))
+                .background(theme.accentColor)
+        )
+        Box(
+            modifier = Modifier
+                .width(2.5.dp)
+                .height((14 * bar2).dp.coerceAtLeast(2.5.dp))
+                .clip(RoundedCornerShape(1.dp))
+                .background(theme.accentColor)
+        )
+        Box(
+            modifier = Modifier
+                .width(2.5.dp)
+                .height((14 * bar3).dp.coerceAtLeast(2.5.dp))
+                .clip(RoundedCornerShape(1.dp))
+                .background(theme.accentColor)
+        )
+    }
+}
+
+/**
+ * Gesture-enabled, riced MiniPlayer sitting right above the bottom dock.
+ * Supports:
+ * - Tap or swipe up to expand to fullscreen player
+ * - Swipe left: skip next track
+ * - Swipe right: skip previous track
+ * - Rotating mini vinyl disc & live equalizer bars
+ */
 @Composable
 fun MiniPlayer(
     theme: HyprThemeConfig,
     playbackState: PlaybackState,
     onPlayPause: () -> Unit,
     onSkipNext: () -> Unit,
+    onSkipPrevious: () -> Unit = {},
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val track = playbackState.currentTrack ?: return
+    val view = LocalView.current
+
+    var totalDragX by remember { mutableFloatStateOf(0f) }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
+            .padding(horizontal = theme.windowGapsDp.dp)
             .hyprTile(theme = theme, isActive = playbackState.isPlaying)
+            .pointerInput(track.id) {
+                detectHorizontalDragGestures(
+                    onDragStart = { totalDragX = 0f },
+                    onDragEnd = {
+                        if (totalDragX < -60f) {
+                            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                            onSkipNext()
+                        } else if (totalDragX > 60f) {
+                            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                            onSkipPrevious()
+                        }
+                    },
+                    onHorizontalDrag = { _, dragAmount ->
+                        totalDragX += dragAmount
+                    }
+                )
+            }
             .clickable { onClick() }
     ) {
         Column {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Cover Art / Thumbnail
+                // Album Cover Art (Clean, Upright)
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(46.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(theme.surfaceVariantColor),
                     contentAlignment = Alignment.Center
@@ -183,22 +388,31 @@ fun MiniPlayer(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
-                // Title and Artist
+                // Title and Artist with live mini equalizer
                 Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = track.title,
+                            color = theme.textPrimaryColor,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        MiniEqualizerBars(
+                            theme = theme,
+                            isPlaying = playbackState.isPlaying
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = track.title,
-                        color = theme.textPrimaryColor,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "${track.artist} • ${track.album}",
+                        text = "${track.artist} • ${track.bitrate}kbps",
                         color = theme.textSecondaryColor,
-                        fontSize = 12.sp,
+                        fontSize = 11.5.sp,
                         fontFamily = FontFamily.Monospace,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -206,21 +420,31 @@ fun MiniPlayer(
                 }
 
                 // Controls
-                IconButton(onClick = onPlayPause) {
+                IconButton(
+                    onClick = {
+                        view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                        onPlayPause()
+                    }
+                ) {
                     Icon(
                         imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = "Play/Pause",
                         tint = theme.accentColor,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(26.dp)
                     )
                 }
 
-                IconButton(onClick = onSkipNext) {
+                IconButton(
+                    onClick = {
+                        view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                        onSkipNext()
+                    }
+                ) {
                     Icon(
                         imageVector = Icons.Default.SkipNext,
                         contentDescription = "Next Track",
                         tint = theme.textPrimaryColor,
-                        modifier = Modifier.size(26.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
@@ -234,6 +458,72 @@ fun MiniPlayer(
                 color = theme.accentColor,
                 trackColor = theme.surfaceVariantColor
             )
+        }
+    }
+}
+
+/**
+ * Bottom Quick-Search Runner Bar (Hypr-Run / Wofi inspired)
+ */
+@Composable
+fun HyprBottomSearchRunner(
+    theme: HyprThemeConfig,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = theme.windowGapsDp.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(theme.borderRadiusDp.dp))
+            .background(theme.surfaceColor)
+            .border(theme.borderThicknessDp.dp, theme.accentColor, RoundedCornerShape(theme.borderRadiusDp.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "find >",
+                color = theme.accentColor,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                placeholder = {
+                    Text(
+                        text = "filter tracks, artists, albums...",
+                        color = theme.textSecondaryColor.copy(alpha = 0.6f),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp
+                    )
+                },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = theme.textPrimaryColor,
+                    unfocusedTextColor = theme.textPrimaryColor,
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent
+                )
+            )
+
+            IconButton(onClick = onClose) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close Search",
+                    tint = theme.textSecondaryColor,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
     }
 }
@@ -262,7 +552,7 @@ fun SyncedLyricsView(
                 )
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
-                    text = "grep -i lyrics in lrclib...",
+                    text = "grep -i lyrics in local storage...",
                     color = theme.textSecondaryColor,
                     fontFamily = FontFamily.Monospace,
                     fontSize = 12.sp
@@ -306,7 +596,7 @@ fun SyncedLyricsView(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "Instrumental track or unindexed in database",
+                    text = "Instrumental track or unindexed .lrc file",
                     color = theme.textSecondaryColor,
                     fontFamily = FontFamily.Monospace,
                     fontSize = 11.sp,

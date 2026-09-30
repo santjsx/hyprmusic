@@ -10,20 +10,28 @@ import com.example.hyprmusic.core.model.Artist
 import com.example.hyprmusic.core.model.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 
 class MusicRepository(private val context: Context) {
 
-    private val _tracks = MutableStateFlow<List<Track>>(DemoTracks.sampleTracks)
+    val favoritesRepository = FavoritesRepository(context)
+    val playbackStatsRepository = PlaybackStatsRepository(context)
+
+    // Initial state is strictly empty - no fake mock tracks!
+    private val _tracks = MutableStateFlow<List<Track>>(emptyList())
     val tracks: StateFlow<List<Track>> = _tracks.asStateFlow()
 
-    private val _albums = MutableStateFlow<List<Album>>(DemoTracks.sampleAlbums)
+    private val _albums = MutableStateFlow<List<Album>>(emptyList())
     val albums: StateFlow<List<Album>> = _albums.asStateFlow()
 
-    private val _artists = MutableStateFlow<List<Artist>>(DemoTracks.sampleArtists)
+    private val _artists = MutableStateFlow<List<Artist>>(emptyList())
     val artists: StateFlow<List<Artist>> = _artists.asStateFlow()
 
     private val _isScanning = MutableStateFlow(false)
@@ -132,9 +140,12 @@ class MusicRepository(private val context: Context) {
                         albumId
                     ).toString()
 
+                    val trackIdStr = id.toString()
+                    val isFav = favoritesRepository.isFavorite(trackIdStr)
+
                     localTracks.add(
                         Track(
-                            id = id.toString(),
+                            id = trackIdStr,
                             title = title,
                             artist = artist,
                             album = album,
@@ -145,7 +156,8 @@ class MusicRepository(private val context: Context) {
                             bitrate = calculatedBitrate,
                             sampleRate = resolvedSampleRate,
                             mimeType = resolvedMimeType,
-                            dateAdded = dateAdded * 1000L
+                            dateAdded = dateAdded * 1000L,
+                            isFavorite = isFav
                         )
                     )
                 }
@@ -154,17 +166,11 @@ class MusicRepository(private val context: Context) {
             e.printStackTrace()
         }
 
-        // Prioritize local tracks if available; only fall back to demo tracks if device has none
-        val finalTracks = if (localTracks.isNotEmpty()) {
-            localTracks
-        } else {
-            DemoTracks.sampleTracks
-        }
-
-        _tracks.value = finalTracks
+        // Real tracks only: no mock data fallback!
+        _tracks.value = localTracks
 
         // Aggregate Albums
-        val aggregatedAlbums = finalTracks
+        val aggregatedAlbums = localTracks
             .groupBy { it.album }
             .map { (albumTitle, tracks) ->
                 Album(
@@ -178,7 +184,7 @@ class MusicRepository(private val context: Context) {
         _albums.value = aggregatedAlbums
 
         // Aggregate Artists
-        val aggregatedArtists = finalTracks
+        val aggregatedArtists = localTracks
             .groupBy { it.artist }
             .map { (artistName, tracks) ->
                 Artist(
@@ -193,9 +199,31 @@ class MusicRepository(private val context: Context) {
         _isScanning.value = false
     }
 
-    fun toggleFavorite(trackId: String) {
+    fun toggleFavorite(trackId: String): Boolean {
+        val isNowFav = favoritesRepository.toggleFavorite(trackId)
         _tracks.update { list ->
-            list.map { if (it.id == trackId) it.copy(isFavorite = !it.isFavorite) else it }
+            list.map { if (it.id == trackId) it.copy(isFavorite = isNowFav) else it }
+        }
+        return isNowFav
+    }
+
+    fun getHeavyRotationTracks(limit: Int = 10): List<Track> {
+        val all = _tracks.value
+        if (all.isEmpty()) return emptyList()
+
+        // Check if there are played tracks
+        val withPlays = all.map { track ->
+            Pair(track, playbackStatsRepository.getPlayCount(track.id))
+        }
+
+        val hasAnyPlays = withPlays.any { it.second > 0 }
+        return if (hasAnyPlays) {
+            withPlays.sortedByDescending { it.second }
+                .take(limit)
+                .map { it.first }
+        } else {
+            // Graceful fallback to recently added or high-bitrate tracks
+            all.take(limit)
         }
     }
 
