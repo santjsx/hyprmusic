@@ -2,6 +2,7 @@ package com.example.hyprmusic.ui.components
 
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode as AnimRepeatMode
@@ -117,6 +118,7 @@ import com.example.hyprmusic.core.theming.HyprThemeConfig
 import com.example.hyprmusic.core.theming.hyprAnimatedGlow
 import com.example.hyprmusic.core.theming.hyprBounceClick
 import com.example.hyprmusic.core.theming.hyprTile
+import kotlinx.coroutines.isActive
 
 enum class HyprWorkspace(val index: Int, val label: String) {
     HOME(1, "home"),
@@ -462,18 +464,18 @@ fun MiniVinylRecord(
     isPlaying: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "mini_vinyl_spin")
-    val rotationAngle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3200, easing = LinearEasing),
-            repeatMode = AnimRepeatMode.Restart
-        ),
-        label = "mini_vinyl_angle"
-    )
-
-    val currentRotation = if (isPlaying) rotationAngle else 0f
+    val rotationAnimatable = remember { Animatable(0f) }
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            while (isActive) {
+                rotationAnimatable.animateTo(
+                    targetValue = rotationAnimatable.value + 360f,
+                    animationSpec = tween(durationMillis = 3200, easing = LinearEasing)
+                )
+            }
+        }
+    }
+    val currentRotation = rotationAnimatable.value % 360f
     val context = LocalContext.current
 
     Box(

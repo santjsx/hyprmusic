@@ -251,7 +251,7 @@ object LyricsRepository {
             connectTimeout = 4000
             readTimeout = 4000
             requestMethod = "GET"
-            setRequestProperty("User-Agent", "HyprMusic/1.8.0 (contact@hyprmusic.dev)")
+            setRequestProperty("User-Agent", "HyprMusic/1.9.0 (contact@hyprmusic.dev)")
         }
         return try {
             if (conn.responseCode == 200) {
@@ -270,7 +270,7 @@ object LyricsRepository {
             connectTimeout = 4000
             readTimeout = 4000
             requestMethod = "GET"
-            setRequestProperty("User-Agent", "HyprMusic/1.8.0 (contact@hyprmusic.dev)")
+            setRequestProperty("User-Agent", "HyprMusic/1.9.0 (contact@hyprmusic.dev)")
         }
         return try {
             if (conn.responseCode == 200) {

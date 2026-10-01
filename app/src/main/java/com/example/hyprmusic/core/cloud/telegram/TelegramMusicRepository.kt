@@ -242,7 +242,7 @@ class TelegramMusicRepository(
             val request = Request.Builder()
                 .url(downloadUrl)
                 .get()
-                .header("User-Agent", "HyprMusic/1.8.0 (Android)")
+                .header("User-Agent", "HyprMusic/1.9.0 (Android)")
                 .build()
 
             downloadClient.newCall(request).execute().use { response ->

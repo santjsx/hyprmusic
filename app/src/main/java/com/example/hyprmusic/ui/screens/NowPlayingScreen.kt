@@ -5,6 +5,7 @@ import android.graphics.Shader
 import android.os.Build
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode as AnimRepeatMode
 import androidx.compose.animation.core.Spring
@@ -124,6 +125,7 @@ import com.example.hyprmusic.ui.components.SleepTimerDialog
 import com.example.hyprmusic.ui.components.SyncedLyricsView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -517,15 +519,18 @@ fun NowPlayingScreen(
                     .padding(horizontal = 10.dp, vertical = 8.dp)
             ) {
                 Column {
-                    // Status Telemetry LED bar
+                    // Status Telemetry LED bar - 3-column layout mathematically pinned to eliminate layout shifts
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 8.dp, vertical = 2.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Start
+                        ) {
                             Box(
                                 modifier = Modifier
                                     .size(6.dp)
@@ -542,20 +547,32 @@ fun NowPlayingScreen(
                             )
                         }
 
-                        Text(
-                            text = "BIT-PERFECT DIRECT",
-                            color = theme.textSecondaryColor,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 8.5.sp
-                        )
+                        Box(
+                            modifier = Modifier.weight(1.4f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "BIT-PERFECT DIRECT",
+                                color = theme.textSecondaryColor,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.5.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
 
-                        Text(
-                            text = "${track.audioFormat} ${track.bitrate}k",
-                            color = theme.accentColor,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Box(
+                            modifier = Modifier.weight(1f),
+                            contentAlignment = Alignment.CenterEnd
+                        ) {
+                            Text(
+                                text = "${track.audioFormat} ${track.bitrate}k",
+                                color = theme.accentColor,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.End
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -1181,18 +1198,18 @@ fun MasterVinylTurntable(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val infiniteTransition = rememberInfiniteTransition(label = "vinyl_turntable_spin")
-    val rotationAngle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3600, easing = LinearEasing),
-            repeatMode = AnimRepeatMode.Restart
-        ),
-        label = "vinyl_turntable_angle"
-    )
-
-    val currentRotation = if (isPlaying) rotationAngle else 0f
+    val rotationAnimatable = remember { Animatable(0f) }
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            while (isActive) {
+                rotationAnimatable.animateTo(
+                    targetValue = rotationAnimatable.value + 360f,
+                    animationSpec = tween(durationMillis = 3600, easing = LinearEasing)
+                )
+            }
+        }
+    }
+    val currentRotation = rotationAnimatable.value % 360f
 
     // Dynamic Tonearm Angle:
     // Parked (Paused): -12 degrees resting on outer arm-rest clip
@@ -1607,17 +1624,19 @@ fun DigipakSleeve(
     val context = LocalContext.current
     val rms = if (isPlaying) HyprVisualizerState.rmsEnergy.value else 0f
 
-    // Rotation for peeking vinyl disc
-    val infiniteTransition = rememberInfiniteTransition(label = "sleeve_vinyl_spin")
-    val rotationAngle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3600, easing = LinearEasing),
-            repeatMode = AnimRepeatMode.Restart
-        ),
-        label = "sleeve_vinyl_angle"
-    )
+    // Rotation for peeking vinyl disc: freezes at exact angle on pause, resumes smoothly
+    val rotationAnimatable = remember { Animatable(0f) }
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            while (isActive) {
+                rotationAnimatable.animateTo(
+                    targetValue = rotationAnimatable.value + 360f,
+                    animationSpec = tween(durationMillis = 3600, easing = LinearEasing)
+                )
+            }
+        }
+    }
+    val currentRotation = rotationAnimatable.value % 360f
 
     // Dynamic slide-out distance: 58dp when playing, 36dp when paused
     val slideTarget = if (isPlaying) (58f + rms * 6f) else 36f
@@ -1659,7 +1678,7 @@ fun DigipakSleeve(
             modifier = Modifier
                 .fillMaxSize(0.86f)
                 .graphicsLayer { translationX = slideOffset.toPx() }
-                .rotate(if (isPlaying) rotationAngle else 0f)
+                .rotate(currentRotation)
                 .clip(CircleShape)
                 .background(Color(0xFF0C0C0F))
                 .border(0.8.dp, Color(0xFF222228), CircleShape),

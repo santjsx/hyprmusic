@@ -160,6 +160,11 @@ class HyprAudioPlayer private constructor(private val context: Context) {
                 exoPlayer.volume = HyprEqualizer.getHeadroomVolumeFactor()
             }
         }
+        applicationScope.launch {
+            HyprEqualizer.isDolbyEnabled.collect {
+                exoPlayer.volume = HyprEqualizer.getHeadroomVolumeFactor()
+            }
+        }
     }
 
     private fun ensureServiceRunning() {
