@@ -60,7 +60,7 @@ sealed interface UpdateDownloadState {
 
 object HyprUpdateManager {
 
-    const val CURRENT_VERSION = "v1.6.1"
+    const val CURRENT_VERSION = "v1.7.0"
     const val DEVELOPER_NAME = "Santhosh Reddy"
     const val GITHUB_REPO_URL = "https://github.com/santjsx/hyprmusic"
     private const val GITHUB_API_URL = "https://api.github.com/repos/santjsx/hyprmusic/releases/latest"

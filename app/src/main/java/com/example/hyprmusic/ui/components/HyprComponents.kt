@@ -77,6 +77,9 @@ import com.example.hyprmusic.core.theming.HyprTheme
 import com.example.hyprmusic.core.theming.IconPackType
 import com.example.hyprmusic.core.theming.PlayControlStyle
 import com.example.hyprmusic.core.theming.ProgressBarStyle
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -206,7 +209,8 @@ fun HyprWaybarHeader(
 }
 
 /**
- * Ergonomic Bottom Waybar Dock: Houses thumb-friendly workspace navigation & quick-search launcher.
+ * Ergonomic Bottom Waybar Dock: Detached floating glass capsule with kinetic active pill indicator,
+ * tactile icon morphs, and dancing mini-equalizer bars on active tabs.
  */
 @Composable
 fun HyprBottomDock(
@@ -220,89 +224,109 @@ fun HyprBottomDock(
 ) {
     val haptic = LocalHapticFeedback.current
 
-    Row(
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = theme.windowGapsDp.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(theme.borderRadiusDp.dp))
-            .background(theme.surfaceColor.copy(alpha = 0.96f))
-            .border(theme.borderThicknessDp.dp, theme.inactiveBorderColor, RoundedCornerShape(theme.borderRadiusDp.dp))
-            .padding(horizontal = 6.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtLeast(16).dp))
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        theme.surfaceColor.copy(alpha = 0.94f),
+                        theme.surfaceColor.copy(alpha = 0.98f)
+                    )
+                )
+            )
+            .border(
+                width = theme.borderThicknessDp.dp,
+                color = theme.inactiveBorderColor.copy(alpha = 0.6f),
+                shape = RoundedCornerShape(theme.borderRadiusDp.coerceAtLeast(16).dp)
+            )
+            .padding(horizontal = 6.dp, vertical = 5.dp)
     ) {
-        // Workspaces [1:home] [2:lib] [3:player] [4:rice] with 48dp+ ergonomic touch targets
         Row(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            HyprWorkspace.entries.forEach { ws ->
-                val isActive = ws == currentWorkspace
-                val icon = when (ws) {
-                    HyprWorkspace.HOME -> Icons.Default.Home
-                    HyprWorkspace.LIBRARY -> Icons.Default.LibraryMusic
-                    HyprWorkspace.PLAYING -> Icons.Default.GraphicEq
-                    HyprWorkspace.SETTINGS -> Icons.Default.Tune
-                }
+            // Workspaces [1:home] [2:lib] [3:player] [4:rice] with ergonomic touch targets
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                HyprWorkspace.entries.forEach { ws ->
+                    val isActive = ws == currentWorkspace
+                    val icon = when (ws) {
+                        HyprWorkspace.HOME -> Icons.Default.Home
+                        HyprWorkspace.LIBRARY -> Icons.Default.LibraryMusic
+                        HyprWorkspace.PLAYING -> Icons.Default.GraphicEq
+                        HyprWorkspace.SETTINGS -> Icons.Default.Tune
+                    }
 
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 50.dp)
-                        .clip(RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(10)).dp))
-                        .background(
-                            if (isActive) theme.accentColor.copy(alpha = 0.22f)
-                            else Color.Transparent
-                        )
-                        .border(
-                            width = if (isActive) 1.dp else 0.dp,
-                            color = if (isActive) theme.accentColor else Color.Transparent,
-                            shape = RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(10)).dp)
-                        )
-                        .hyprBounceClick {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onWorkspaceSelected(ws)
-                        }
-                        .padding(vertical = 5.dp, horizontal = 2.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                    val pillIndicatorWidth by animateDpAsState(
+                        targetValue = if (isActive) 16.dp else 0.dp,
+                        animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow),
+                        label = "pill_indicator_width"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp)
+                            .clip(RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(12)).dp))
+                            .background(
+                                if (isActive) theme.accentColor.copy(alpha = 0.18f)
+                                else Color.Transparent
+                            )
+                            .border(
+                                width = if (isActive) 1.dp else 0.dp,
+                                color = if (isActive) theme.accentColor.copy(alpha = 0.7f) else Color.Transparent,
+                                shape = RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(12)).dp)
+                            )
+                            .hyprBounceClick {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onWorkspaceSelected(ws)
+                            }
+                            .padding(vertical = 4.dp, horizontal = 2.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        if (ws == HyprWorkspace.PLAYING && isPlaying) {
-                            MiniEqualizerBars(
-                                theme = theme,
-                                isPlaying = true,
-                                modifier = Modifier.height(16.dp)
-                            )
-                        } else {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = ws.label,
-                                tint = if (isActive) theme.accentColor else theme.textSecondaryColor,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            if (ws == HyprWorkspace.PLAYING && isPlaying) {
+                                MiniEqualizerBars(
+                                    theme = theme,
+                                    isPlaying = true,
+                                    modifier = Modifier.height(16.dp)
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = ws.label,
+                                    tint = if (isActive) theme.accentColor else theme.textSecondaryColor,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
 
-                        Spacer(modifier = Modifier.height(3.dp))
-
-                        Text(
-                            text = "[${ws.index}:${ws.label}]",
-                            color = if (isActive) theme.accentColor else theme.textSecondaryColor,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Clip
-                        )
-
-                        if (isActive) {
                             Spacer(modifier = Modifier.height(2.dp))
+
+                            Text(
+                                text = "[${ws.index}:${ws.label}]",
+                                color = if (isActive) theme.accentColor else theme.textSecondaryColor,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.5.sp,
+                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip
+                            )
+
+                            Spacer(modifier = Modifier.height(2.dp))
+
                             Box(
                                 modifier = Modifier
-                                    .width(12.dp)
+                                    .width(pillIndicatorWidth)
                                     .height(2.dp)
                                     .clip(RoundedCornerShape(1.dp))
                                     .background(theme.accentColor)
@@ -311,48 +335,48 @@ fun HyprBottomDock(
                     }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(6.dp))
 
-        // Ergonomic Quick Search runner trigger button
-        Box(
-            modifier = Modifier
-                .size(width = 46.dp, height = 50.dp)
-                .clip(RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(10)).dp))
-                .background(
-                    if (isSearchActive) theme.accentColor
-                    else theme.surfaceVariantColor
-                )
-                .border(
-                    width = 1.dp,
-                    color = if (isSearchActive) theme.accentColor else theme.inactiveBorderColor,
-                    shape = RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(10)).dp)
-                )
-                .hyprBounceClick {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onToggleSearch()
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+            // Ergonomic Quick Search runner trigger button (cybernetic runner launcher)
+            Box(
+                modifier = Modifier
+                    .size(width = 46.dp, height = 48.dp)
+                    .clip(RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(12)).dp))
+                    .background(
+                        if (isSearchActive) theme.accentColor
+                        else theme.surfaceVariantColor
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = if (isSearchActive) theme.accentColor else theme.inactiveBorderColor.copy(alpha = 0.8f),
+                        shape = RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(12)).dp)
+                    )
+                    .hyprBounceClick {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onToggleSearch()
+                    },
+                contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = "Search",
-                    tint = if (isSearchActive) theme.backgroundColor else theme.accentColor,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "find",
-                    color = if (isSearchActive) theme.backgroundColor else theme.accentColor,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Search",
+                        tint = if (isSearchActive) theme.backgroundColor else theme.accentColor,
+                        modifier = Modifier.size(17.dp)
+                    )
+                    Spacer(modifier = Modifier.height(1.dp))
+                    Text(
+                        text = "run",
+                        color = if (isSearchActive) theme.backgroundColor else theme.accentColor,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }
@@ -427,12 +451,118 @@ fun MiniEqualizerBars(
 }
 
 /**
- * Gesture-enabled, riced MiniPlayer sitting right above the bottom dock.
+ * Interactive 46dp Mini Vinyl Record with realistic concentric microgrooves,
+ * center spindle hole, and spinning album art label at 33 RPM during playback.
+ */
+@Composable
+fun MiniVinylRecord(
+    theme: HyprThemeConfig,
+    albumArtUri: String?,
+    trackTitle: String,
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "mini_vinyl_spin")
+    val rotationAngle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 3200, easing = LinearEasing),
+            repeatMode = AnimRepeatMode.Restart
+        ),
+        label = "mini_vinyl_angle"
+    )
+
+    val currentRotation = if (isPlaying) rotationAngle else 0f
+    val context = LocalContext.current
+
+    Box(
+        modifier = modifier
+            .size(46.dp)
+            .clip(CircleShape)
+            .background(Color(0xFF141416)),
+        contentAlignment = Alignment.Center
+    ) {
+        // Grooved vinyl record background with concentric microgrooves
+        Canvas(modifier = Modifier.fillMaxSize().rotate(currentRotation)) {
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val radius = size.minDimension / 2f
+
+            // Outer vinyl edge rim
+            drawCircle(
+                color = Color(0xFF222226),
+                radius = radius,
+                center = center
+            )
+
+            // Concentric vinyl reflection grooves
+            val grooveAlphas = listOf(0.08f, 0.04f, 0.09f, 0.05f)
+            grooveAlphas.forEachIndexed { i, a ->
+                val r = radius * (0.58f + i * 0.10f)
+                drawCircle(
+                    color = Color.White.copy(alpha = a),
+                    radius = r,
+                    center = center,
+                    style = Stroke(width = 0.8.dp.toPx())
+                )
+            }
+        }
+
+        // Center Album Art Label (26dp circular crop)
+        Box(
+            modifier = Modifier
+                .size(26.dp)
+                .clip(CircleShape)
+                .rotate(currentRotation)
+                .background(theme.surfaceVariantColor),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!albumArtUri.isNullOrBlank()) {
+                val miniLabelReq = remember(albumArtUri) {
+                    ImageRequest.Builder(context)
+                        .data(albumArtUri)
+                        .size(100, 100)
+                        .allowHardware(true)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .crossfade(false)
+                        .build()
+                }
+                AsyncImage(
+                    model = miniLabelReq,
+                    contentDescription = trackTitle,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = theme.accentColor,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+
+            // Center spindle hole
+            Box(
+                modifier = Modifier
+                    .size(5.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF0A0A0C))
+                    .border(0.6.dp, Color(0xFF888888), CircleShape)
+            )
+        }
+    }
+}
+
+/**
+ * Gesture-enabled, floating island MiniPlayer sitting right above the bottom dock.
  * Supports:
- * - Tap or swipe up to expand to fullscreen player
+ * - Rotating mini vinyl record with concentric microgrooves
+ * - Interactive kinetic drag with spring return
  * - Swipe left: skip next track
  * - Swipe right: skip previous track
- * - Rotating mini vinyl disc & live equalizer bars
+ * - Embedded luminous progress filament
  */
 @Composable
 fun MiniPlayer(
@@ -447,27 +577,51 @@ fun MiniPlayer(
     val track = playbackState.currentTrack ?: return
     val view = LocalView.current
 
-    var totalDragX by remember { mutableFloatStateOf(0f) }
+    var dragOffsetX by remember { mutableFloatStateOf(0f) }
+    val animatedDragX by animateFloatAsState(
+        targetValue = dragOffsetX,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "mini_player_drag"
+    )
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = theme.windowGapsDp.dp)
-            .hyprTile(theme = theme, isActive = playbackState.isPlaying)
+            .graphicsLayer {
+                translationX = animatedDragX
+                rotationZ = animatedDragX * 0.02f
+            }
+            .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtLeast(14).dp))
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        theme.surfaceColor.copy(alpha = 0.95f),
+                        theme.surfaceColor.copy(alpha = 0.98f)
+                    )
+                )
+            )
+            .border(
+                width = theme.borderThicknessDp.dp,
+                color = if (playbackState.isPlaying) theme.accentColor.copy(alpha = 0.5f) else theme.inactiveBorderColor.copy(alpha = 0.6f),
+                shape = RoundedCornerShape(theme.borderRadiusDp.coerceAtLeast(14).dp)
+            )
             .pointerInput(track.id) {
                 detectHorizontalDragGestures(
-                    onDragStart = { totalDragX = 0f },
+                    onDragStart = { dragOffsetX = 0f },
                     onDragEnd = {
-                        if (totalDragX < -60f) {
+                        if (dragOffsetX < -70f) {
                             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                             onSkipNext()
-                        } else if (totalDragX > 60f) {
+                        } else if (dragOffsetX > 70f) {
                             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                             onSkipPrevious()
                         }
+                        dragOffsetX = 0f
                     },
+                    onDragCancel = { dragOffsetX = 0f },
                     onHorizontalDrag = { _, dragAmount ->
-                        totalDragX += dragAmount
+                        dragOffsetX = (dragOffsetX + dragAmount * 0.65f).coerceIn(-130f, 130f)
                     }
                 )
             }
@@ -480,45 +634,17 @@ fun MiniPlayer(
                     .padding(horizontal = 10.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Album Cover Art (Clean, Upright)
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(theme.surfaceVariantColor),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (!track.albumArtUri.isNullOrBlank()) {
-                        val context = LocalContext.current
-                        val miniPlayerReq = remember(track.albumArtUri) {
-                            ImageRequest.Builder(context)
-                                .data(track.albumArtUri)
-                                .size(140, 140)
-                                .allowHardware(true)
-                                .memoryCachePolicy(CachePolicy.ENABLED)
-                                .diskCachePolicy(CachePolicy.ENABLED)
-                                .crossfade(false)
-                                .build()
-                        }
-                        AsyncImage(
-                            model = miniPlayerReq,
-                            contentDescription = track.title,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.MusicNote,
-                            contentDescription = null,
-                            tint = theme.accentColor,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
+                // Interactive Mini Vinyl Record
+                MiniVinylRecord(
+                    theme = theme,
+                    albumArtUri = track.albumArtUri,
+                    trackTitle = track.title,
+                    isPlaying = playbackState.isPlaying
+                )
 
                 Spacer(modifier = Modifier.width(10.dp))
 
-                // Title and Artist with live mini equalizer
+                // Title and Artist with live mini equalizer & audiophile codec badge
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -537,15 +663,35 @@ fun MiniPlayer(
                         )
                     }
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "${track.artist} • ${track.bitrate}kbps",
-                        color = theme.textSecondaryColor,
-                        fontSize = 11.5.sp,
-                        fontFamily = HyprTheme.spec.fontFamily,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = track.artist,
+                            color = theme.textSecondaryColor,
+                            fontSize = 11.5.sp,
+                            fontFamily = HyprTheme.spec.fontFamily,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(theme.surfaceVariantColor)
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                        ) {
+                            Text(
+                                text = "${track.audioFormat} ${track.bitrate}k",
+                                color = theme.accentColor,
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
+
+                Spacer(modifier = Modifier.width(6.dp))
 
                 // Adaptive Controls matching selected geometry and icon pack
                 AdaptivePlayButton(
@@ -563,21 +709,34 @@ fun MiniPlayer(
                 )
             }
 
-            // High Precision Mini Progress Bar
-            LinearProgressIndicator(
-                progress = { playbackState.progress },
+            // High Precision Luminous Audio Progress Filament
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(2.dp),
-                color = theme.accentColor,
-                trackColor = theme.surfaceVariantColor
-            )
+                    .height(2.5.dp)
+                    .background(theme.surfaceVariantColor.copy(alpha = 0.5f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(playbackState.progress.coerceIn(0f, 1f))
+                        .fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    theme.accentColor.copy(alpha = 0.6f),
+                                    theme.accentColor
+                                )
+                            )
+                        )
+                )
+            }
         }
     }
 }
 
 /**
- * Bottom Quick-Search Runner Bar (Hypr-Run / Wofi inspired)
+ * Bottom Quick-Search Runner Bar (Spotlight / Wofi command palette inspired)
+ * Features terminal prompt, live search chips, and keyboard-friendly actions.
  */
 @Composable
 fun HyprBottomSearchRunner(
@@ -591,22 +750,35 @@ fun HyprBottomSearchRunner(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = theme.windowGapsDp.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(theme.borderRadiusDp.dp))
-            .background(theme.surfaceColor)
-            .border(theme.borderThicknessDp.dp, theme.accentColor, RoundedCornerShape(theme.borderRadiusDp.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtLeast(14).dp))
+            .background(theme.surfaceColor.copy(alpha = 0.98f))
+            .border(
+                width = theme.borderThicknessDp.dp,
+                color = theme.accentColor,
+                shape = RoundedCornerShape(theme.borderRadiusDp.coerceAtLeast(14).dp)
+            )
+            .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "find >",
-                color = theme.accentColor,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
-            )
+            // Cybernetic terminal prompt pill
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(theme.accentColor.copy(alpha = 0.18f))
+                    .padding(horizontal = 7.dp, vertical = 3.dp)
+            ) {
+                Text(
+                    text = "find >",
+                    color = theme.accentColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
             Spacer(modifier = Modifier.width(8.dp))
 
             OutlinedTextField(
@@ -630,13 +802,38 @@ fun HyprBottomSearchRunner(
                 )
             )
 
-            IconButton(onClick = onClose) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Close Search",
-                    tint = theme.textSecondaryColor,
-                    modifier = Modifier.size(18.dp)
-                )
+            if (query.isNotEmpty()) {
+                IconButton(
+                    onClick = { onQueryChange("") },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Clear",
+                        tint = theme.textSecondaryColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier.size(28.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(theme.surfaceVariantColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close Search",
+                        tint = theme.textPrimaryColor,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
             }
         }
     }
@@ -775,23 +972,25 @@ fun SyncedLyricsView(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        item { Spacer(modifier = Modifier.height(30.dp)) }
+        item { Spacer(modifier = Modifier.height(40.dp)) }
 
         itemsIndexed(
             items = lyrics,
             key = { index, item -> "$index-${item.timestampMs}" }
         ) { index, line ->
+            val distance = (index - activeIndex).let { if (it < 0) -it else it }
             LyricLineItem(
                 theme = theme,
                 line = line,
                 isActive = index == activeIndex,
+                distance = distance,
                 onSeekTo = onSeekTo
             )
         }
 
-        item { Spacer(modifier = Modifier.height(100.dp)) }
+        item { Spacer(modifier = Modifier.height(120.dp)) }
     }
 }
 
@@ -800,21 +999,74 @@ private fun LyricLineItem(
     theme: HyprThemeConfig,
     line: LyricLine,
     isActive: Boolean,
+    distance: Int,
     onSeekTo: (Long) -> Unit
 ) {
-    Column(
+    val haptic = LocalHapticFeedback.current
+    val alpha = when {
+        isActive -> 1f
+        distance == 1 -> 0.65f
+        distance == 2 -> 0.40f
+        else -> 0.22f
+    }
+
+    val minSec = remember(line.timestampMs) {
+        val totalSec = line.timestampMs / 1000
+        val m = totalSec / 60
+        val s = totalSec % 60
+        String.format("%02d:%02d", m, s)
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onSeekTo(line.timestampMs) }
-            .padding(vertical = 4.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(
+                if (isActive) theme.accentColor.copy(alpha = 0.14f)
+                else Color.Transparent
+            )
+            .border(
+                width = if (isActive) 1.dp else 0.dp,
+                color = if (isActive) theme.accentColor.copy(alpha = 0.5f) else Color.Transparent,
+                shape = RoundedCornerShape(8.dp)
+            )
+            .clickable {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onSeekTo(line.timestampMs)
+            }
+            .padding(horizontal = 12.dp, vertical = if (isActive) 10.dp else 6.dp)
     ) {
-        Text(
-            text = line.text,
-            color = if (isActive) theme.accentColor else theme.textSecondaryColor.copy(alpha = 0.45f),
-            fontSize = if (isActive) 19.sp else 15.sp,
-            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-            fontFamily = if (isActive) FontFamily.Default else FontFamily.Monospace
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = line.text,
+                color = if (isActive) theme.accentColor else theme.textPrimaryColor.copy(alpha = alpha),
+                fontSize = if (isActive) 18.5.sp else 15.sp,
+                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                fontFamily = if (isActive) FontFamily.Default else FontFamily.Monospace,
+                modifier = Modifier.weight(1f)
+            )
+
+            if (isActive) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(theme.accentColor.copy(alpha = 0.25f))
+                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "[$minSec]",
+                        color = theme.accentColor,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
     }
 }
 

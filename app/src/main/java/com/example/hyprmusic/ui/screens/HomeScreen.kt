@@ -60,6 +60,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import com.example.hyprmusic.core.theming.GridLayoutStyle
 import com.example.hyprmusic.core.theming.HyprTheme
 import com.example.hyprmusic.ui.components.AdaptivePlayButton
+import com.example.hyprmusic.ui.components.MiniEqualizerBars
 
 @Composable
 fun HomeScreen(
@@ -522,17 +523,27 @@ fun HomeTrackRowItem(
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val durationSec = track.durationMs / 1000
+    val durationStr = String.format("%d:%02d", durationSec / 60, durationSec % 60)
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .hyprTile(theme = theme, isActive = isCurrent)
+            .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(10).dp))
+            .background(if (isCurrent) theme.accentColor.copy(alpha = 0.12f) else theme.surfaceColor)
+            .border(
+                width = if (isCurrent) theme.borderThicknessDp.dp else 1.dp,
+                color = if (isCurrent) theme.accentColor else theme.inactiveBorderColor.copy(alpha = 0.5f),
+                shape = RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(10).dp)
+            )
             .hyprBounceClick { onClick() }
-            .padding(10.dp)
+            .padding(horizontal = 12.dp, vertical = 9.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Album Artwork with vinyl disc edge
             Box(
                 modifier = Modifier
                     .size(46.dp)
@@ -540,11 +551,11 @@ fun HomeTrackRowItem(
                     .background(theme.surfaceVariantColor),
                 contentAlignment = Alignment.Center
             ) {
-                if (track.albumArtUri != null) {
+                if (!track.albumArtUri.isNullOrBlank()) {
                     val rowReq = remember(track.albumArtUri) {
                         ImageRequest.Builder(context)
                             .data(track.albumArtUri)
-                            .size(130, 130)
+                            .size(140, 140)
                             .allowHardware(true)
                             .memoryCachePolicy(CachePolicy.ENABLED)
                             .diskCachePolicy(CachePolicy.ENABLED)
@@ -553,7 +564,7 @@ fun HomeTrackRowItem(
                     }
                     AsyncImage(
                         model = rowReq,
-                        contentDescription = null,
+                        contentDescription = track.title,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
@@ -569,32 +580,67 @@ fun HomeTrackRowItem(
 
             Spacer(modifier = Modifier.width(12.dp))
 
+            // Title & Artist
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = track.title,
                     color = if (isCurrent) theme.accentColor else theme.textPrimaryColor,
                     fontSize = 13.5.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "${track.artist} • ${track.bitrate}kbps",
-                    color = theme.textSecondaryColor,
-                    fontSize = 11.5.sp,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = track.artist,
+                        color = theme.textSecondaryColor,
+                        fontSize = 11.5.sp,
+                        fontFamily = HyprTheme.spec.fontFamily,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    // Audio codec pill
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(theme.surfaceVariantColor)
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            text = "${track.audioFormat} ${track.bitrate}k",
+                            color = if (isCurrent) theme.accentColor else theme.textSecondaryColor,
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
 
-            if (isPlaying) {
-                Icon(
-                    imageVector = Icons.Default.GraphicEq,
-                    contentDescription = null,
-                    tint = theme.accentColor,
-                    modifier = Modifier.size(18.dp)
+            Spacer(modifier = Modifier.width(10.dp))
+
+            // Duration & Live Equalizer
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (isPlaying) {
+                    MiniEqualizerBars(
+                        theme = theme,
+                        isPlaying = true,
+                        modifier = Modifier.height(14.dp)
+                    )
+                }
+
+                Text(
+                    text = durationStr,
+                    color = if (isCurrent) theme.accentColor else theme.textSecondaryColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
         }

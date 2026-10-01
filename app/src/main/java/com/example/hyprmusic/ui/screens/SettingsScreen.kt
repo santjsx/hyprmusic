@@ -22,8 +22,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.material.icons.Icons
@@ -59,7 +62,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -130,47 +132,230 @@ fun SettingsScreen(
             .padding(horizontal = theme.windowGapsDp.dp),
         verticalArrangement = Arrangement.spacedBy(theme.windowGapsDp.dp)
     ) {
-        // Section: System Header
+        // Section: System Header (Machined Audiophile Rack Header)
         item {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .hyprTile(theme = theme)
+                    .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtLeast(14).dp))
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                theme.surfaceColor.copy(alpha = 0.95f),
+                                theme.surfaceVariantColor.copy(alpha = 0.75f)
+                            )
+                        )
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = theme.accentColor.copy(alpha = 0.45f),
+                        shape = RoundedCornerShape(theme.borderRadiusDp.coerceAtLeast(14).dp)
+                    )
                     .padding(14.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(46.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(theme.surfaceVariantColor),
-                        contentAlignment = Alignment.Center
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = null,
-                            tint = theme.accentColor,
-                            modifier = Modifier.size(26.dp)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(theme.surfaceVariantColor),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = null,
+                                tint = theme.accentColor,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "HYPRMUSIC ENGINE",
+                                    color = theme.textPrimaryColor,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF00E676))
+                                )
+                            }
+                            Text(
+                                text = "Audiophile Bit-Perfect Media Framework",
+                                color = theme.textSecondaryColor,
+                                fontSize = 11.5.sp
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.width(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    Column(modifier = Modifier.weight(1f)) {
+                    // Audiophile Rack Telemetry Bar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(theme.surfaceColor.copy(alpha = 0.8f))
+                            .border(0.8.dp, theme.inactiveBorderColor.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "PIPELINE",
+                                color = theme.textSecondaryColor,
+                                fontSize = 8.5.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "AAudio PCM",
+                                color = theme.accentColor,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Column {
+                            Text(
+                                text = "SAMPLING",
+                                color = theme.textSecondaryColor,
+                                fontSize = 8.5.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "44.1kHz / 16b",
+                                color = theme.textPrimaryColor,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Column {
+                            Text(
+                                text = "HEADROOM",
+                                color = theme.textSecondaryColor,
+                                fontSize = 8.5.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "+0.0dB Direct",
+                                color = theme.textPrimaryColor,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Column {
+                            Text(
+                                text = "DRIVER",
+                                color = theme.textSecondaryColor,
+                                fontSize = 8.5.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "Bit-Perfect",
+                                color = Color(0xFF00E676),
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Section: Gesture Navigation Architecture
+        item {
+            Column {
+                Text(
+                    text = "GESTURE SYSTEM // NAVIGATION",
+                    color = theme.textSecondaryColor,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .hyprTile(theme = theme)
+                        .padding(14.dp)
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(theme.accentColor.copy(alpha = 0.16f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Security,
+                                    contentDescription = null,
+                                    tint = theme.accentColor,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Android Edge Swipe Navigation",
+                                    color = theme.textPrimaryColor,
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Hierarchical Sub-View Dismissal Shield",
+                                    color = theme.textSecondaryColor,
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Color(0xFF00E676).copy(alpha = 0.18f))
+                                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = "[ACTIVE]",
+                                    color = Color(0xFF00E676),
+                                    fontSize = 9.5.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
                         Text(
-                            text = "HYPRMUSIC CONFIG",
-                            color = theme.textPrimaryColor,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Text(
-                            text = "Hyprland Tiling Ricing & Audio Suite",
+                            text = "Edge swipe gestures pop child screens (equalizer, search, now playing, album detail, playlists) sequentially without terminating playback or accidentally exiting the application. Double-back within 2 seconds is enforced on the Home screen to exit safely.",
                             color = theme.textSecondaryColor,
-                            fontSize = 11.5.sp
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp
                         )
                     }
                 }

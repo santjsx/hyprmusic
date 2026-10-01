@@ -1,8 +1,25 @@
 package com.example.hyprmusic.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.platform.LocalContext
 import com.example.hyprmusic.core.cloud.telegram.TelegramMusicRepository
+import com.example.hyprmusic.core.data.PlaylistRepository
+import com.example.hyprmusic.core.data.CustomPlaylist
+import com.example.hyprmusic.ui.components.AddToPlaylistDialog
+import com.example.hyprmusic.ui.components.MiniEqualizerBars
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.PlaylistPlay
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -17,6 +34,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -102,6 +120,7 @@ import com.example.hyprmusic.core.model.PlaybackState
 import com.example.hyprmusic.core.model.Track
 import com.example.hyprmusic.core.theming.HyprThemeConfig
 import com.example.hyprmusic.core.theming.hyprAnimatedGlow
+import com.example.hyprmusic.core.theming.hyprBounceClick
 import com.example.hyprmusic.core.theming.hyprTile
 import kotlinx.coroutines.launch
 
@@ -115,6 +134,7 @@ enum class LibraryFilter(val label: String) {
     TRACKS("TRACKS"),
     ALBUMS("ALBUMS"),
     ARTISTS("ARTISTS"),
+    PLAYLISTS("PLAYLISTS"),
     HI_RES("HI-RES FLAC"),
     FAVORITES("FAVORITES")
 }
@@ -123,6 +143,7 @@ private sealed interface LibraryViewState {
     data class Main(val filter: LibraryFilter) : LibraryViewState
     data class AlbumDetail(val album: Album) : LibraryViewState
     data class ArtistDetail(val artist: Artist) : LibraryViewState
+    data class PlaylistDetail(val playlist: CustomPlaylist) : LibraryViewState
 }
 
 @Composable
@@ -137,6 +158,7 @@ fun LibraryScreen(
     onTrackSelected: (Track, List<Track>) -> Unit,
     onToggleFavorite: (String) -> Unit,
     telegramRepository: TelegramMusicRepository? = null,
+    playlistRepository: PlaylistRepository? = null,
     initialAlbum: Album? = null,
     onAlbumCleared: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -146,6 +168,17 @@ fun LibraryScreen(
     var viewState by remember { mutableStateOf<LibraryViewState>(LibraryViewState.Main(LibraryFilter.TRACKS)) }
     var searchQuery by remember { mutableStateOf("") }
     var activeFilter by remember { mutableStateOf(LibraryFilter.TRACKS) }
+
+    val playlists = playlistRepository?.playlists?.collectAsStateWithLifecycle()?.value ?: emptyList()
+
+    BackHandler(enabled = viewState !is LibraryViewState.Main || searchQuery.isNotBlank()) {
+        if (searchQuery.isNotBlank()) {
+            searchQuery = ""
+        } else {
+            viewState = LibraryViewState.Main(activeFilter)
+            onAlbumCleared()
+        }
+    }
 
     LaunchedEffect(initialAlbum) {
         if (initialAlbum != null) {
@@ -246,6 +279,9 @@ fun LibraryScreen(
                                 tracks = tracks,
                                 albums = albums,
                                 artists = artists,
+                                playlists = playlists,
+                                playlistRepository = playlistRepository,
+                                onOpenPlaylist = { playlist -> viewState = LibraryViewState.PlaylistDetail(playlist) },
                                 searchQuery = searchQuery,
                                 onSearchQueryChange = { searchQuery = it },
                                 activeFilter = activeFilter,
@@ -293,6 +329,19 @@ fun LibraryScreen(
                                 onOpenAlbum = { album -> viewState = LibraryViewState.AlbumDetail(album) }
                             )
                         }
+
+                        is LibraryViewState.PlaylistDetail -> {
+                            PlaylistDetailView(
+                                theme = theme,
+                                playlist = state.playlist,
+                                allTracks = tracks,
+                                playbackState = playbackState,
+                                playlistRepository = playlistRepository,
+                                onBack = { viewState = LibraryViewState.Main(activeFilter) },
+                                onTrackSelected = onTrackSelected,
+                                onToggleFavorite = onToggleFavorite
+                            )
+                        }
                     }
                 }
             } else {
@@ -315,6 +364,9 @@ private fun MainLibraryView(
     tracks: List<Track>,
     albums: List<Album>,
     artists: List<Artist>,
+    playlists: List<CustomPlaylist> = emptyList(),
+    playlistRepository: PlaylistRepository? = null,
+    onOpenPlaylist: (CustomPlaylist) -> Unit = {},
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     activeFilter: LibraryFilter,
@@ -367,6 +419,12 @@ private fun MainLibraryView(
         val query = searchQuery.trim().lowercase()
         if (query.isBlank()) artists
         else artists.filter { it.name.lowercase().contains(query) }
+    }
+
+    val filteredPlaylists = remember(playlists, searchQuery) {
+        val query = searchQuery.trim().lowercase()
+        if (query.isBlank()) playlists
+        else playlists.filter { it.name.lowercase().contains(query) }
     }
 
     // Precomputed alphabet jump map for instant 1M track fast scrolling
@@ -448,7 +506,8 @@ private fun MainLibraryView(
                     LibraryFilter.TRACKS, LibraryFilter.HI_RES, LibraryFilter.FAVORITES -> filteredTracks.size
                     LibraryFilter.ALBUMS -> filteredAlbums.size
                     LibraryFilter.ARTISTS -> filteredArtists.size
-                    LibraryFilter.ALL -> filteredTracks.size + filteredAlbums.size + filteredArtists.size
+                    LibraryFilter.PLAYLISTS -> filteredPlaylists.size
+                    LibraryFilter.ALL -> filteredTracks.size + filteredAlbums.size + filteredArtists.size + filteredPlaylists.size
                 }
 
                 Box(
@@ -624,6 +683,16 @@ private fun MainLibraryView(
 
                             item { Spacer(modifier = Modifier.height(90.dp)) }
                         }
+                    }
+
+                    LibraryFilter.PLAYLISTS -> {
+                        PlaylistsGridView(
+                            theme = theme,
+                            playlists = filteredPlaylists,
+                            allTracks = tracks,
+                            playlistRepository = playlistRepository,
+                            onOpenPlaylist = onOpenPlaylist
+                        )
                     }
 
                     LibraryFilter.ALL -> {
@@ -919,8 +988,18 @@ fun AlbumDetailView(
                         AsyncImage(
                             model = albumCoverReq,
                             contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { alpha = 0.35f },
                             contentScale = ContentScale.Crop
+                        )
+                        AsyncImage(
+                            model = albumCoverReq,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(2.dp),
+                            contentScale = ContentScale.Fit
                         )
                     } else {
                         Icon(
@@ -1345,7 +1424,728 @@ fun ArtistDetailView(
 }
 
 /**
- * Ultra-fast recycled track row item for 60/120 FPS scrolling.
+ * Playlist Detail Screen with high-end hero header, total duration, Play All, Shuffle,
+ * and track deletion/reorder controls.
+ */
+@Composable
+private fun PlaylistDetailView(
+    theme: HyprThemeConfig,
+    playlist: CustomPlaylist,
+    allTracks: List<Track>,
+    playbackState: PlaybackState,
+    playlistRepository: PlaylistRepository?,
+    onBack: () -> Unit,
+    onTrackSelected: (Track, List<Track>) -> Unit,
+    onToggleFavorite: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val playlistTracks = remember(allTracks, playlist.trackIds) {
+        playlist.trackIds.mapNotNull { id -> allTracks.firstOrNull { it.id == id } }
+    }
+    val totalDurationMs = remember(playlistTracks) { playlistTracks.sumOf { it.durationMs } }
+    val totalMinutes = totalDurationMs / 60000
+    val totalSeconds = (totalDurationMs % 60000) / 1000
+
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = theme.windowGapsDp.dp)
+    ) {
+        // Back Navigation Bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(theme.surfaceVariantColor)
+                    .clickable(onClick = onBack)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = theme.accentColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "[ ESC / PLAYLISTS ]",
+                        color = theme.textPrimaryColor,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Hero Playlist Card
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .hyprTile(theme = theme)
+                .padding(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Collage or Icon Artwork Box
+                val artUris = remember(playlistTracks) {
+                    playlistTracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+                }
+                Box(
+                    modifier = Modifier
+                        .size(96.dp)
+                        .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(12).dp))
+                        .background(theme.surfaceVariantColor)
+                        .border(1.dp, theme.accentColor.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (artUris.size >= 4) {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            Row(modifier = Modifier.weight(1f)) {
+                                AsyncImage(
+                                    model = artUris[0],
+                                    contentDescription = null,
+                                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                AsyncImage(
+                                    model = artUris[1],
+                                    contentDescription = null,
+                                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                            Row(modifier = Modifier.weight(1f)) {
+                                AsyncImage(
+                                    model = artUris[2],
+                                    contentDescription = null,
+                                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                AsyncImage(
+                                    model = artUris[3],
+                                    contentDescription = null,
+                                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+                    } else if (artUris.isNotEmpty()) {
+                        AsyncImage(
+                            model = artUris.first(),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.PlaylistPlay,
+                            contentDescription = null,
+                            tint = theme.accentColor,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(14.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = playlist.name,
+                        color = theme.textPrimaryColor,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "CUSTOM PLAYLIST",
+                        color = theme.accentColor,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${playlistTracks.size} tracks • %02d:%02d".format(totalMinutes, totalSeconds),
+                        color = theme.textSecondaryColor,
+                        fontSize = 11.5.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (playlistTracks.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(theme.accentColor)
+                                    .hyprBounceClick {
+                                        onTrackSelected(playlistTracks.first(), playlistTracks)
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        tint = theme.backgroundColor,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "PLAY",
+                                        color = theme.backgroundColor,
+                                        fontSize = 10.5.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(theme.surfaceVariantColor)
+                                    .hyprBounceClick {
+                                        val shuffled = playlistTracks.shuffled()
+                                        onTrackSelected(shuffled.first(), shuffled)
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Shuffle,
+                                        contentDescription = null,
+                                        tint = theme.accentColor,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "SHUFFLE",
+                                        color = theme.accentColor,
+                                        fontSize = 10.5.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(theme.surfaceVariantColor)
+                                .hyprBounceClick { showDeleteConfirm = true }
+                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete Playlist",
+                                tint = Color(0xFFFF5555),
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        if (playlistTracks.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "[!] PLAYLIST IS EMPTY",
+                        color = theme.accentColor,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Add tracks from library using '+ Add to Playlist'",
+                        color = theme.textSecondaryColor,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(theme.windowGapsDp.dp)
+            ) {
+                itemsIndexed(
+                    items = playlistTracks,
+                    key = { index, track -> "pl_${playlist.id}_${track.id}_$index" },
+                    contentType = { _, _ -> "playlist_track" }
+                ) { _, track ->
+                    val isPlaying = playbackState.currentTrack?.id == track.id
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                HyprTrackRow(
+                                    theme = theme,
+                                    track = track,
+                                    isPlaying = isPlaying,
+                                    isAudioActive = isPlaying && playbackState.isPlaying,
+                                    onClick = { onTrackSelected(track, playlistTracks) },
+                                    onFavoriteClick = { onToggleFavorite(track.id) }
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    playlistRepository?.removeTrackFromPlaylist(playlist.id, track.id)
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Remove from playlist",
+                                    tint = theme.textSecondaryColor,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item { Spacer(modifier = Modifier.height(90.dp)) }
+            }
+        }
+    }
+
+    if (showDeleteConfirm) {
+        Dialog(onDismissRequest = { showDeleteConfirm = false }) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.85f)
+                    .clip(RoundedCornerShape(theme.borderRadiusDp.dp))
+                    .background(theme.surfaceColor)
+                    .border(1.dp, Color(0xFFFF5555).copy(alpha = 0.5f), RoundedCornerShape(theme.borderRadiusDp.dp))
+                    .padding(18.dp)
+            ) {
+                Column {
+                    Text(
+                        text = "rm -rf playlist?",
+                        color = Color(0xFFFF5555),
+                        fontSize = 14.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Delete playlist '${playlist.name}'? Tracks will remain in your library.",
+                        color = theme.textSecondaryColor,
+                        fontSize = 12.sp
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable { showDeleteConfirm = false }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "[ CANCEL ]",
+                                color = theme.textSecondaryColor,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFFFF5555))
+                                .clickable {
+                                    showDeleteConfirm = false
+                                    playlistRepository?.deletePlaylist(playlist.id)
+                                    onBack()
+                                }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "[ DELETE ]",
+                                color = Color.White,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 2-Column Playlists Grid with "+ NEW PLAYLIST" hero creation tile and 4-quadrant dynamic album art collages.
+ */
+@Composable
+private fun PlaylistsGridView(
+    theme: HyprThemeConfig,
+    playlists: List<CustomPlaylist>,
+    allTracks: List<Track>,
+    playlistRepository: PlaylistRepository?,
+    onOpenPlaylist: (CustomPlaylist) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showCreateDialog by remember { mutableStateOf(false) }
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(theme.windowGapsDp.dp),
+        horizontalArrangement = Arrangement.spacedBy(theme.windowGapsDp.dp)
+    ) {
+        // Hero "+ NEW PLAYLIST" Tile
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(12).dp))
+                    .background(theme.surfaceVariantColor.copy(alpha = 0.45f))
+                    .border(
+                        width = 1.dp,
+                        color = theme.accentColor.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(12).dp)
+                    )
+                    .hyprBounceClick { showCreateDialog = true }
+                    .padding(12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .background(theme.accentColor.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "New Playlist",
+                            tint = theme.accentColor,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "+ NEW PLAYLIST",
+                        color = theme.accentColor,
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "mkplaylist <name>",
+                        color = theme.textSecondaryColor,
+                        fontSize = 9.5.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        }
+
+        // Custom Playlist Cards
+        items(
+            items = playlists,
+            key = { it.id },
+            contentType = { "playlist_card" }
+        ) { playlist ->
+            val playlistTracks = remember(allTracks, playlist.trackIds) {
+                playlist.trackIds.mapNotNull { id -> allTracks.firstOrNull { it.id == id } }
+            }
+            val artUris = remember(playlistTracks) {
+                playlistTracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .hyprTile(theme = theme)
+                    .hyprBounceClick { onOpenPlaylist(playlist) }
+                    .padding(8.dp)
+            ) {
+                Column {
+                    // Artwork collage canvas
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(12).dp))
+                            .background(theme.surfaceVariantColor),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (artUris.size >= 4) {
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                Row(modifier = Modifier.weight(1f)) {
+                                    AsyncImage(
+                                        model = artUris[0],
+                                        contentDescription = null,
+                                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    AsyncImage(
+                                        model = artUris[1],
+                                        contentDescription = null,
+                                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+                                Row(modifier = Modifier.weight(1f)) {
+                                    AsyncImage(
+                                        model = artUris[2],
+                                        contentDescription = null,
+                                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    AsyncImage(
+                                        model = artUris[3],
+                                        contentDescription = null,
+                                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+                            }
+                        } else if (artUris.isNotEmpty()) {
+                            AsyncImage(
+                                model = artUris.first(),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Default.PlaylistPlay,
+                                    contentDescription = null,
+                                    tint = theme.accentColor,
+                                    modifier = Modifier.size(46.dp)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "EMPTY PLAYLIST",
+                                    color = theme.textSecondaryColor,
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        // Monospace track count badge
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(6.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color.Black.copy(alpha = 0.7f))
+                                .border(0.5.dp, theme.accentColor.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "${playlist.trackIds.size} TRK",
+                                color = theme.accentColor,
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = playlist.name,
+                        color = theme.textPrimaryColor,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "${playlist.trackIds.size} tracks • custom list",
+                        color = theme.textSecondaryColor,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(90.dp)) }
+    }
+
+    if (showCreateDialog) {
+        CreatePlaylistDialog(
+            theme = theme,
+            onDismiss = { showCreateDialog = false },
+            onCreate = { name ->
+                showCreateDialog = false
+                val created = playlistRepository?.createPlaylist(name)
+                if (created != null) {
+                    onOpenPlaylist(created)
+                }
+            }
+        )
+    }
+}
+
+/**
+ * Tactical Modal Dialog for naming and creating a new custom playlist.
+ */
+@Composable
+private fun CreatePlaylistDialog(
+    theme: HyprThemeConfig,
+    onDismiss: () -> Unit,
+    onCreate: (String) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.88f)
+                .clip(RoundedCornerShape(theme.borderRadiusDp.dp))
+                .background(theme.surfaceColor)
+                .border(1.dp, theme.accentColor.copy(alpha = 0.4f), RoundedCornerShape(theme.borderRadiusDp.dp))
+                .padding(20.dp)
+        ) {
+            Column {
+                Text(
+                    text = "mkplaylist // CREATE",
+                    color = theme.accentColor,
+                    fontSize = 14.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Enter a name for your custom playlist:",
+                    color = theme.textSecondaryColor,
+                    fontSize = 11.5.sp
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(theme.surfaceVariantColor)
+                        .border(1.dp, theme.accentColor.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                ) {
+                    if (name.isEmpty()) {
+                        Text(
+                            text = "e.g. Late Night Drives",
+                            color = theme.textSecondaryColor.copy(alpha = 0.5f),
+                            fontSize = 13.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                    BasicTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        textStyle = TextStyle(
+                            color = theme.textPrimaryColor,
+                            fontSize = 13.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Medium
+                        ),
+                        cursorBrush = SolidColor(theme.accentColor),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable(onClick = onDismiss)
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = "[ CANCEL ]",
+                            color = theme.textSecondaryColor,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(
+                                if (name.isNotBlank()) theme.accentColor
+                                else theme.surfaceVariantColor
+                            )
+                            .clickable(enabled = name.isNotBlank()) { onCreate(name.trim()) }
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = "[ CREATE ]",
+                            color = if (name.isNotBlank()) theme.backgroundColor else theme.textSecondaryColor,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Ultra-fast recycled track row item with live VU meters and audiophile codec badges.
  */
 @Composable
 fun HyprTrackRow(
@@ -1355,6 +2155,7 @@ fun HyprTrackRow(
     isAudioActive: Boolean,
     onClick: () -> Unit,
     onFavoriteClick: () -> Unit,
+    onAddToPlaylist: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -1362,14 +2163,14 @@ fun HyprTrackRow(
         modifier = modifier
             .fillMaxWidth()
             .hyprTile(theme = theme, isActive = isPlaying)
-            .clickable(onClick = onClick)
+            .hyprBounceClick(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 7.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Artwork or Equalizer
+            // Artwork or Live VU Meter
             Box(
                 modifier = Modifier
                     .size(42.dp)
@@ -1378,11 +2179,10 @@ fun HyprTrackRow(
                 contentAlignment = Alignment.Center
             ) {
                 if (isAudioActive) {
-                    Icon(
-                        imageVector = Icons.Default.Equalizer,
-                        contentDescription = "Playing",
-                        tint = theme.accentColor,
-                        modifier = Modifier.size(24.dp)
+                    MiniEqualizerBars(
+                        theme = theme,
+                        isPlaying = true,
+                        modifier = Modifier.size(20.dp)
                     )
                 } else if (!track.albumArtUri.isNullOrBlank()) {
                     val trackReq = remember(track.albumArtUri) {
@@ -1439,6 +2239,11 @@ fun HyprTrackRow(
                 modifier = Modifier
                     .clip(RoundedCornerShape(4.dp))
                     .background(theme.surfaceVariantColor)
+                    .border(
+                        width = 0.5.dp,
+                        color = if (track.isLossless) theme.accentColor.copy(alpha = 0.6f) else Color.Transparent,
+                        shape = RoundedCornerShape(4.dp)
+                    )
                     .padding(horizontal = 5.dp, vertical = 2.dp)
             ) {
                 Text(
@@ -1458,6 +2263,20 @@ fun HyprTrackRow(
                 fontFamily = FontFamily.Monospace
             )
 
+            if (onAddToPlaylist != null) {
+                IconButton(
+                    onClick = onAddToPlaylist,
+                    modifier = Modifier.size(30.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                        contentDescription = "Add to playlist",
+                        tint = theme.textSecondaryColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
             IconButton(
                 onClick = onFavoriteClick,
                 modifier = Modifier.size(32.dp)
@@ -1476,6 +2295,10 @@ fun HyprTrackRow(
 /**
  * Album Card for 2-column Grid with click-to-open detail view.
  */
+/**
+ * Vinyl & Digipak Album Sleeve with 1:1 Aspect Ratio, Dual-Layer Zero-Crop Engine,
+ * Grooved Vinyl Disc Peek, and Corner Audio Chip Badge.
+ */
 @Composable
 fun HyprAlbumCard(
     theme: HyprThemeConfig,
@@ -1488,41 +2311,105 @@ fun HyprAlbumCard(
         modifier = modifier
             .fillMaxWidth()
             .hyprTile(theme = theme)
-            .clickable(onClick = onClick)
-            .padding(10.dp)
+            .hyprBounceClick(onClick = onClick)
+            .padding(8.dp)
     ) {
         Column {
+            // Physical Vinyl Sleeve + Ambient Backdrop Engine
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(130.dp)
-                    .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(10).dp))
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(12).dp))
                     .background(theme.surfaceVariantColor),
                 contentAlignment = Alignment.Center
             ) {
+                // Vinyl Record Edge Peek (Simulating physical LP sleeve)
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(end = 1.dp)
+                ) {
+                    val discRadius = size.height * 0.47f
+                    val centerOffset = Offset(size.width * 0.99f, size.height * 0.5f)
+                    // Outer vinyl black rim
+                    drawCircle(
+                        color = Color(0xFF141416),
+                        radius = discRadius,
+                        center = centerOffset
+                    )
+                    // Concentric vinyl grooves
+                    for (i in 1..4) {
+                        drawCircle(
+                            color = Color(0xFF2E2E36).copy(alpha = 0.55f),
+                            radius = discRadius * (0.38f + i * 0.12f),
+                            center = centerOffset,
+                            style = Stroke(width = 1.dp.toPx())
+                        )
+                    }
+                    // Center label ring
+                    drawCircle(
+                        color = theme.accentColor.copy(alpha = 0.85f),
+                        radius = discRadius * 0.28f,
+                        center = centerOffset
+                    )
+                }
+
                 if (!album.coverUri.isNullOrBlank()) {
                     val albumCardReq = remember(album.coverUri) {
                         ImageRequest.Builder(context)
                             .data(album.coverUri)
-                            .size(260, 260)
+                            .size(360, 360)
                             .allowHardware(true)
                             .memoryCachePolicy(CachePolicy.ENABLED)
                             .diskCachePolicy(CachePolicy.ENABLED)
                             .crossfade(false)
                             .build()
                     }
+                    // Ambient blurred underglow so wide or non-square art fills the sleeve
                     AsyncImage(
                         model = albumCardReq,
                         contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { alpha = 0.35f },
                         contentScale = ContentScale.Crop
+                    )
+                    // Crisp foreground jacket fitted with zero cropping of faces, banners, or titles
+                    AsyncImage(
+                        model = albumCardReq,
+                        contentDescription = album.title,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(4.dp)
+                            .clip(RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(10) - 2).coerceAtLeast(4).dp)),
+                        contentScale = ContentScale.Fit
                     )
                 } else {
                     Icon(
                         imageVector = Icons.Default.Album,
                         contentDescription = null,
                         tint = theme.accentColor,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+
+                // Sleek Monospace Audio Chip Badge
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color.Black.copy(alpha = 0.7f))
+                        .border(0.5.dp, theme.accentColor.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "${album.trackCount} TRK",
+                        color = theme.accentColor,
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -1537,8 +2424,9 @@ fun HyprAlbumCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "${album.artist} • ${album.trackCount} tracks",
+                text = album.artist,
                 color = theme.textSecondaryColor,
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace,

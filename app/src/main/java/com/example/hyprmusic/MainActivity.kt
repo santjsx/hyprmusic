@@ -214,12 +214,29 @@ fun HyprMusicApp(
         musicRepository.scanLocalMedia()
     }
 
-    BackHandler(enabled = isNowPlayingExpanded || isSearchActive) {
-        if (isNowPlayingExpanded) {
+    val context = LocalContext.current
+    var lastBackPressMs by remember { mutableStateOf(0L) }
+
+    BackHandler(enabled = true) {
+        if (showEqualizerDialog) {
+            showEqualizerDialog = false
+        } else if (isNowPlayingExpanded) {
             isNowPlayingExpanded = false
         } else if (isSearchActive) {
             isSearchActive = false
             searchQuery = ""
+        } else if (selectedAlbumForLibrary != null) {
+            selectedAlbumForLibrary = null
+        } else if (currentWorkspace != HyprWorkspace.HOME) {
+            currentWorkspace = HyprWorkspace.HOME
+        } else {
+            val now = System.currentTimeMillis()
+            if (now - lastBackPressMs < 2000L) {
+                (context as? ComponentActivity)?.finish()
+            } else {
+                lastBackPressMs = now
+                android.widget.Toast.makeText(context, "[ PRESS BACK AGAIN TO EXIT ]", android.widget.Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -429,6 +446,7 @@ fun HyprMusicApp(
                                     audioPlayer.updateFavoriteStatus(trackId, isFav)
                                 },
                                 telegramRepository = telegramRepository,
+                                playlistRepository = playlistRepository,
                                 initialAlbum = selectedAlbumForLibrary,
                                 onAlbumCleared = { selectedAlbumForLibrary = null }
                             )

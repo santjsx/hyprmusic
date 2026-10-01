@@ -1,98 +1,97 @@
-# HyprMusic v1.6.1 — Touch Pass-Through Fix, Scroll Stability & 250 Edge-Case Hardening
+# HyprMusic v1.7.0 — Gesture Navigation Shield, Audiophile Turntable & Component Uniqueness Overhaul
 
-HyprMusic v1.6.1 delivers critical bug fixes, gesture stabilization, and comprehensive edge-case hardening across the application stack. This release resolves the progress bar touch pass-through on the Now Playing screen, eliminates track counter modulo loops and duplicate listings on the Home screen, removes recomposition churn from animated glow modifiers, and hardens audio playback error recovery, sleep timer volume restoration, and atomic storage persistence.
-
----
-
-## What's New in v1.6.0
-
-### 10 Curated Bespoke Theme Personalities
-* **Catppuccin Mocha**: Soft pastel luxury with Phosphor Rounded icons, Capsule Seeker progress engine, and Floating Squircle control buttons.
-* **Gruvbox Retro**: 1970s analog Hi-Fi stereo aesthetic featuring Retro Console vectors, 24-step Segmented LED VU meters, Tactile Hi-Fi Beveled buttons, and IBM Plex Mono typography.
-* **Tokyo Night**: Electric cyberpunk cityscape with Lucide Geometric line vectors, Dynamic Neon glow slider, and Neon Glow Pill controls.
-* **Nordic Frost**: Scandinavian minimalism with Tabler Minimal airy strokes, Minimal Waybar 2.5dp line track, Minimal Glass Halo controls, and Inter Clean modern sans.
-* **OLED Cyberpunk**: Pitch black true-void backdrop with Remix Solid silhouettes, Dynamic Neon sliders, 45-degree Cyber Chamfered buttons, and Space Grotesk typography.
-* **Dracula Void**: Atmospheric synthwave featuring Phosphor Rounded icons, multi-band Waveform EQ Scrubber, and Floating Squircle controls.
-* **Rose Pine**: Boutique luxury aesthetic with Tabler Minimal vectors, Capsule Seeker scrubber, and Minimal Glass Halo controls.
-* **Monokai Pro**: Developer syntax theme with Lucide Geometric vectors, Segmented LED VU meter, and Bracket Console terminal controls.
-* **Solarized Amber (New)**: Sci-Fi telemetry terminal featuring Retro Console vectors, vintage Analog Tape Gauge with precision tick marks, and Tactile Bevel buttons.
-* **Emerald Matrix (New)**: Classic hacker terminal with Lucide line vectors, ultra-thin Minimal Waybar line, Bracket Console controls, and Retro Terminal monospace.
+HyprMusic v1.7.0 introduces full system-wide Android edge gesture navigation protection, an audiophile centerpiece overhaul featuring a dual-mode master vinyl turntable and digipak sleeve, an integrated custom playlist engine with multi-quadrant collage artwork, a floating glass bottom dock with kinetic spring indicators, an interactive floating island mini player with 33 RPM spinning vinyl record, depth-of-field kinetic lyrics typography, and machined telemetry rack settings.
 
 ---
 
-### 6 Specialized Progress Bar Engines
-* **Capsule Seeker**: 5dp rounded track with a 12dp smooth tactile scrubber thumb and continuous horizontal drag/tap gestures.
-* **Waveform EQ Scrubber**: 32-band organic audio spectrum rendered in hardware Canvas with elapsed bars illuminated in active accent.
-* **Segmented LED VU**: 24 discrete illuminated studio audio VU meter blocks with calibrated amber warning and red peak overload thresholds.
-* **Minimal Waybar Line**: Ultra-thin 2.5dp low-profile line track with edge-to-edge touch seeking.
-* **Dynamic Neon Glow**: Luminous accent slider with radiant glowing borders and responsive scrub feedback.
-* **Analog Tape Gauge**: Vintage reel-to-reel style dual-rail track with precision tick marks and a sliding needle indicator.
+## What's New in v1.7.0
+
+### Intelligent Android Gesture Navigation & Hierarchical Dismissal Shield
+* **Edge Swipe Back Protection**: Single-swipe back gestures on secondary or child screens now cleanly pop the current view (dismissing equalizer dialog, collapsing Now Playing player, closing search runner, or popping album/artist/playlist detail views) sequentially without terminating playback or abruptly closing the app.
+* **Home Screen Double-Back Safety**: When on the primary Home workspace, edge swipe gestures are protected by a 2000ms double-tap threshold with terminal notification toast `[ PRESS BACK AGAIN TO EXIT ]`, preventing accidental app termination during navigation.
+* **Child Screen Local Back Handlers**: `LibraryScreen` intercepts system back gestures locally inside Album, Artist, and Playlist views, returning to the catalog index smoothly.
 
 ---
 
-### 6 Playback Control Button Geometries
-* **Floating Squircle**: Soft rounded squircle with subtle elevation and active border.
-* **Neon Glow Pill**: Stadium pill shape with radiant outer glow aura and high contrast.
-* **Tactile Hi-Fi Bevel**: Physical stereo hardware button with 3D drop-shadow and tactile pressed depth.
-* **Minimal Glass Halo**: Translucent frosted circular ring with hairline vector stroke.
-* **Cyber Chamfer**: Futuristic 45-degree technical polygon with angular corner cuts.
-* **Bracket Console**: Retro terminal bracket frame (`[ ▶ ]`) with crisp vector bounding lines.
+### Audiophile Centerpiece: Master Turntable vs Digipak Sleeve
+* **Dual-Mode Interactive Switcher**: Seamlessly toggle between direct-drive vinyl turntable and high-fidelity digipak sleeve presentation via screen tap or action chip.
+* **Master Vinyl Turntable**:
+  * 12-inch micro-grooved vinyl record rotating continuously at 33 1/3 RPM during playback with realistic light sheen.
+  * Heavy direct-drive platter base with 36-point strobe perimeter speed calibration dots.
+  * 4-inch center circular album art label with central spindle hole.
+  * Precision tonearm assembly with pivot gimbal, counterweight, stainless steel tube, headshell cartridge, and needle stylus that tracks onto the groove when playing and smoothly parks when paused.
+* **Digipak Sleeve Mode**:
+  * Dual-layer zero-crop sleeve architecture with ambient reactive backdrop and fitted foreground jacket.
+  * Beat-synchronized RMS audio pulsation.
+  * Vinyl record peeking out of the right sleeve opening with grooved reflections.
 
 ---
 
-### 5 Specialized Icon Theme Systems
-* **Centralized Vector Icon Provider (`HyprIconProvider`)**: Hardware-accelerated Canvas vector rendering tailoring every icon to the active icon pack:
-  * `Phosphor Rounded`: Soft rounded geometry with warm 2.0dp strokes and curved corner joins.
-  * `Lucide Geometric`: Sharp, razor-clean 1.8dp geometric lines with technical precision.
-  * `Remix Solid`: High-contrast solid silhouettes and bold weights for maximum visibility.
-  * `Tabler Minimal`: Delicate, airy 1.5dp minimalist vector strokes.
-  * `Retro Console`: Industrial, mechanical right-angled and segmented technical lines.
+### Zero-Crop Album Cover & Digipak Sleeve Engine
+* **Dual-Layer Zero-Crop Architecture**:
+  * Wide movie posters, horizontal film soundtrack covers, and non-square album art now render 100% of their imagery without cropped heads or sliced titles.
+  * Ambient blurred backdrop scales with `ContentScale.Crop` at 35% alpha to eliminate empty black letterboxing.
+  * Foreground jacket renders with `ContentScale.Fit` inside a true 1:1 vinyl sleeve aspect ratio.
+  * Corner audio chip badge (`[ X TRK ]`) and tactile bounce feedback.
 
 ---
 
-### 5 Dynamic Typography Engines
-* **JetBrains Mono**: Clean, high-readability developer monospace.
-* **IBM Plex Mono**: Industrial retro monospace with distinct character terminals.
-* **Space Grotesk**: Contemporary geometric sans-serif for sleek futuristic interfaces.
-* **Inter Clean**: Modern, neutral sans-serif optimized for legibility.
-* **Retro Terminal**: High-density monospace calibrated for telemetry and terminal aesthetics.
+### Complete Playlists Engine & Management Screen
+* **Dedicated Playlists Tab**: Added `PLAYLISTS` filter tab with live match count badges.
+* **2-Column Playlists Grid**:
+  * Hero card: `+ NEW PLAYLIST` (`mkplaylist <name>`).
+  * Dynamic 4-Quadrant Artwork Collages: Automatically generated from tracks inside each playlist.
+* **Playlist Detail Screen**:
+  * Real-time aggregate duration calculation, Play All, Shuffle Mix, and Playlist Delete confirmation dialog.
+  * Track rows with individual removal actions and direct audio launching.
+* **`CreatePlaylistDialog`**:
+  * Fast modal dialog for creating new playlists on demand.
 
 ---
 
-### Live Interactive "Rice Studio" Customizer
-* **Live Sandbox Preview**: Real-time interactive playback preview tile supporting live seek drag and play/pause controls.
-* **One-Tap Preset Carousel**: Visual cards displaying live color dots, icon pack badges, and progress engine tags.
-* **Modular Engine Selectors**: Independent selection tabs for Control Button Style, Progress Bar Engine, Icon Pack Architecture, Typography, and Grid Layout.
-* **Compositor Sliders**: Smooth adjustments for Window Gaps (0–24dp), Corner Radius (0–28dp), Border Thickness (1–6dp), Frosted Glass Blur (0–40dp), and Outer Glow Aura Intensity (0–100%).
-* **OLED Pure Black Mode**: One-tap toggle converting backgrounds to `#000000` for battery conservation on OLED displays.
+### Detached Floating Glass Capsule Bottom Dock
+* **Frosted Glass Styling**: Detached floating pill dock with vertical gradient translucency, subtle border highlights, and window gaps padding.
+* **Kinetic Sliding Indicator Pill**: Active workspace highlighted with `animateDpAsState` spring-loaded width indicator pill.
+* **Active Equalizer Tab**: The `PLAYING` tab features live dancing `MiniEqualizerBars` when playback is active.
+* **Cybernetic Runner Button**: Dedicated tactile `run` launcher button triggering the search command palette.
 
 ---
 
-### Bug Fixes & System Stability Improvements
-* **Touch Event Pass-Through Fix**: Added full touch consumption and 44–48dp ergonomic touch hit-boxes to the Now Playing progress bar and screen container, completely preventing accidental song changes from touches leaking to background track rows.
-* **Home Screen Scroll Loop & Deduplication Fix**:
-  * Fixed track index counter formatting in terminal layout (removed `% 100` modulo that caused track 100 to show as `00` and appear as a loop).
-  * Only display Heavy Rotation when genuine play history exists, and automatically deduplicate any Heavy Rotation tracks from Recently Indexed.
-  * Hoisted `LazyListState` using `rememberSaveable` to retain exact scroll position across tab switches.
-  * Moved animated glow border computation from composition phase to draw phase (`drawWithContent`), eliminating 60/120 FPS continuous recomposition churn and scroll jank.
-* **Audio Engine & Seeking Safeguards**:
-  * Clamped `seekTo()` upper bound to `durationMs - 300L` to prevent seeking near the track end from triggering premature auto-skip or playback end state.
-  * Added retry counters to playback error handling to prevent infinite retry loops on corrupted or deleted media.
-  * Smart shuffle selection now avoids immediately picking the same playing track again when queue size > 1.
-* **Audiophile Sleep Timer Polish**:
-  * Preserves and restores user-selected volume levels after timer fade-out or cancellation instead of forcefully resetting to 100%.
-* **Storage & Cloud Resiliency**:
-  * Added atomic file writes with `.tmp` staging for track library cache, playlists, and cloud catalog to eliminate risk of database corruption on process termination.
-  * Safe column index resolution for MediaStore on Android 10+ with proper `albumId > 0` validation to eliminate missing album art crashes.
-  * Guaranteed cleanup of pending MediaStore URIs on aborted or failed Telegram cloud downloads.
-  * Ensured HTTP connection closure across LRCLIB lyrics requests to eliminate socket leaks.
-  * Updated OTA update manager current version identifier to `v1.6.1`.
+### Floating Island MiniPlayer with 33 RPM Vinyl Record
+* **Interactive 46dp Mini Vinyl Record**:
+  * Concentric microgrooves drawn on Canvas with outer vinyl rim, spinning continuously at 33 RPM during playback.
+  * Center circular album art label with central spindle hole.
+* **Kinetic Drag-to-Skip Gestures**:
+  * Interactive horizontal drag translation with physical spring resistance and haptic feedback.
+  * Swiping past 70dp triggers previous or next track skip with instant spring-back return.
+* **Luminous Audio Progress Filament**:
+  * Ultra-thin gradient progress filament running along the bottom edge showing live playback progress.
+
+---
+
+### Depth-of-Field Kinetic Typography Lyrics
+* **Kinetic Depth-of-Field**:
+  * Active line magnified in bold typography, highlighted in active accent color, and housed in an illuminated spotlight card with live timecode badges (`[02:15]`).
+  * Distant lines feature progressive opacity falloff (0.65f to 0.22f) for true spatial depth.
+  * Direct seek: Tapping any lyric line seeks playback directly with tactile haptic feedback.
+  * Automatic smooth scrolling centered on active lyrics.
+
+---
+
+### Quick-Search Runner Command Palette
+* **Spotlight / Wofi Command Palette**: Monospace terminal prompt pill `find >`, active border accent glow, query clear action, and seamless keyboard dismissal.
+
+---
+
+### Machined Telemetry Settings & Hardware Rack
+* **Live Pipeline Telemetry Bar**: Real-time display of audio rendering engine (`AAudio PCM`), bit-depth and sample rate (`44.1kHz / 16b`), studio headroom (`+0.0dB Direct`), and driver state (`Bit-Perfect`).
+* **Gesture System Monitoring Card**: Documents and verifies the Android edge gesture dismissal shield and double-back exit safety mechanism.
 
 ---
 
 ## Package Information
-* **Version**: `v1.6.1`
-* **Version Code**: `9`
+* **Version**: `v1.7.0`
+* **Version Code**: `10`
 * **Package Name**: `com.example.hyprmusic`
 * **Target SDK**: Android 16 (API 36)
 * **Minimum SDK**: Android 10 (API 29)
@@ -101,4 +100,4 @@ HyprMusic v1.6.1 delivers critical bug fixes, gesture stabilization, and compreh
 ---
 
 ## Installation
-Download the `HyprMusic-v1.6.1.apk` asset and install directly on your Android device (Android 10+), or use the built-in OTA update checker in Settings.
+Download the `HyprMusic-v1.7.0.apk` asset and install directly on your Android device (Android 10+), or use the built-in OTA update checker in Settings.
