@@ -1,52 +1,51 @@
-# HyprMusic v1.8.0 — Audiophile Tonearm Physics, Physical Digipak Sleeve & Quick Actions Overhaul
+# HyprMusic v1.9.1 — Studio-Grade Hardware Acoustic Profiles & Studio Mastering Equalizer
 
-HyprMusic v1.8.0 delivers an authentic physical audiophile centerpiece overhaul, a complete rewrite of the Home screen Audio Engine quick actions, album art restoration across all terminal theme rows, and a decluttered Settings page.
-
----
-
-## What's New in v1.8.0
-
-### Ultra-Realistic Master Vinyl Turntable Centerpiece
-* **Fixed-Pivot Tonearm Physics**: Replaced container-level canvas rotation with a mathematically anchored pivot at `(width * 0.85f, height * 0.17f)` using DrawScope rotation around the plinth bearing base. The tonearm pivot stays permanently anchored to the turntable body.
-* **Lead-In to Lead-Out Needle Tracking**: When playback is paused or stopped, the tonearm smoothly parks at `-12°` on the physical cueing arm-rest clip. While playing, the tonearm dynamically interpolates from `7°` (lead-in groove) to `20°` (lead-out runoff), tracking song progress strictly across the sound grooves and never piercing the circular center label.
-* **Audiophile S-Curve Aluminum Tube**: Rendered an authentic cubic Bezier S-curved tonearm tube with polished chrome reflection gradient, rear knurled counterweight cylinder, angled headshell, phono cartridge body with accent highlight, and diamond stylus tip.
-* **Platter Stroboscopic Detailing**: Features a recessed platter well with radial drop-shadow, heavy cast aluminum bevel rim with 4 rings of strobe calibration dots, and an anisotropic bowtie/butterfly optical reflection sheen across the rotating vinyl microgrooves.
+HyprMusic v1.9.1 introduces studio-grade hardware acoustic profile matrices to the Dolby Mastering Engine, pairing dynamic frequency response mapping and profile-calibrated headroom pre-cut gain with an overhaul of the Studio Equalizer interface.
 
 ---
 
-### Tangible Physical Gatefold Digipak Sleeve
-* **Authentic Cardboard Jacket**: Eliminated harsh wireframe neon borders in favor of soft ambient underglow, an authentic physical book-spine fold crease highlight on the left, and an open pocket edge on the right.
-* **Sliding 12-Inch Vinyl LP**: Features an authentic vinyl disc that slides out from the sleeve pocket (58dp when playing with subtle RMS sway, 36dp when paused), showcasing grooved optical reflection sweep gradients and a circular center album artwork label with center spindle pin.
+## What's New in v1.9.1
+
+### Hardware-Targeted Acoustic Profile Matrices (DolbyPresetProfile)
+* **Cinema Soundstage (`HOME_THEATER`)**:
+  * Designed for external speakers, soundbars, and multi-channel systems.
+  * Spatial room boundary expanded to `780` for a broad, three-dimensional acoustic soundstage.
+  * Calibrated sub-bass boost (`+7.0 dB`) and mid-bass punch (`+3.0 dB`) with `0.65f` (-3.7 dB) headroom pre-cut gain to maintain distortion-free dynamic peaks.
+* **Cabin Acoustic (`CAR_AUDIO`)**:
+  * Engineered specifically for automobile interior acoustics and road vibration compensation.
+  * Sub-bass rumble elevated to `+8.0 dB` to overcome tire and engine rumble, paired with an upper-mid boost (`+3.0 dB`) to preserve vocal articulation against wind noise.
+  * Spatial boundary restricted to `250` for focused imaging inside cabin enclosures; safe headroom pre-cut set to `0.62f` (-4.1 dB).
+* **Intimate Buds (`IN_EAR_BUDS`)**:
+  * Acoustically tuned for in-ear monitors (IEMs) and true wireless earbuds.
+  * Introduces a surgical lower-mid scoop (`-1.5 dB`) across the 250Hz - 500Hz region to eliminate enclosed skull resonance and ear-canal boxiness.
+  * Air and brilliance elevated (`+3.5 dB`), spatial width set to `320`, with `0.75f` (-2.5 dB) headroom pre-cut.
+* **Studio Reference (`OVER_EAR_HEADPHONES`)**:
+  * Tuned for open-back and closed-back circumaural studio headphones.
+  * Delivers a neutral, transparent mid-range with airy top-end brilliance (`+6.0 dB`) and subtle sub-bass extension (`+4.0 dB`).
+  * Expansive spatial strength (`550`) with `0.70f` (-3.1 dB) headroom pre-cut for mastering-grade fidelity.
+* **Midnight Cinema (`NIGHT_LOUDNESS`)**:
+  * Optimized for late-night listening without abrupt volume spikes or muddy dialogue.
+  * Boosts center mid-range dialogue (`+3.5 dB`) while reigning in sub-bass impact (`+2.0 dB`) and preserving upper clarity.
+  * Headroom pre-cut set to `0.80f` (-1.9 dB) with `400` spatial room strength.
 
 ---
 
-### Home Screen Audio Engine Quick Actions Overhaul
-* **Play / Pause Button**:
-  * Added fallback support for idle or newly launched states: clicking `PLAY` when no track is actively loaded automatically initiates playback with the first track from the indexed library rather than failing silently.
-  * Hardened ExoPlayer resume logic against `STATE_IDLE` and `STATE_ENDED` edge conditions, ensuring instantaneous playback recovery.
-  * Enhanced with `hyprBounceClick` and active state borders.
-* **Shuffle Button**:
-  * Implemented `playRandomMix`, which shuffles the entire library queue, persists `isShuffle = true` to the playback state, and starts audio immediately. Subsequent track skips remain in shuffle mode throughout the session.
-  * Added visual active-state tracking: when shuffle is active, the button renders `spec.borderActive`, an active background fill, and accent-tinted iconography.
-  * Tactile bounce feedback and a brief confirmation toast (`Shuffled X tracks`).
-* **Rescan Button**:
-  * Wired full observation of `isScanning` into the terminal rows home layout.
-  * Added a smooth 360-degree rotation animation on the refresh icon while scanning is underway, accompanied by `SCANNING...` status typography.
-  * Implemented atomic concurrency guards in `MusicRepository.scanLocalMedia()` to eliminate redundant background scans.
-  * Interactive click-lock disables the button during an active scan to prevent double-tap storming.
-  * Displays a completion toast confirming indexed track counts.
-* **Dynamic Audio Engine Badge**:
-  * The top-right badge now dynamically displays `[ SCANNING ]` during media indexing, `[ PLAYING ]` when streaming audio, `[ PAUSED ]` when paused with loaded media, and `[ IDLE ]` when stopped.
+### Dynamic Frequency Response & Safe Headroom Routing
+* **Center Frequency Interpolation**: Maps each profile's precise acoustic offsets dynamically against the Android device's physical hardware equalizer bands (from 31Hz sub-bass up to 16kHz brilliance).
+* **Profile-Specific Dynamic Headroom Pre-Cut**: Core playback volume dynamically adapts to the selected acoustic profile's required attenuation factor, preventing inter-sample clipping and digital distortion regardless of hardware EQ boost amplitudes.
+* **Virtualizer Room Sync**: Seamlessly syncs hardware audio virtualizer spatial width with the active profile's acoustic environment parameters.
 
 ---
 
-### Universal Album Art in Terminal Layouts
-* **TerminalRowsHomeScreen Album Art Jackets**: Added a 38x38dp rounded album artwork jacket thumbnail with cached Coil loading, boundary border, and active mini equalizer bar overlay to `TerminalRowsHomeScreen`. Emerald Matrix, Monokai Pro, and all terminal theme layouts now display album art alongside track indices.
-
----
-
-### Settings Page Cleanup
-* **Eliminated Architecture Slop**: Removed the verbose `GESTURE SYSTEM // NAVIGATION` card from the Settings screen. The page now flows cleanly and directly from the Engine telemetry header into `Audio DSP // Equalizer`.
+### Studio Equalizer Panel UI Overhaul
+* **Acoustic Environment Card Carousel**:
+  * Horizontal scrolling carousel featuring dedicated interactive cards for all 5 acoustic environments.
+  * Live telemetry badges for each profile showing room boundary strength (`ROOM: <val>`), safe pre-cut gain (`GAIN: <val>x`), and sub-bass emphasis (`SUB: +<val>dB`).
+  * Smooth theme-aware selection border animations and active state indicators.
+* **Dolby Mastering Hero Selector**:
+  * Elevated hero card displaying active profile naming, active acoustic telemetry (`ACOUSTICS: <profile>`), and safe headroom readouts (`HEADROOM: <gain>x SAFE`).
+  * One-tap toggle to immediately engage or disengage the mastering engine.
+  * One-touch matrix re-apply action button to instantly realign all bands to the active hardware profile target.
 
 ---
 
@@ -54,9 +53,9 @@ HyprMusic v1.8.0 delivers an authentic physical audiophile centerpiece overhaul,
 * **Minimum Android Version**: Android 10.0 (API level 29)
 * **Target Android Version**: Android 16.0 (API level 36)
 * **Architecture**: Jetpack Compose 100% Kotlin Coroutines, ExoPlayer Media3, StateFlow Architecture
-* **Version**: `v1.8.0` (Build 11)
+* **Version**: `v1.9.1` (Build 13)
 
 ---
 
 ## Installation
-Download the `HyprMusic-v1.8.0.apk` asset and install directly on your Android device (Android 10+), or use the built-in OTA update checker in Settings.
+Download the `HyprMusic-v1.9.1.apk` asset and install directly on your Android device (Android 10+), or use the built-in OTA update checker in Settings.

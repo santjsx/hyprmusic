@@ -1,6 +1,7 @@
 package com.example.hyprmusic.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,7 +32,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
@@ -56,12 +56,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.hyprmusic.core.media.DolbyPresetProfile
 import com.example.hyprmusic.core.media.EqualizerBand
 import com.example.hyprmusic.core.media.HyprEqualizer
 import com.example.hyprmusic.core.theming.HyprThemeConfig
@@ -78,6 +80,7 @@ fun EqualizerDialog(
     val bassBoost by HyprEqualizer.bassBoostStrength.collectAsStateWithLifecycle()
     val virtualizer by HyprEqualizer.virtualizerStrength.collectAsStateWithLifecycle()
     val isDolbyEnabled by HyprEqualizer.isDolbyEnabled.collectAsStateWithLifecycle()
+    val activeProfile by HyprEqualizer.currentDolbyProfile.collectAsStateWithLifecycle()
     val spatialStrength by HyprEqualizer.spatialStrength.collectAsStateWithLifecycle()
     val isLimiterEngaged by HyprEqualizer.isLimiterEngaged.collectAsStateWithLifecycle()
 
@@ -186,16 +189,85 @@ fun EqualizerDialog(
                         isDolbyActive = isDolbyEnabled,
                         isEnabled = isEnabled,
                         isLimiterEngaged = isLimiterEngaged,
+                        activeProfile = activeProfile,
                         spatialStrength = spatialStrength,
                         theme = theme,
                         onToggleDolby = { HyprEqualizer.setDolbyEnabled(it) },
-                        onApplyHybridCurve = { HyprEqualizer.applyDolbyCinemaTuning() },
+                        onApplyHybridCurve = { HyprEqualizer.setDolbyProfile(activeProfile) },
                         onSpatialStrengthChange = { HyprEqualizer.setSpatialStrength(it) }
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    // Presets Carousel
+                    // Acoustic Environment Hardware Profiles Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "ACOUSTIC ENVIRONMENTS",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            color = theme.textSecondaryColor
+                        )
+                        Text(
+                            text = "HARDWARE-TARGETED",
+                            fontSize = 8.5.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = theme.accentColor
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Acoustic Environments Carousel
+                    val profileScrollState = rememberScrollState()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(profileScrollState),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        DolbyPresetProfile.values().forEach { profile ->
+                            AcousticEnvironmentCard(
+                                profile = profile,
+                                isSelected = isDolbyEnabled && isEnabled && activeProfile == profile,
+                                isEnabled = isEnabled,
+                                theme = theme,
+                                onSelect = {
+                                    HyprEqualizer.setDolbyProfile(profile)
+                                }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Standard Presets Carousel Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "PRESET CURVES",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            color = theme.textSecondaryColor
+                        )
+                        Text(
+                            text = currentPreset.uppercase(),
+                            fontSize = 8.5.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = theme.accentColor
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
                     val presetScrollState = rememberScrollState()
                     Row(
                         modifier = Modifier
@@ -235,13 +307,13 @@ fun EqualizerDialog(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     // Frequency Response Curve Visualizer
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(60.dp)
+                            .height(62.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .background(theme.surfaceVariantColor.copy(alpha = 0.7f))
                             .border(0.5.dp, theme.accentColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
@@ -459,6 +531,114 @@ fun EqualizerDialog(
 }
 
 /**
+ * Hardware-Targeted Acoustic Environment Card.
+ */
+@Composable
+fun AcousticEnvironmentCard(
+    profile: DolbyPresetProfile,
+    isSelected: Boolean,
+    isEnabled: Boolean,
+    theme: HyprThemeConfig,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val animatedBg by animateColorAsState(
+        targetValue = if (isSelected && isEnabled) theme.accentColor.copy(alpha = 0.20f)
+        else theme.surfaceVariantColor.copy(alpha = 0.60f),
+        label = "ProfileCardBg"
+    )
+    val animatedBorderWidth by animateDpAsState(
+        targetValue = if (isSelected && isEnabled) 1.5.dp else 0.8.dp,
+        label = "ProfileCardBorder"
+    )
+
+    Box(
+        modifier = modifier
+            .width(230.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(animatedBg)
+            .border(
+                width = animatedBorderWidth,
+                color = if (isSelected && isEnabled) theme.accentColor else theme.inactiveBorderColor.copy(alpha = 0.35f),
+                shape = RoundedCornerShape(10.dp)
+            )
+            .clickable { onSelect() }
+            .padding(11.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = profile.displayName,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (isSelected && isEnabled) theme.accentColor else theme.textPrimaryColor
+                )
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(if (isSelected && isEnabled) theme.accentColor else Color.Gray.copy(alpha = 0.4f))
+                )
+            }
+
+            Text(
+                text = profile.subtitle,
+                fontSize = 8.5.sp,
+                fontFamily = FontFamily.Monospace,
+                color = theme.textSecondaryColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = profile.description,
+                fontSize = 8.sp,
+                fontFamily = FontFamily.Monospace,
+                color = theme.textPrimaryColor.copy(alpha = 0.8f),
+                lineHeight = 11.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Technical Profile Badges
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "ROOM: ${profile.spatialStrength}",
+                    fontSize = 7.5.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (isSelected && isEnabled) theme.accentColor else theme.textSecondaryColor
+                )
+                Text(
+                    text = "GAIN: ${profile.preCutGain}x",
+                    fontSize = 7.5.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (isSelected && isEnabled) Color(0xFF00E676) else theme.textSecondaryColor
+                )
+                Text(
+                    text = "SUB: +${profile.subBass.toInt()}dB",
+                    fontSize = 7.5.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (isSelected && isEnabled) theme.accentColor else theme.textSecondaryColor
+                )
+            }
+        }
+    }
+}
+
+/**
  * One-Tap Dolby Studio Remastering Hero Selector.
  * Isolates complex audio configurations into clean, beautifully responsive states.
  */
@@ -467,6 +647,7 @@ fun DolbyMasteringSelector(
     isDolbyActive: Boolean,
     isEnabled: Boolean,
     isLimiterEngaged: Boolean,
+    activeProfile: DolbyPresetProfile,
     spatialStrength: Int,
     theme: HyprThemeConfig,
     onToggleDolby: (Boolean) -> Unit,
@@ -529,10 +710,10 @@ fun DolbyMasteringSelector(
                     Spacer(modifier = Modifier.height(3.dp))
                     Text(
                         text = if (isDolbyActive && isEnabled)
-                            "Adaptive 3D soundstage & active distortion prevention enabled."
+                            "${activeProfile.displayName} profile active. Adaptive 3D soundstage & active distortion prevention enabled."
                         else
                             "Standard flat playback. Tap to optimize acoustic balance.",
-                        fontSize = 9.sp,
+                        fontSize = 8.5.sp,
                         fontFamily = FontFamily.Monospace,
                         color = textColor
                     )
@@ -568,7 +749,7 @@ fun DolbyMasteringSelector(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "HEADROOM: -3.1dB (0.70x)",
+                        text = "HEADROOM: ${activeProfile.preCutGain}x SAFE",
                         color = if (isDolbyActive && isEnabled) Color(0xFF00E676) else Color.Gray,
                         fontSize = 8.5.sp,
                         fontFamily = FontFamily.Monospace,
@@ -601,15 +782,8 @@ fun DolbyMasteringSelector(
                             .background(if (isDolbyActive && isEnabled) theme.accentColor else Color.Gray)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    val soundstageLabel = when {
-                        !isEnabled || !isDolbyActive -> "DIRECT"
-                        spatialStrength < 250 -> "DIRECT"
-                        spatialStrength < 500 -> "WIDE"
-                        spatialStrength < 750 -> "THEATER"
-                        else -> "360 DOME"
-                    }
                     Text(
-                        text = "ACOUSTICS: $soundstageLabel",
+                        text = "ACOUSTICS: ${activeProfile.name.replace('_', ' ')}",
                         color = if (isDolbyActive && isEnabled) theme.accentColor else Color.Gray,
                         fontSize = 8.5.sp,
                         fontFamily = FontFamily.Monospace,
@@ -660,7 +834,7 @@ fun DolbyMasteringSelector(
                         .height(28.dp)
                 )
 
-                // Harmon/Dolby Hybrid Curve Action Button
+                // Re-Apply Active Profile Matrix Action Button
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -674,7 +848,7 @@ fun DolbyMasteringSelector(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "RE-APPLY HARMON/DOLBY HYBRID CURVE (-2dB MUD SCOOP / +6dB SUB)",
+                        text = "RE-APPLY ${activeProfile.displayName.uppercase()} MATRIX",
                         color = theme.accentColor,
                         fontSize = 8.sp,
                         fontFamily = FontFamily.Monospace,
@@ -729,6 +903,7 @@ private fun VerticalEqualizerFader(
                         change.consume()
                         val h = size.height.toFloat()
                         val y = change.position.y.coerceIn(0f, h)
+                        // Top is +12dB, Bottom is -12dB
                         val fraction = if (h > 0f) 1f - (y / h) else 0.5f
                         val newDb = minDb + (fraction * (maxDb - minDb))
                         onLevelChange(newDb.toInt().toShort())

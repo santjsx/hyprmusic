@@ -24,6 +24,67 @@ data class EqualizerBand(
         get() = levelMb / 100f
 }
 
+/**
+ * High-Fidelity Audio Matrix for Hardware-Targeted Studio Mastering.
+ * Tailored frequency offsets, room boundaries, and pre-cut headroom values
+ * designed to compensate for physical acoustic bottlenecks.
+ */
+enum class DolbyPresetProfile(
+    val displayName: String,
+    val subtitle: String,
+    val description: String,
+    val spatialStrength: Short, // 0 to 1000 (Spatial room boundaries)
+    val subBass: Float,        // 31Hz - 60Hz (Sub-bass rumble)
+    val midBass: Float,        // 125Hz - 250Hz (Kick drum punch)
+    val lowerMids: Float,      // 400Hz - 500Hz (Body/Warmth)
+    val centerMids: Float,     // 1kHz (Vocal core)
+    val upperMids: Float,      // 2kHz - 3kHz (Instrument presence)
+    val treble: Float,         // 4kHz - 8kHz (Detail/Crispness)
+    val brilliance: Float,     // 16kHz (Acoustic air)
+    val preCutGain: Float      // Safe headroom offset (0.0f to 1.0f)
+) {
+    HOME_THEATER(
+        displayName = "Cinema Soundstage",
+        subtitle = "Dolby Digital Home Theater",
+        description = "Simulates massive room acoustics. Delivers a deep sub-bass physical rumble and an extra-wide multi-channel soundstage.",
+        spatialStrength = 780,
+        subBass = 7.0f, midBass = 4.0f, lowerMids = 0.5f, centerMids = -3.0f, upperMids = 2.0f, treble = 4.5f, brilliance = 5.5f,
+        preCutGain = 0.65f // High boost requires deep headroom control
+    ),
+    CAR_AUDIO(
+        displayName = "Cabin Acoustic",
+        subtitle = "Automotive Master Tuning",
+        description = "Compensates for road noise and engine rumble. Focuses power into mid-bass punch and pulls vocal presence forward.",
+        spatialStrength = 250, // Narrow spatial field for close-proximity car speakers
+        subBass = 8.0f, midBass = 5.5f, lowerMids = -1.0f, centerMids = 0.5f, upperMids = 3.0f, treble = 2.5f, brilliance = 4.0f,
+        preCutGain = 0.62f
+    ),
+    IN_EAR_BUDS(
+        displayName = "Intimate Buds",
+        subtitle = "In-Ear Monitor Optimization",
+        description = "Reduces harsh ear-canal resonances. Relieves ear pressure while maintaining crystalline acoustic details and close up, intimate vocals.",
+        spatialStrength = 320, // Lower width prevents hollow spatial echo inside the ear canal
+        subBass = 4.5f, midBass = 2.0f, lowerMids = -1.5f, centerMids = -1.0f, upperMids = 1.0f, treble = 3.0f, brilliance = 4.0f,
+        preCutGain = 0.75f
+    ),
+    OVER_EAR_HEADPHONES(
+        displayName = "Studio Reference",
+        subtitle = "Over-Ear Open-Back Simulation",
+        description = "Optimized for large headphone drivers. Delivers incredible instrument separation, transparent mids, and high-end structural sparkle.",
+        spatialStrength = 550,
+        subBass = 5.5f, midBass = 3.0f, lowerMids = 0.0f, centerMids = -2.0f, upperMids = 1.5f, treble = 4.0f, brilliance = 6.0f,
+        preCutGain = 0.70f
+    ),
+    NIGHT_LOUDNESS(
+        displayName = "Midnight Cinema",
+        subtitle = "Dynamic Range Normalization",
+        description = "Perfect for quiet listening. Evens out loud explosions or drops while lifting quiet vocals and micro-details.",
+        spatialStrength = 400,
+        subBass = 3.0f, midBass = 2.0f, lowerMids = 1.0f, centerMids = 2.0f, upperMids = 2.5f, treble = 3.0f, brilliance = 3.0f,
+        preCutGain = 0.80f
+    )
+}
+
 object HyprEqualizer {
 
     private var equalizer: Equalizer? = null
@@ -59,7 +120,10 @@ object HyprEqualizer {
     private val _isDolbyEnabled = MutableStateFlow(false)
     val isDolbyEnabled: StateFlow<Boolean> = _isDolbyEnabled.asStateFlow()
 
-    private val _spatialStrength = MutableStateFlow(450)
+    private val _currentDolbyProfile = MutableStateFlow(DolbyPresetProfile.OVER_EAR_HEADPHONES)
+    val currentDolbyProfile: StateFlow<DolbyPresetProfile> = _currentDolbyProfile.asStateFlow()
+
+    private val _spatialStrength = MutableStateFlow(550)
     val spatialStrength: StateFlow<Int> = _spatialStrength.asStateFlow()
 
     private val _isLimiterEngaged = MutableStateFlow(false)
@@ -109,13 +173,14 @@ object HyprEqualizer {
         val p = prefs ?: return
 
         // Clean migration: reset any past corrupted or extreme settings to pristine Flat baseline
-        val isClean = p.getBoolean("eq_v3_clean", false)
+        val isClean = p.getBoolean("eq_v4_clean", false)
         if (!isClean) {
             p.edit()
-                .putBoolean("eq_v3_clean", true)
+                .putBoolean("eq_v4_clean", true)
                 .putBoolean("eq_enabled", false)
                 .putBoolean("dolby_enabled", false)
-                .putInt("spatial_strength", 450)
+                .putString("dolby_profile", DolbyPresetProfile.OVER_EAR_HEADPHONES.name)
+                .putInt("spatial_strength", 550)
                 .putString("preset", "Flat")
                 .putInt("bass_boost", 0)
                 .putInt("virtualizer", 0)
@@ -131,7 +196,11 @@ object HyprEqualizer {
         val savedDolby = p.getBoolean("dolby_enabled", false)
         _isDolbyEnabled.value = savedDolby
 
-        val savedSpatial = p.getInt("spatial_strength", 450).coerceIn(0, 1000)
+        val savedProfileName = p.getString("dolby_profile", DolbyPresetProfile.OVER_EAR_HEADPHONES.name)
+        val matchedProfile = DolbyPresetProfile.values().find { it.name == savedProfileName } ?: DolbyPresetProfile.OVER_EAR_HEADPHONES
+        _currentDolbyProfile.value = matchedProfile
+
+        val savedSpatial = p.getInt("spatial_strength", matchedProfile.spatialStrength.toInt()).coerceIn(0, 1000)
         _spatialStrength.value = savedSpatial
 
         val savedPreset = p.getString("preset", "Flat") ?: "Flat"
@@ -165,7 +234,7 @@ object HyprEqualizer {
             }
 
             val effectiveSpatial = if (_isDolbyEnabled.value) {
-                _spatialStrength.value.coerceAtLeast(350)
+                _spatialStrength.value.coerceAtLeast(200)
             } else {
                 _virtualizerStrength.value
             }
@@ -255,31 +324,35 @@ object HyprEqualizer {
     }
 
     /**
-     * The Harmon/Dolby Hybrid Curve Matrix.
-     * Calculates decibels target for any hardware center frequency.
+     * Maps any center frequency to the target decibels defined by a DolbyPresetProfile.
      */
-    fun calculateDolbyTargetDb(centerFreqHz: Int): Float = when {
-        centerFreqHz <= 60   -> 6.0f   // Sub-bass physical vibration (Deep cinematic feel)
-        centerFreqHz <= 160  -> 3.5f   // Warm acoustic punch (Drums and basslines)
-        centerFreqHz <= 400  -> 1.0f   // Lower-mid structural weight
-        centerFreqHz <= 1000 -> -2.0f  // The "Mud Scoop" - Clears up cheap speaker boxiness
-        centerFreqHz <= 3000 -> 1.5f   // Premium vocal separation and presence
-        centerFreqHz <= 7000 -> 3.5f   // Micro-detail brightness (Acoustic crispness)
-        else                 -> 5.0f   // Pure diamond air and ultra-wide spatial extension
+    fun calculateProfileTargetDb(profile: DolbyPresetProfile, centerFreqHz: Int): Float = when {
+        centerFreqHz <= 60   -> profile.subBass
+        centerFreqHz <= 250  -> profile.midBass
+        centerFreqHz <= 500  -> profile.lowerMids
+        centerFreqHz <= 1000 -> profile.centerMids
+        centerFreqHz <= 3000 -> profile.upperMids
+        centerFreqHz <= 8000 -> profile.treble
+        else                 -> profile.brilliance
     }
 
     /**
+     * Legacy Harmon/Dolby Hybrid Curve helper.
+     */
+    fun calculateDolbyTargetDb(centerFreqHz: Int): Float =
+        calculateProfileTargetDb(_currentDolbyProfile.value, centerFreqHz)
+
+    /**
      * Professional Headroom Compensation (Pre-Cut Attenuation).
-     * When Dolby is active, enforces 0.70f core player volume headroom (creating 3dB
-     * of digital headroom to guarantee zero clipping or distortion).
+     * When Dolby is active, enforces profile-specific core player volume headroom
+     * (e.g. 0.65f for Home Theater, 0.70f for Studio Reference, 0.75f for In-Ear),
+     * ensuring massive boosts never choke hardware drivers.
      */
     fun getHeadroomVolumeFactor(): Float {
         if (!_isEnabled.value) return 1.0f
 
         if (_isDolbyEnabled.value) {
-            // Crucial step: 0.70f creates 3dB of digital headroom,
-            // ensuring frequency boosts and 3D spatializing never choke hardware speakers.
-            return 0.70f
+            return _currentDolbyProfile.value.preCutGain
         }
 
         val maxBoostMb = _bands.value.maxOfOrNull { it.levelMb.toInt() }?.coerceAtLeast(0) ?: 0
@@ -316,11 +389,7 @@ object HyprEqualizer {
                 _isEnabled.value = true
                 prefs?.edit()?.putBoolean("eq_enabled", true)?.apply()
             }
-            if (_spatialStrength.value == 0) {
-                _spatialStrength.value = 450
-                prefs?.edit()?.putInt("spatial_strength", 450)?.apply()
-            }
-            applyDolbyCinemaTuning()
+            setDolbyProfile(_currentDolbyProfile.value)
         } else {
             if (currentAttachedSessionId != 0) {
                 applyEffectsToSession(currentAttachedSessionId)
@@ -328,19 +397,37 @@ object HyprEqualizer {
         }
     }
 
-    fun applyDolbyCinemaTuning() {
-        _currentPreset.value = "Dolby Cinema"
-        prefs?.edit()?.putString("preset", "Dolby Cinema")?.apply()
+    /**
+     * Sets and injects a hardware-targeted DolbyPresetProfile into the audio engine.
+     */
+    fun setDolbyProfile(profile: DolbyPresetProfile) {
+        _currentDolbyProfile.value = profile
+        _spatialStrength.value = profile.spatialStrength.toInt()
+        _currentPreset.value = profile.displayName
+        prefs?.edit()?.apply {
+            putString("dolby_profile", profile.name)
+            putInt("spatial_strength", profile.spatialStrength.toInt())
+            putString("preset", profile.displayName)
+            apply()
+        }
 
-        // 1. Calculate and map for standard state list
+        if (!_isDolbyEnabled.value) {
+            _isDolbyEnabled.value = true
+            prefs?.edit()?.putBoolean("dolby_enabled", true)?.apply()
+        }
+        if (!_isEnabled.value) {
+            _isEnabled.value = true
+            prefs?.edit()?.putBoolean("eq_enabled", true)?.apply()
+        }
+
+        // Apply physical configurations across available device bands
         _bands.value = _bands.value.map { band ->
-            val targetDb = calculateDolbyTargetDb(band.centerFreqHz)
+            val targetDb = calculateProfileTargetDb(profile, band.centerFreqHz)
             val millibels = (targetDb * 100).toInt().toShort()
             prefs?.edit()?.putInt("band_${band.bandIndex}", millibels.toInt())?.apply()
             band.copy(levelMb = millibels)
         }
 
-        // 2. Hardware-calibrated tuning across actual hardware bands
         val eq = equalizer
         if (eq != null) {
             try {
@@ -355,7 +442,7 @@ object HyprEqualizer {
                     } catch (_: Exception) {
                         _bands.value.getOrNull(band)?.centerFreqHz ?: 1000
                     }
-                    val targetDb = calculateDolbyTargetDb(centerFreqHz)
+                    val targetDb = calculateProfileTargetDb(profile, centerFreqHz)
                     val millibels = (targetDb * 100).toInt().toShort()
                     val safeClampedLevel = millibels.coerceIn(minLevel, maxLevel)
                     eq.setBandLevel(band.toShort(), safeClampedLevel)
@@ -365,9 +452,15 @@ object HyprEqualizer {
             }
         }
 
+        setVirtualizer(profile.spatialStrength.toInt())
+
         if (currentAttachedSessionId != 0) {
             applyEffectsToSession(currentAttachedSessionId)
         }
+    }
+
+    fun applyDolbyCinemaTuning() {
+        setDolbyProfile(_currentDolbyProfile.value)
     }
 
     fun setSpatialStrength(strength: Int) {
@@ -445,18 +538,16 @@ object HyprEqualizer {
         // Calibrated gain curves centered near 0 dB to preserve dynamic range
         val gains: List<Short> = when (presetName) {
             "Dolby Cinema" -> {
-                _isDolbyEnabled.value = true
-                prefs?.edit()?.putBoolean("dolby_enabled", true)?.apply()
-                _spatialStrength.value = 450
+                setDolbyProfile(DolbyPresetProfile.OVER_EAR_HEADPHONES)
                 DEFAULT_BANDS.map { band ->
-                    (calculateDolbyTargetDb(band.centerFreqHz) * 100).toInt().toShort()
+                    (calculateProfileTargetDb(DolbyPresetProfile.OVER_EAR_HEADPHONES, band.centerFreqHz) * 100).toInt().toShort()
                 }
             }
             "Spatial Theater" -> {
-                _isDolbyEnabled.value = true
-                prefs?.edit()?.putBoolean("dolby_enabled", true)?.apply()
-                _spatialStrength.value = 700
-                listOf(350, 150, 0, 150, 400)
+                setDolbyProfile(DolbyPresetProfile.HOME_THEATER)
+                DEFAULT_BANDS.map { band ->
+                    (calculateProfileTargetDb(DolbyPresetProfile.HOME_THEATER, band.centerFreqHz) * 100).toInt().toShort()
+                }
             }
             "Vocal Clarity" -> {
                 listOf(-150, -100, 300, 200, 50)
