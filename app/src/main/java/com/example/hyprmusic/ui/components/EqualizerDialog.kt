@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -28,10 +27,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
@@ -41,7 +43,9 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,11 +55,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -69,6 +73,20 @@ import com.example.hyprmusic.core.media.HyprEqualizer
 import com.example.hyprmusic.core.theming.HyprThemeConfig
 import com.example.hyprmusic.core.theming.hyprBounceClick
 
+/**
+ * Operating mode tabs for the Dual-Tier Equalizer Suite.
+ */
+enum class EqualizerTab {
+    SMART, // Smart Acoustic: 1-tap hardware targets & macro dynamics
+    PRO    // Pro Console: 5-band vertical faders & frequency curve
+}
+
+/**
+ * Production-Grade Studio Equalizer & DSP Mastering Dialog.
+ * Features a dual-tier architecture that eliminates vertical scrolling,
+ * prevents touch conflicts, avoids background bleed, and offers both
+ * effortless smart profiles and precision audiophile console control.
+ */
 @Composable
 fun EqualizerDialog(
     theme: HyprThemeConfig,
@@ -78,11 +96,12 @@ fun EqualizerDialog(
     val bands by HyprEqualizer.bands.collectAsStateWithLifecycle()
     val currentPreset by HyprEqualizer.currentPreset.collectAsStateWithLifecycle()
     val bassBoost by HyprEqualizer.bassBoostStrength.collectAsStateWithLifecycle()
-    val virtualizer by HyprEqualizer.virtualizerStrength.collectAsStateWithLifecycle()
+    val spatialStrength by HyprEqualizer.spatialStrength.collectAsStateWithLifecycle()
     val isDolbyEnabled by HyprEqualizer.isDolbyEnabled.collectAsStateWithLifecycle()
     val activeProfile by HyprEqualizer.currentDolbyProfile.collectAsStateWithLifecycle()
-    val spatialStrength by HyprEqualizer.spatialStrength.collectAsStateWithLifecycle()
     val isLimiterEngaged by HyprEqualizer.isLimiterEngaged.collectAsStateWithLifecycle()
+
+    var currentTab by remember { mutableStateOf(EqualizerTab.SMART) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -98,12 +117,12 @@ fun EqualizerDialog(
                 ),
             contentAlignment = Alignment.Center
         ) {
+            // Opaque, solid-backed dialog container to completely prevent background bleed
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.94f)
-                    .heightIn(max = 680.dp)
                     .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(16).dp))
-                    .background(theme.surfaceColor)
+                    .background(theme.surfaceColor.copy(alpha = 1.0f))
                     .border(
                         width = theme.borderThicknessDp.dp,
                         brush = Brush.linearGradient(theme.activeBorderGradient),
@@ -117,413 +136,72 @@ fun EqualizerDialog(
                     .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Header Bar
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.GraphicEq,
-                                contentDescription = null,
-                                tint = theme.accentColor,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    text = "EQUALIZER // CINEMA DSP",
-                                    color = theme.textPrimaryColor,
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                                Text(
-                                    text = if (!isEnabled) {
-                                        "BIT-PERFECT DIRECT"
-                                    } else if (isDolbyEnabled) {
-                                        "DOLBY CINEMA MULTI-BAND ENGINE"
-                                    } else {
-                                        "HARDWARE DSP ACTIVE"
-                                    },
-                                    color = if (!isEnabled) theme.textSecondaryColor else theme.accentColor,
-                                    fontSize = 8.5.sp,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
-                        }
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Switch(
-                                checked = isEnabled,
-                                onCheckedChange = { HyprEqualizer.setEnabled(it) },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = theme.backgroundColor,
-                                    checkedTrackColor = theme.accentColor,
-                                    uncheckedThumbColor = theme.textSecondaryColor,
-                                    uncheckedTrackColor = theme.surfaceVariantColor
-                                ),
-                                modifier = Modifier.size(40.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Close",
-                                    tint = theme.textSecondaryColor,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // One-Tap Dolby Studio Remastering Hero Section
-                    DolbyMasteringSelector(
-                        isDolbyActive = isDolbyEnabled,
+                    // 1. Unified Master Header Bar
+                    MasterDspHeader(
                         isEnabled = isEnabled,
-                        isLimiterEngaged = isLimiterEngaged,
+                        isDolbyEnabled = isDolbyEnabled,
                         activeProfile = activeProfile,
-                        spatialStrength = spatialStrength,
                         theme = theme,
-                        onToggleDolby = { HyprEqualizer.setDolbyEnabled(it) },
-                        onApplyHybridCurve = { HyprEqualizer.setDolbyProfile(activeProfile) },
-                        onSpatialStrengthChange = { HyprEqualizer.setSpatialStrength(it) }
+                        onToggle = { HyprEqualizer.setEnabled(it) },
+                        onDismiss = onDismiss
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    // 2. Segmented Mode Switcher (Smart Acoustic vs Pro Console)
+                    SegmentedModeSwitcher(
+                        currentTab = currentTab,
+                        theme = theme,
+                        onTabSelect = { currentTab = it }
+                    )
 
-                    // Acoustic Environment Hardware Profiles Header
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "ACOUSTIC ENVIRONMENTS",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            color = theme.textSecondaryColor
+                    // 3. Tab Content Area (Zero-Scroll bounded layout)
+                    if (currentTab == EqualizerTab.SMART) {
+                        SmartAcousticView(
+                            activeProfile = activeProfile,
+                            isEnabled = isEnabled,
+                            bassBoost = bassBoost,
+                            spatialStrength = spatialStrength,
+                            theme = theme,
+                            onSelectProfile = { profile ->
+                                HyprEqualizer.setDolbyProfile(profile)
+                            },
+                            onBassBoostChange = { HyprEqualizer.setBassBoost(it) },
+                            onSpatialChange = { HyprEqualizer.setSpatialStrength(it) },
+                            onReapplyMatrix = {
+                                HyprEqualizer.setDolbyProfile(activeProfile)
+                            }
                         )
-                        Text(
-                            text = "HARDWARE-TARGETED",
-                            fontSize = 8.5.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = theme.accentColor
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Acoustic Environments Carousel
-                    val profileScrollState = rememberScrollState()
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(profileScrollState),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        DolbyPresetProfile.values().forEach { profile ->
-                            AcousticEnvironmentCard(
-                                profile = profile,
-                                isSelected = isDolbyEnabled && isEnabled && activeProfile == profile,
-                                isEnabled = isEnabled,
-                                theme = theme,
-                                onSelect = {
-                                    HyprEqualizer.setDolbyProfile(profile)
+                    } else {
+                        ProConsoleView(
+                            bands = bands,
+                            currentPreset = currentPreset,
+                            isEnabled = isEnabled,
+                            theme = theme,
+                            onBandChange = { bandIndex, newLevel ->
+                                HyprEqualizer.setBandLevel(bandIndex, newLevel)
+                            },
+                            onApplyPreset = { preset ->
+                                if (isEnabled) {
+                                    HyprEqualizer.applyPreset(preset)
                                 }
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Standard Presets Carousel Header
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "PRESET CURVES",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            color = theme.textSecondaryColor
-                        )
-                        Text(
-                            text = currentPreset.uppercase(),
-                            fontSize = 8.5.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = theme.accentColor
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    val presetScrollState = rememberScrollState()
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(presetScrollState),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        HyprEqualizer.availablePresets.forEach { preset ->
-                            val isSelected = preset.equals(currentPreset, ignoreCase = true)
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(
-                                        if (isSelected && isEnabled) theme.accentColor.copy(alpha = 0.25f)
-                                        else theme.surfaceVariantColor
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (isSelected && isEnabled) theme.accentColor else Color.Transparent,
-                                        RoundedCornerShape(6.dp)
-                                    )
-                                    .clickable {
-                                        if (isEnabled) {
-                                            HyprEqualizer.applyPreset(preset)
-                                        }
-                                    }
-                                    .padding(horizontal = 9.dp, vertical = 5.dp)
-                            ) {
-                                Text(
-                                    text = preset.uppercase(),
-                                    color = if (isSelected && isEnabled) theme.accentColor else theme.textSecondaryColor,
-                                    fontSize = 9.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Frequency Response Curve Visualizer
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(62.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(theme.surfaceVariantColor.copy(alpha = 0.7f))
-                            .border(0.5.dp, theme.accentColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            val width = size.width
-                            val height = size.height
-                            val midY = height / 2
-
-                            // Reference grid lines
-                            drawLine(
-                                color = Color.White.copy(alpha = 0.08f),
-                                start = Offset(0f, midY - height * 0.25f),
-                                end = Offset(width, midY - height * 0.25f),
-                                strokeWidth = 1f
-                            )
-                            drawLine(
-                                color = Color.White.copy(alpha = 0.16f),
-                                start = Offset(0f, midY),
-                                end = Offset(width, midY),
-                                strokeWidth = 1.2f
-                            )
-                            drawLine(
-                                color = Color.White.copy(alpha = 0.08f),
-                                start = Offset(0f, midY + height * 0.25f),
-                                end = Offset(width, midY + height * 0.25f),
-                                strokeWidth = 1f
-                            )
-
-                            if (bands.isNotEmpty()) {
-                                val strokePath = Path()
-                                val fillPath = Path()
-                                val step = width / (bands.size + 1)
-
-                                strokePath.moveTo(0f, midY)
-                                fillPath.moveTo(0f, midY)
-
-                                bands.forEachIndexed { i, band ->
-                                    val x = step * (i + 1)
-                                    val normalizedDb = (band.levelMb / 1200f).coerceIn(-1f, 1f)
-                                    val y = midY - (normalizedDb * (height * 0.40f))
-
-                                    if (i == 0) {
-                                        val cx = x / 2
-                                        strokePath.cubicTo(cx, midY, cx, y, x, y)
-                                        fillPath.cubicTo(cx, midY, cx, y, x, y)
-                                    } else {
-                                        val prevX = step * i
-                                        val prevNorm = (bands[i - 1].levelMb / 1200f).coerceIn(-1f, 1f)
-                                        val prevY = midY - (prevNorm * (height * 0.40f))
-                                        val cx = (prevX + x) / 2
-                                        strokePath.cubicTo(cx, prevY, cx, y, x, y)
-                                        fillPath.cubicTo(cx, prevY, cx, y, x, y)
-                                    }
+                            },
+                            onResetToFlat = {
+                                if (isEnabled) {
+                                    HyprEqualizer.applyPreset("Flat")
                                 }
-
-                                val lastX = step * bands.size
-                                val lastNorm = (bands.last().levelMb / 1200f).coerceIn(-1f, 1f)
-                                val lastY = midY - (lastNorm * (height * 0.40f))
-                                val finalCx = (lastX + width) / 2
-                                strokePath.cubicTo(finalCx, lastY, finalCx, midY, width, midY)
-                                fillPath.cubicTo(finalCx, lastY, finalCx, midY, width, midY)
-
-                                fillPath.lineTo(width, height)
-                                fillPath.lineTo(0f, height)
-                                fillPath.close()
-
-                                drawPath(
-                                    path = fillPath,
-                                    brush = Brush.verticalGradient(
-                                        colors = listOf(
-                                            if (isEnabled) theme.accentColor.copy(alpha = 0.22f) else Color.Transparent,
-                                            Color.Transparent
-                                        )
-                                    )
-                                )
-
-                                drawPath(
-                                    path = strokePath,
-                                    color = if (isEnabled) theme.accentColor else Color.Gray.copy(alpha = 0.4f),
-                                    style = Stroke(width = 2.2f, cap = StrokeCap.Round)
-                                )
                             }
-                        }
+                        )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // 5-Band Vertical Studio Console Faders
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(145.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        bands.forEach { band ->
-                            VerticalEqualizerFader(
-                                band = band,
-                                isEnabled = isEnabled,
-                                theme = theme,
-                                onLevelChange = { newLevel ->
-                                    HyprEqualizer.setBandLevel(band.bandIndex, newLevel)
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Acoustic Enhancement Sliders: Bass Boost & 3D Surround
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        // Bass Boost Card
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(theme.surfaceVariantColor)
-                                .padding(9.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "BASS PUNCH",
-                                    color = theme.textSecondaryColor,
-                                    fontSize = 9.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "${bassBoost / 10}%",
-                                    color = if (isEnabled) theme.accentColor else theme.textSecondaryColor,
-                                    fontSize = 9.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(3.dp))
-                            Slider(
-                                value = bassBoost.toFloat(),
-                                onValueChange = { HyprEqualizer.setBassBoost(it.toInt()) },
-                                valueRange = 0f..1000f,
-                                enabled = isEnabled,
-                                colors = SliderDefaults.colors(
-                                    thumbColor = theme.accentColor,
-                                    activeTrackColor = theme.accentColor,
-                                    inactiveTrackColor = theme.surfaceColor,
-                                    disabledThumbColor = Color.Gray,
-                                    disabledActiveTrackColor = Color.DarkGray
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(28.dp)
-                            )
-                        }
-
-                        // 3D Spatial Surround Card
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(theme.surfaceVariantColor)
-                                .padding(9.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "3D SPATIAL",
-                                    color = theme.textSecondaryColor,
-                                    fontSize = 9.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "${virtualizer / 10}%",
-                                    color = if (isEnabled) theme.accentColor else theme.textSecondaryColor,
-                                    fontSize = 9.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(3.dp))
-                            Slider(
-                                value = virtualizer.toFloat(),
-                                onValueChange = { HyprEqualizer.setVirtualizer(it.toInt()) },
-                                valueRange = 0f..1000f,
-                                enabled = isEnabled,
-                                colors = SliderDefaults.colors(
-                                    thumbColor = theme.accentColor,
-                                    activeTrackColor = theme.accentColor,
-                                    inactiveTrackColor = theme.surfaceColor,
-                                    disabledThumbColor = Color.Gray,
-                                    disabledActiveTrackColor = Color.DarkGray
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(28.dp)
-                            )
-                        }
-                    }
+                    // 4. Unified Bottom Telemetry HUD
+                    TelemetryHud(
+                        activeProfile = activeProfile,
+                        isLimiterEngaged = isLimiterEngaged,
+                        isEnabled = isEnabled,
+                        theme = theme
+                    )
                 }
             }
         }
@@ -531,107 +209,174 @@ fun EqualizerDialog(
 }
 
 /**
- * Hardware-Targeted Acoustic Environment Card.
+ * Unified Master DSP Header with single power switch.
  */
 @Composable
-fun AcousticEnvironmentCard(
-    profile: DolbyPresetProfile,
-    isSelected: Boolean,
+private fun MasterDspHeader(
     isEnabled: Boolean,
+    isDolbyEnabled: Boolean,
+    activeProfile: DolbyPresetProfile,
     theme: HyprThemeConfig,
-    onSelect: () -> Unit,
-    modifier: Modifier = Modifier
+    onToggle: (Boolean) -> Unit,
+    onDismiss: () -> Unit
 ) {
-    val animatedBg by animateColorAsState(
-        targetValue = if (isSelected && isEnabled) theme.accentColor.copy(alpha = 0.20f)
-        else theme.surfaceVariantColor.copy(alpha = 0.60f),
-        label = "ProfileCardBg"
-    )
-    val animatedBorderWidth by animateDpAsState(
-        targetValue = if (isSelected && isEnabled) 1.5.dp else 0.8.dp,
-        label = "ProfileCardBorder"
-    )
-
-    Box(
-        modifier = modifier
-            .width(230.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(animatedBg)
-            .border(
-                width = animatedBorderWidth,
-                color = if (isSelected && isEnabled) theme.accentColor else theme.inactiveBorderColor.copy(alpha = 0.35f),
-                shape = RoundedCornerShape(10.dp)
-            )
-            .clickable { onSelect() }
-            .padding(11.dp)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (isEnabled) theme.accentColor.copy(alpha = 0.18f) else theme.surfaceVariantColor),
+                contentAlignment = Alignment.Center
             ) {
+                Icon(
+                    imageVector = Icons.Default.GraphicEq,
+                    contentDescription = null,
+                    tint = if (isEnabled) theme.accentColor else theme.textSecondaryColor,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
                 Text(
-                    text = profile.displayName,
-                    fontSize = 11.sp,
+                    text = "HYPR AUDIO DSP // MASTER",
+                    color = theme.textPrimaryColor,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    text = if (!isEnabled) {
+                        "BIT-PERFECT DIRECT PASSTHROUGH"
+                    } else if (isDolbyEnabled) {
+                        "${activeProfile.displayName.uppercase()} // DOLBY 3D ACTIVE"
+                    } else {
+                        "HARDWARE DSP ACTIVE"
+                    },
+                    color = if (!isEnabled) theme.textSecondaryColor else theme.accentColor,
+                    fontSize = 8.5.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Switch(
+                checked = isEnabled,
+                onCheckedChange = onToggle,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = theme.backgroundColor,
+                    checkedTrackColor = theme.accentColor,
+                    uncheckedThumbColor = theme.textSecondaryColor,
+                    uncheckedTrackColor = theme.surfaceVariantColor
+                ),
+                modifier = Modifier.size(40.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = theme.textSecondaryColor,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Top Segmented View Switcher between Smart Acoustic and Pro Console.
+ */
+@Composable
+private fun SegmentedModeSwitcher(
+    currentTab: EqualizerTab,
+    theme: HyprThemeConfig,
+    onTabSelect: (EqualizerTab) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(34.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(theme.surfaceVariantColor.copy(alpha = 0.65f))
+            .border(0.8.dp, theme.inactiveBorderColor.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+            .padding(2.dp)
+    ) {
+        // Segment 1: Smart Acoustic
+        val smartBg by animateColorAsState(
+            targetValue = if (currentTab == EqualizerTab.SMART) theme.accentColor.copy(alpha = 0.22f) else Color.Transparent,
+            label = "SmartTabBg"
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(6.dp))
+                .background(smartBg)
+                .border(
+                    width = if (currentTab == EqualizerTab.SMART) 1.dp else 0.dp,
+                    color = if (currentTab == EqualizerTab.SMART) theme.accentColor.copy(alpha = 0.7f) else Color.Transparent,
+                    shape = RoundedCornerShape(6.dp)
+                )
+                .clickable { onTabSelect(EqualizerTab.SMART) },
+            contentAlignment = Alignment.Center
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = if (currentTab == EqualizerTab.SMART) theme.accentColor else theme.textSecondaryColor,
+                    modifier = Modifier.size(12.dp)
+                )
+                Spacer(modifier = Modifier.width(5.dp))
+                Text(
+                    text = "SMART ACOUSTIC",
+                    fontSize = 9.5.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
-                    color = if (isSelected && isEnabled) theme.accentColor else theme.textPrimaryColor
-                )
-                Box(
-                    modifier = Modifier
-                        .size(7.dp)
-                        .clip(CircleShape)
-                        .background(if (isSelected && isEnabled) theme.accentColor else Color.Gray.copy(alpha = 0.4f))
+                    color = if (currentTab == EqualizerTab.SMART) theme.accentColor else theme.textSecondaryColor
                 )
             }
+        }
 
-            Text(
-                text = profile.subtitle,
-                fontSize = 8.5.sp,
-                fontFamily = FontFamily.Monospace,
-                color = theme.textSecondaryColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = profile.description,
-                fontSize = 8.sp,
-                fontFamily = FontFamily.Monospace,
-                color = theme.textPrimaryColor.copy(alpha = 0.8f),
-                lineHeight = 11.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Technical Profile Badges
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "ROOM: ${profile.spatialStrength}",
-                    fontSize = 7.5.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = if (isSelected && isEnabled) theme.accentColor else theme.textSecondaryColor
+        // Segment 2: Pro Console
+        val proBg by animateColorAsState(
+            targetValue = if (currentTab == EqualizerTab.PRO) theme.accentColor.copy(alpha = 0.22f) else Color.Transparent,
+            label = "ProTabBg"
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(6.dp))
+                .background(proBg)
+                .border(
+                    width = if (currentTab == EqualizerTab.PRO) 1.dp else 0.dp,
+                    color = if (currentTab == EqualizerTab.PRO) theme.accentColor.copy(alpha = 0.7f) else Color.Transparent,
+                    shape = RoundedCornerShape(6.dp)
                 )
-                Text(
-                    text = "GAIN: ${profile.preCutGain}x",
-                    fontSize = 7.5.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = if (isSelected && isEnabled) Color(0xFF00E676) else theme.textSecondaryColor
+                .clickable { onTabSelect(EqualizerTab.PRO) },
+            contentAlignment = Alignment.Center
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Tune,
+                    contentDescription = null,
+                    tint = if (currentTab == EqualizerTab.PRO) theme.accentColor else theme.textSecondaryColor,
+                    modifier = Modifier.size(12.dp)
                 )
+                Spacer(modifier = Modifier.width(5.dp))
                 Text(
-                    text = "SUB: +${profile.subBass.toInt()}dB",
-                    fontSize = 7.5.sp,
+                    text = "PRO CONSOLE",
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
-                    color = if (isSelected && isEnabled) theme.accentColor else theme.textSecondaryColor
+                    color = if (currentTab == EqualizerTab.PRO) theme.accentColor else theme.textSecondaryColor
                 )
             }
         }
@@ -639,187 +384,148 @@ fun AcousticEnvironmentCard(
 }
 
 /**
- * One-Tap Dolby Studio Remastering Hero Selector.
- * Isolates complex audio configurations into clean, beautifully responsive states.
+ * Smart Acoustic Tab: Instant 1-tap hardware optimization and macro sonic controls.
  */
 @Composable
-fun DolbyMasteringSelector(
-    isDolbyActive: Boolean,
-    isEnabled: Boolean,
-    isLimiterEngaged: Boolean,
+private fun SmartAcousticView(
     activeProfile: DolbyPresetProfile,
+    isEnabled: Boolean,
+    bassBoost: Int,
     spatialStrength: Int,
     theme: HyprThemeConfig,
-    onToggleDolby: (Boolean) -> Unit,
-    onApplyHybridCurve: () -> Unit,
-    onSpatialStrengthChange: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    onSelectProfile: (DolbyPresetProfile) -> Unit,
+    onBassBoostChange: (Int) -> Unit,
+    onSpatialChange: (Int) -> Unit,
+    onReapplyMatrix: () -> Unit
 ) {
-    val containerColor by animateColorAsState(
-        targetValue = if (isDolbyActive && isEnabled) theme.accentColor.copy(alpha = 0.16f) else theme.surfaceVariantColor.copy(alpha = 0.70f),
-        label = "DolbyBgAnimation"
-    )
-    val borderColor by animateColorAsState(
-        targetValue = if (isDolbyActive && isEnabled) theme.accentColor.copy(alpha = 0.75f) else theme.inactiveBorderColor.copy(alpha = 0.35f),
-        label = "DolbyBorderAnimation"
-    )
-    val titleColor by animateColorAsState(
-        targetValue = if (isDolbyActive && isEnabled) theme.accentColor else theme.textPrimaryColor,
-        label = "DolbyTitleAnimation"
-    )
-    val textColor by animateColorAsState(
-        targetValue = if (isDolbyActive && isEnabled) theme.textPrimaryColor else theme.textSecondaryColor,
-        label = "DolbyTextAnimation"
-    )
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(containerColor)
-            .border(1.2.dp, borderColor, RoundedCornerShape(12.dp))
-            .padding(13.dp)
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
+        // Section Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "HARDWARE TARGET ACOUSTICS",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                color = theme.textSecondaryColor
+            )
+            Text(
+                text = "ONE-TAP MATRIX",
+                fontSize = 8.sp,
+                fontFamily = FontFamily.Monospace,
+                color = theme.accentColor
+            )
+        }
+
+        // Hardware Profile Selector Grid (5 profiles without scrolling)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            CompactAcousticCard(
+                profile = DolbyPresetProfile.IN_EAR_BUDS,
+                icon = Icons.Default.Headphones,
+                benefit = "Skull Resonance Scoop",
+                isSelected = activeProfile == DolbyPresetProfile.IN_EAR_BUDS,
+                isEnabled = isEnabled,
+                theme = theme,
+                onSelect = { onSelectProfile(DolbyPresetProfile.IN_EAR_BUDS) },
+                modifier = Modifier.weight(1f)
+            )
+            CompactAcousticCard(
+                profile = DolbyPresetProfile.OVER_EAR_HEADPHONES,
+                icon = Icons.Default.Headphones,
+                benefit = "Open-Back Air & Flat Mids",
+                isSelected = activeProfile == DolbyPresetProfile.OVER_EAR_HEADPHONES,
+                isEnabled = isEnabled,
+                theme = theme,
+                onSelect = { onSelectProfile(DolbyPresetProfile.OVER_EAR_HEADPHONES) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            CompactAcousticCard(
+                profile = DolbyPresetProfile.CAR_AUDIO,
+                icon = Icons.Default.Tune,
+                benefit = "Road Noise Sub Punch",
+                isSelected = activeProfile == DolbyPresetProfile.CAR_AUDIO,
+                isEnabled = isEnabled,
+                theme = theme,
+                onSelect = { onSelectProfile(DolbyPresetProfile.CAR_AUDIO) },
+                modifier = Modifier.weight(1f)
+            )
+            CompactAcousticCard(
+                profile = DolbyPresetProfile.HOME_THEATER,
+                icon = Icons.Default.GraphicEq,
+                benefit = "3D Cinematic Room",
+                isSelected = activeProfile == DolbyPresetProfile.HOME_THEATER,
+                isEnabled = isEnabled,
+                theme = theme,
+                onSelect = { onSelectProfile(DolbyPresetProfile.HOME_THEATER) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        // 5th Profile: Midnight Cinema (Full width compact card)
+        CompactAcousticCard(
+            profile = DolbyPresetProfile.NIGHT_LOUDNESS,
+            icon = Icons.Default.Bedtime,
+            benefit = "Dialogue Clarity & Night Leveling",
+            isSelected = activeProfile == DolbyPresetProfile.NIGHT_LOUDNESS,
+            isEnabled = isEnabled,
+            theme = theme,
+            onSelect = { onSelectProfile(DolbyPresetProfile.NIGHT_LOUDNESS) },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        // Dual Macro Dynamics Sliders (Sub-Bass Punch & Spatial Room)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Bass Punch Macro
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .hyprBounceClick {
-                        onToggleDolby(!(isDolbyActive && isEnabled))
-                    },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(theme.surfaceVariantColor.copy(alpha = 0.70f))
+                    .border(0.8.dp, theme.inactiveBorderColor.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 9.dp, vertical = 7.dp)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(if (isDolbyActive && isEnabled) theme.accentColor else Color.Gray)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Dolby Studio Remastering",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            color = titleColor
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(3.dp))
-                    Text(
-                        text = if (isDolbyActive && isEnabled)
-                            "${activeProfile.displayName} profile active. Adaptive 3D soundstage & active distortion prevention enabled."
-                        else
-                            "Standard flat playback. Tap to optimize acoustic balance.",
-                        fontSize = 8.5.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = textColor
-                    )
-                }
-
-                Switch(
-                    checked = isDolbyActive && isEnabled,
-                    onCheckedChange = { onToggleDolby(it) },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = theme.backgroundColor,
-                        checkedTrackColor = theme.accentColor,
-                        uncheckedThumbColor = theme.textSecondaryColor,
-                        uncheckedTrackColor = theme.surfaceColor
-                    ),
-                    modifier = Modifier.size(38.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Unbreakable Shield DRC & Headroom Telemetry
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(5.dp)
-                            .clip(CircleShape)
-                            .background(if (isDolbyActive && isEnabled) Color(0xFF00E676) else Color.Gray)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "HEADROOM: ${activeProfile.preCutGain}x SAFE",
-                        color = if (isDolbyActive && isEnabled) Color(0xFF00E676) else Color.Gray,
-                        fontSize = 8.5.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(5.dp)
-                            .clip(CircleShape)
-                            .background(if (isLimiterEngaged) Color(0xFF00E5FF) else Color.Gray)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = if (isLimiterEngaged) "DRC LIMITER: ACTIVE" else "DRC: STANDBY",
-                        color = if (isLimiterEngaged) Color(0xFF00E5FF) else Color.Gray,
-                        fontSize = 8.5.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(5.dp)
-                            .clip(CircleShape)
-                            .background(if (isDolbyActive && isEnabled) theme.accentColor else Color.Gray)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "ACOUSTICS: ${activeProfile.name.replace('_', ' ')}",
-                        color = if (isDolbyActive && isEnabled) theme.accentColor else Color.Gray,
-                        fontSize = 8.5.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            if (isDolbyActive && isEnabled) {
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Soundstage Width Slider
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "SOUNDSTAGE EXPANSION",
+                        text = "SUB-BASS PUNCH",
                         color = theme.textSecondaryColor,
-                        fontSize = 9.sp,
+                        fontSize = 8.5.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "${spatialStrength / 10}%",
-                        color = theme.accentColor,
-                        fontSize = 9.sp,
+                        text = "${bassBoost / 10}%",
+                        color = if (isEnabled) theme.accentColor else theme.textSecondaryColor,
+                        fontSize = 8.5.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
                     )
                 }
-
+                Spacer(modifier = Modifier.height(2.dp))
                 Slider(
-                    value = spatialStrength.toFloat(),
-                    onValueChange = { onSpatialStrengthChange(it.toInt()) },
+                    value = bassBoost.toFloat(),
+                    onValueChange = { onBassBoostChange(it.toInt()) },
                     valueRange = 0f..1000f,
                     enabled = isEnabled,
                     colors = SliderDefaults.colors(
@@ -831,30 +537,395 @@ fun DolbyMasteringSelector(
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(28.dp)
+                        .height(24.dp)
                 )
+            }
 
-                // Re-Apply Active Profile Matrix Action Button
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(theme.surfaceColor)
-                        .border(0.8.dp, theme.accentColor.copy(alpha = 0.45f), RoundedCornerShape(6.dp))
-                        .hyprBounceClick {
-                            onApplyHybridCurve()
-                        }
-                        .padding(vertical = 6.dp),
-                    contentAlignment = Alignment.Center
+            // Spatial Room Macro
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(theme.surfaceVariantColor.copy(alpha = 0.70f))
+                    .border(0.8.dp, theme.inactiveBorderColor.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 9.dp, vertical = 7.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "RE-APPLY ${activeProfile.displayName.uppercase()} MATRIX",
-                        color = theme.accentColor,
-                        fontSize = 8.sp,
+                        text = "SPATIAL ROOM",
+                        color = theme.textSecondaryColor,
+                        fontSize = 8.5.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${spatialStrength / 10}%",
+                        color = if (isEnabled) theme.accentColor else theme.textSecondaryColor,
+                        fontSize = 8.5.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
                     )
                 }
+                Spacer(modifier = Modifier.height(2.dp))
+                Slider(
+                    value = spatialStrength.toFloat(),
+                    onValueChange = { onSpatialChange(it.toInt()) },
+                    valueRange = 0f..1000f,
+                    enabled = isEnabled,
+                    colors = SliderDefaults.colors(
+                        thumbColor = theme.accentColor,
+                        activeTrackColor = theme.accentColor,
+                        inactiveTrackColor = theme.surfaceColor,
+                        disabledThumbColor = Color.Gray,
+                        disabledActiveTrackColor = Color.DarkGray
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(24.dp)
+                )
+            }
+        }
+
+        // Re-Apply Calibrated Matrix Button
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(30.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(theme.surfaceVariantColor.copy(alpha = 0.60f))
+                .border(0.8.dp, theme.accentColor.copy(alpha = 0.40f), RoundedCornerShape(6.dp))
+                .hyprBounceClick {
+                    if (isEnabled) {
+                        onReapplyMatrix()
+                    }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "RE-APPLY ${activeProfile.displayName.uppercase()} MATRIX",
+                color = if (isEnabled) theme.accentColor else theme.textSecondaryColor,
+                fontSize = 8.5.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+/**
+ * Compact Acoustic Card with zero text clipping.
+ */
+@Composable
+private fun CompactAcousticCard(
+    profile: DolbyPresetProfile,
+    icon: ImageVector,
+    benefit: String,
+    isSelected: Boolean,
+    isEnabled: Boolean,
+    theme: HyprThemeConfig,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val active = isSelected && isEnabled
+    val bg by animateColorAsState(
+        targetValue = if (active) theme.accentColor.copy(alpha = 0.18f) else theme.surfaceVariantColor.copy(alpha = 0.65f),
+        label = "CompactCardBg"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (active) theme.accentColor else theme.inactiveBorderColor.copy(alpha = 0.35f),
+        label = "CompactCardBorder"
+    )
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(bg)
+            .border(width = if (active) 1.2.dp else 0.8.dp, color = borderColor, shape = RoundedCornerShape(8.dp))
+            .clickable { onSelect() }
+            .padding(horizontal = 9.dp, vertical = 7.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (active) theme.accentColor else theme.textSecondaryColor,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Column {
+                    Text(
+                        text = profile.displayName,
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        color = if (active) theme.accentColor else theme.textPrimaryColor,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = benefit,
+                        fontSize = 7.5.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = theme.textSecondaryColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(if (active) theme.accentColor.copy(alpha = 0.25f) else Color.Transparent)
+                    .padding(horizontal = 4.dp, vertical = 1.dp)
+            ) {
+                Text(
+                    text = "${profile.preCutGain}x",
+                    fontSize = 7.5.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = if (active) theme.accentColor else theme.textSecondaryColor
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Pro Console Tab: Surgical 5-band faders, frequency spectrum spline, and genre curves.
+ */
+@Composable
+private fun ProConsoleView(
+    bands: List<EqualizerBand>,
+    currentPreset: String,
+    isEnabled: Boolean,
+    theme: HyprThemeConfig,
+    onBandChange: (Short, Short) -> Unit,
+    onApplyPreset: (String) -> Unit,
+    onResetToFlat: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // 1. Frequency Response Curve Visualizer (54dp height)
+        FrequencyCurveCanvas(
+            bands = bands,
+            isEnabled = isEnabled,
+            theme = theme,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp)
+        )
+
+        // 2. 5-Band Vertical Studio Console Faders (152dp height)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(152.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            bands.forEach { band ->
+                VerticalEqualizerFader(
+                    band = band,
+                    isEnabled = isEnabled,
+                    theme = theme,
+                    onLevelChange = { newLevel ->
+                        onBandChange(band.bandIndex, newLevel)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        // 3. Preset Curves Strip
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "PRESET CURVES",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                color = theme.textSecondaryColor
+            )
+            Text(
+                text = currentPreset.uppercase(),
+                fontSize = 8.sp,
+                fontFamily = FontFamily.Monospace,
+                color = theme.accentColor
+            )
+        }
+
+        val presetScrollState = rememberScrollState()
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(presetScrollState),
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            HyprEqualizer.availablePresets.forEach { preset ->
+                val isSelected = preset.equals(currentPreset, ignoreCase = true)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(
+                            if (isSelected && isEnabled) theme.accentColor.copy(alpha = 0.25f)
+                            else theme.surfaceVariantColor
+                        )
+                        .border(
+                            width = 0.8.dp,
+                            color = if (isSelected && isEnabled) theme.accentColor else Color.Transparent,
+                            shape = RoundedCornerShape(5.dp)
+                        )
+                        .clickable { onApplyPreset(preset) }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = preset.uppercase(),
+                        color = if (isSelected && isEnabled) theme.accentColor else theme.textSecondaryColor,
+                        fontSize = 8.5.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+            }
+        }
+
+        // Reset to Flat Action Button
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(28.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(theme.surfaceVariantColor.copy(alpha = 0.50f))
+                .border(0.8.dp, theme.inactiveBorderColor.copy(alpha = 0.35f), RoundedCornerShape(6.dp))
+                .hyprBounceClick {
+                    if (isEnabled) {
+                        onResetToFlat()
+                    }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "RESET ALL FADERS TO FLAT (0 dB)",
+                color = theme.textSecondaryColor,
+                fontSize = 8.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+/**
+ * Frequency Response Curve Spline Canvas with reference grids and gradient fill.
+ */
+@Composable
+private fun FrequencyCurveCanvas(
+    bands: List<EqualizerBand>,
+    isEnabled: Boolean,
+    theme: HyprThemeConfig,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(theme.surfaceVariantColor.copy(alpha = 0.70f))
+            .border(0.6.dp, theme.accentColor.copy(alpha = 0.30f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val width = size.width
+            val height = size.height
+            val midY = height / 2
+
+            // Reference grid lines (+6dB, 0dB, -6dB)
+            drawLine(
+                color = Color.White.copy(alpha = 0.08f),
+                start = Offset(0f, midY - height * 0.25f),
+                end = Offset(width, midY - height * 0.25f),
+                strokeWidth = 1f
+            )
+            drawLine(
+                color = Color.White.copy(alpha = 0.16f),
+                start = Offset(0f, midY),
+                end = Offset(width, midY),
+                strokeWidth = 1.2f
+            )
+            drawLine(
+                color = Color.White.copy(alpha = 0.08f),
+                start = Offset(0f, midY + height * 0.25f),
+                end = Offset(width, midY + height * 0.25f),
+                strokeWidth = 1f
+            )
+
+            if (bands.isNotEmpty()) {
+                val strokePath = Path()
+                val fillPath = Path()
+                val step = width / (bands.size + 1)
+
+                strokePath.moveTo(0f, midY)
+                fillPath.moveTo(0f, midY)
+
+                bands.forEachIndexed { i, band ->
+                    val x = step * (i + 1)
+                    val normalizedDb = (band.levelMb / 1200f).coerceIn(-1f, 1f)
+                    val y = midY - (normalizedDb * (height * 0.40f))
+
+                    if (i == 0) {
+                        val cx = x / 2
+                        strokePath.cubicTo(cx, midY, cx, y, x, y)
+                        fillPath.cubicTo(cx, midY, cx, y, x, y)
+                    } else {
+                        val prevX = step * i
+                        val prevNorm = (bands[i - 1].levelMb / 1200f).coerceIn(-1f, 1f)
+                        val prevY = midY - (prevNorm * (height * 0.40f))
+                        val cx = (prevX + x) / 2
+                        strokePath.cubicTo(cx, prevY, cx, y, x, y)
+                        fillPath.cubicTo(cx, prevY, cx, y, x, y)
+                    }
+                }
+
+                val lastX = step * bands.size
+                val lastNorm = (bands.last().levelMb / 1200f).coerceIn(-1f, 1f)
+                val lastY = midY - (lastNorm * (height * 0.40f))
+                val finalCx = (lastX + width) / 2
+                strokePath.cubicTo(finalCx, lastY, finalCx, midY, width, midY)
+                fillPath.cubicTo(finalCx, lastY, finalCx, midY, width, midY)
+
+                fillPath.lineTo(width, height)
+                fillPath.lineTo(0f, height)
+                fillPath.close()
+
+                drawPath(
+                    path = fillPath,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            if (isEnabled) theme.accentColor.copy(alpha = 0.22f) else Color.Transparent,
+                            Color.Transparent
+                        )
+                    )
+                )
+
+                drawPath(
+                    path = strokePath,
+                    color = if (isEnabled) theme.accentColor else Color.Gray.copy(alpha = 0.4f),
+                    style = Stroke(width = 2.0f, cap = StrokeCap.Round)
+                )
             }
         }
     }
@@ -862,7 +933,7 @@ fun DolbyMasteringSelector(
 
 /**
  * Custom tactile vertical fader matching physical studio hardware consoles.
- * Supports smooth vertical drag gestures and tap-to-level.
+ * Free from parent scroll interference with instant touch tracking.
  */
 @Composable
 private fun VerticalEqualizerFader(
@@ -890,13 +961,13 @@ private fun VerticalEqualizerFader(
             fontWeight = if (currentLevel != 0f) FontWeight.Bold else FontWeight.Normal
         )
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(3.dp))
 
         // Vertical Track & Thumb Box
         BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
-                .width(40.dp)
+                .width(38.dp)
                 .pointerInput(isEnabled) {
                     if (!isEnabled) return@pointerInput
                     detectDragGestures { change, _ ->
@@ -979,15 +1050,92 @@ private fun VerticalEqualizerFader(
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(3.dp))
 
         // Center Frequency
         Text(
             text = band.formattedFreq,
             color = theme.textSecondaryColor,
-            fontSize = 9.sp,
+            fontSize = 8.5.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Medium
         )
+    }
+}
+
+/**
+ * Unified Bottom Telemetry HUD: clean, non-wrapping status readouts.
+ */
+@Composable
+private fun TelemetryHud(
+    activeProfile: DolbyPresetProfile,
+    isLimiterEngaged: Boolean,
+    isEnabled: Boolean,
+    theme: HyprThemeConfig
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(theme.surfaceVariantColor.copy(alpha = 0.50f))
+            .border(0.6.dp, theme.inactiveBorderColor.copy(alpha = 0.25f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Headroom Safety
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(5.dp)
+                    .clip(CircleShape)
+                    .background(if (isEnabled) Color(0xFF00E676) else Color.Gray)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = "HEADROOM: ${activeProfile.preCutGain}x SAFE",
+                color = if (isEnabled) Color(0xFF00E676) else Color.Gray,
+                fontSize = 8.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        // Limiter Status
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(5.dp)
+                    .clip(CircleShape)
+                    .background(if (isLimiterEngaged && isEnabled) Color(0xFF00E5FF) else Color.Gray)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = if (isLimiterEngaged && isEnabled) "LIMITER: ARMED" else "LIMITER: PASS",
+                color = if (isLimiterEngaged && isEnabled) Color(0xFF00E5FF) else Color.Gray,
+                fontSize = 8.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        // Active Profile
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(5.dp)
+                    .clip(CircleShape)
+                    .background(if (isEnabled) theme.accentColor else Color.Gray)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = activeProfile.displayName.uppercase(),
+                color = if (isEnabled) theme.accentColor else theme.textSecondaryColor,
+                fontSize = 8.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+        }
     }
 }
