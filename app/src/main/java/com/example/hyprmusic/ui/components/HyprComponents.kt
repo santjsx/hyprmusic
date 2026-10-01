@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,11 +38,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,8 +68,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -181,29 +187,41 @@ fun HyprBottomDock(
     onWorkspaceSelected: (HyprWorkspace) -> Unit,
     onToggleSearch: () -> Unit = {},
     isSearchActive: Boolean = false,
+    isPlaying: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = theme.windowGapsDp.dp, vertical = 6.dp)
             .clip(RoundedCornerShape(theme.borderRadiusDp.dp))
-            .background(theme.surfaceColor.copy(alpha = 0.95f))
+            .background(theme.surfaceColor.copy(alpha = 0.96f))
             .border(theme.borderThicknessDp.dp, theme.inactiveBorderColor, RoundedCornerShape(theme.borderRadiusDp.dp))
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 6.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Workspaces [1:home] [2:lib] [3:player] [4:rice]
+        // Workspaces [1:home] [2:lib] [3:player] [4:rice] with 48dp+ ergonomic touch targets
         Row(
             modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             HyprWorkspace.values().forEach { ws ->
                 val isActive = ws == currentWorkspace
+                val icon = when (ws) {
+                    HyprWorkspace.HOME -> Icons.Default.Home
+                    HyprWorkspace.LIBRARY -> Icons.Default.LibraryMusic
+                    HyprWorkspace.PLAYING -> Icons.Default.GraphicEq
+                    HyprWorkspace.SETTINGS -> Icons.Default.Tune
+                }
+
                 Box(
                     modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 50.dp)
                         .clip(RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(10)).dp))
                         .background(
                             if (isActive) theme.accentColor.copy(alpha = 0.22f)
@@ -214,24 +232,65 @@ fun HyprBottomDock(
                             color = if (isActive) theme.accentColor else Color.Transparent,
                             shape = RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(10)).dp)
                         )
-                        .hyprBounceClick { onWorkspaceSelected(ws) }
-                        .padding(horizontal = 10.dp, vertical = 7.dp)
+                        .hyprBounceClick {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onWorkspaceSelected(ws)
+                        }
+                        .padding(vertical = 5.dp, horizontal = 2.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "[${ws.index}:${ws.label}]",
-                        color = if (isActive) theme.accentColor else theme.textSecondaryColor,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                        maxLines = 1
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        if (ws == HyprWorkspace.PLAYING && isPlaying) {
+                            MiniEqualizerBars(
+                                theme = theme,
+                                isPlaying = true,
+                                modifier = Modifier.height(16.dp)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = ws.label,
+                                tint = if (isActive) theme.accentColor else theme.textSecondaryColor,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(3.dp))
+
+                        Text(
+                            text = "[${ws.index}:${ws.label}]",
+                            color = if (isActive) theme.accentColor else theme.textSecondaryColor,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Clip
+                        )
+
+                        if (isActive) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Box(
+                                modifier = Modifier
+                                    .width(12.dp)
+                                    .height(2.dp)
+                                    .clip(RoundedCornerShape(1.dp))
+                                    .background(theme.accentColor)
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        // Quick Search runner trigger button
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // Ergonomic Quick Search runner trigger button
         Box(
             modifier = Modifier
+                .size(width = 46.dp, height = 50.dp)
                 .clip(RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(10)).dp))
                 .background(
                     if (isSearchActive) theme.accentColor
@@ -242,15 +301,29 @@ fun HyprBottomDock(
                     color = if (isSearchActive) theme.accentColor else theme.inactiveBorderColor,
                     shape = RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(10)).dp)
                 )
-                .hyprBounceClick { onToggleSearch() }
-                .padding(horizontal = 8.dp, vertical = 7.dp)
+                .hyprBounceClick {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onToggleSearch()
+                },
+            contentAlignment = Alignment.Center
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
                 Icon(
                     imageVector = Icons.Default.Search,
                     contentDescription = "Search",
                     tint = if (isSearchActive) theme.backgroundColor else theme.accentColor,
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "find",
+                    color = if (isSearchActive) theme.backgroundColor else theme.accentColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }

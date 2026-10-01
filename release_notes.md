@@ -1,47 +1,36 @@
-# ☁️ HyprMusic v1.2.0 — Telegram Personal Music Cloud (TPMC) Integration
+# ⚡ HyprMusic v1.2.1 — Ergonomic Dock, Instant Startup & GitHub OTA Engine
 
-HyprMusic v1.2.0 introduces native integration with Telegram Personal Music Cloud (TPMC) — turning private Telegram channels and bots into an infinite, free cloud music streaming and download system directly within HyprMusic.
+HyprMusic v1.2.1 brings critical usability refinements, eliminates startup UI flashes, redesigns the bottom navigation bar for effortless one-handed thumb ergonomics, and introduces a fully functional GitHub Releases OTA update engine.
 
 ---
 
-## 🚀 Key Highlights in v1.2.0
+## 🚀 Key Improvements in v1.2.1
 
-### 📡 Direct HTTP 206 Partial Content Streaming via Media3 ExoPlayer
-* **Byte-Range Seek & Scrub**: Streams FLAC, M4A, MP3, and WAV files directly from the TPMC server with HTTP 206 chunked byte-range requests.
-* **500MB LRU Disk Cache**: Backed by Media3 `CacheDataSource` and `SimpleCache` with `StandaloneDatabaseProvider`. Loop playback and repeated listens consume zero extra data.
-* **Cold-Start Wake Protection**: Automatic retry and Render wake-up handling for free-tier backend instances.
-* **MTProto 128KB Chunk Alignment**: Server chunk requests strictly satisfy Telegram MTProto specification constraints for maximum streaming throughput and reliability.
+### ⚡ Zero-Flash Instant Library Startup
+* **Persistent Disk Metadata Cache**: Scanned audio tracks are now persisted to a local disk cache (`tracks_cache.json`). On app launch, your entire library loads synchronously from frame 1 with zero latency.
+* **Scan State Awareness**: Fixed the jarring startup screen flash where `[ SCAN STORAGE ]` briefly flickered before tracks populated. The empty state now only displays if a full scan completes with genuinely zero tracks found.
 
-### 📥 One-Tap Direct MediaStore Background Downloads
-* **Scoped Storage Audio Integration**: Direct stream-to-disk downloader saves tracks into `Music/HyprMusic` on Android 10+ (API 29+) with `IS_PENDING = 1` staging.
-* **Instant Catalog Indexing**: Upon download completion, tracks immediately appear in local library without rescan or duplicate entries.
-* **Real-Time Progress Tracking**: Micro-progress indicators display live download percentage (`45%`, `80%`) and status badges (`[SAVED]`).
+### 🎛️ Redesigned Ergonomic Bottom Navigation Dock
+* **Comfortable 50dp+ Touch Targets**: Expanded dock height to 58dp with balanced column weights, adhering strictly to Android accessibility guidelines for comfortable, accurate one-handed thumb navigation.
+* **Hybrid Icon & Terminal Aesthetic**: Added clean vector glyphs alongside classic Hyprland workspace tags (`[1:home]`, `[2:lib]`, `[3:player]`, `[4:rice]`).
+* **Live Player Tab Equalizer**: The `[3:player]` tab displays animated audio visualizer frequency bars in real time while music is playing.
+* **Tactile Haptic Feedback**: Every tab switch triggers subtle, mechanical haptic feedback for a responsive desktop-grade feel.
+* **Active Glow & Indicator**: Active workspaces feature an accent pill highlight with a glowing micro indicator bar.
+* **Dedicated Search Launcher**: Sized quick search trigger with clear active and inactive state visual feedback.
 
-### 🎛️ Dual-Workspace Library & Hyprland Terminal Tabs
-* **Scope Switcher**: Switch seamlessly between `[ 0 : local (N) ]` and `[ 1 : tpmc cloud (N) ]` with zero layout thrashing.
-* **Audio Fidelity Badges**: Clear visual differentiation for `FLAC 24-bit`, `320kbps High Fidelity`, `M4A`, and lossless tracks.
-* **Telegram Cloud Settings**: Dedicated configuration suite in `[4:rice]` with live server health test ping (`● CONNECTED`), user ID mapping, and API key token authentication.
-* **Unified Global Search**: Bottom quick search runner simultaneously scans local storage and Telegram Cloud songs with dedicated `[CLOUD]` tags.
-
-### 🔊 Real-Time PCM Spectrum Visualizer & Upright Cover Art
-* **Song-Synchronized 16-Bar Spectrum Analyzer**: Direct PCM audio buffer analysis via custom Media3 `HyprVisualizerProcessor`. Visualizer bars jump and dance in 100% exact synchronization with real audio frequencies and beats.
-* **Zero Vinyl Distortion**: Album artwork remains crisp, upright, and stable with subtle, spring-based beat-reactive scaling.
-* **Smart Resting State**: Smooth decay to a resting baseline when playback is paused.
-
-### 🛡️ True Background Playback (Survives Minimizing & Recents Dismissal)
-* **Self-Managed MediaSessionService**: `HyprPlaybackService` maintains a persistent foreground media notification running with `FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK`.
-* **Recents Dismissal Survivability**: Audio playback continues uninterrupted even when the app is swiped away from Android Recents.
-
-### 📱 Ergonomic Bottom Navigation & Hyprland Ricing
-* **Bottom Hyprland Dock**: Workspace switcher (`[1:home]`, `[2:lib]`, `[3:player]`, `[4:rice]`) positioned for thumb ergonomics.
-* **8 Curated Themes**: Tokyo Night, Catppuccin Mocha, Nordic Frost, Gruvbox Dark, OLED Cyberpunk, Dracula Void, Rose Pine, and Monokai Pro.
-* **Window Geometry Controls**: Custom window gaps (0–24dp), border radius (0–28dp), border thickness (1–4dp), and true OLED black mode.
+### 🔄 Fully Functional GitHub Releases OTA Update Engine
+* **Corrected Repository Integration**: Updated release endpoints to point directly to `santjsx/hyprmusic/releases/latest`.
+* **Direct Streaming Coroutine Downloader**: Downloads APK releases directly with automatic redirect handling (following HTTP 302/301 redirects to GitHub S3 storage objects).
+* **Real-Time Progress & Speed**: Displays a live `LinearProgressIndicator`, percentage counter, downloaded/total MB (e.g. `75.4 MB`), and transfer speed directly in Settings.
+* **Automated Package Installation**: Resolves secure content URIs via `FileProvider` and prompts the Android package installer with `FLAG_GRANT_READ_URI_PERMISSION`.
+* **Unknown Apps Permission Prompt**: Automatically handles Android 8.0+ (Oreo through 16) `canRequestPackageInstalls()` checks, directing to system settings when necessary.
+* **Test & Re-Download Option**: Added `RE-DOWNLOAD / TEST OTA` and `INSTALL UPDATE NOW` actions in `[4:rice]` > Settings for effortless verification.
 
 ---
 
 ## 📦 Package Information
-* **Version**: `v1.2.0`
-* **Version Code**: `3`
+* **Version**: `v1.2.1`
+* **Version Code**: `4`
 * **Package Name**: `com.example.hyprmusic`
 * **Target SDK**: Android 16 (API 36)
 * **Minimum SDK**: Android 10 (API 29)
@@ -50,4 +39,4 @@ HyprMusic v1.2.0 introduces native integration with Telegram Personal Music Clou
 ---
 
 ## 🛠️ Installation
-Download the `HyprMusic-v1.2.0.apk` asset and install directly on your Android device (Android 10+).
+Download the `HyprMusic-v1.2.1.apk` asset and install directly on your Android device (Android 10+).

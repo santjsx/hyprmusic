@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
@@ -76,6 +77,7 @@ import com.example.hyprmusic.core.theming.hyprAnimatedGlow
 import com.example.hyprmusic.core.theming.hyprBounceClick
 import com.example.hyprmusic.core.theming.hyprTile
 import com.example.hyprmusic.core.updater.HyprUpdateManager
+import com.example.hyprmusic.core.updater.UpdateDownloadState
 import kotlinx.coroutines.launch
 
 @Composable
@@ -94,6 +96,7 @@ fun SettingsScreen(
     val updateInfo by HyprUpdateManager.updateState.collectAsState()
     val isCheckingUpdate by HyprUpdateManager.isChecking.collectAsState()
     val downloadProgress by HyprUpdateManager.downloadProgress.collectAsState()
+    val downloadState by HyprUpdateManager.downloadState.collectAsState()
     val eqEnabled by HyprEqualizer.isEnabled.collectAsState()
     val eqPreset by HyprEqualizer.currentPreset.collectAsState()
 
@@ -104,15 +107,19 @@ fun SettingsScreen(
     val syncError = telegramRepository?.syncError?.collectAsState()?.value
 
     var serverHostInput by remember(cloudSettings?.serverUrl) {
+        val currentUrl = cloudSettings?.serverUrl
         mutableStateOf(
-            if (cloudSettings?.serverUrl.isNullOrBlank() || cloudSettings?.serverUrl == "http://10.0.2.2:8080") {
+            if (currentUrl.isNullOrBlank() || currentUrl == "http://10.0.2.2:8080") {
                 "https://tpmc-music-cloud.onrender.com"
             } else {
-                cloudSettings!!.serverUrl
+                currentUrl
             }
         )
     }
-    var userIdInput by remember(cloudSettings?.userId) { mutableStateOf(if ((cloudSettings?.userId ?: 0L) > 0L) cloudSettings!!.userId.toString() else "") }
+    var userIdInput by remember(cloudSettings?.userId) {
+        val uid = cloudSettings?.userId ?: 0L
+        mutableStateOf(if (uid > 0L) uid.toString() else "")
+    }
     var apiKeyInput by remember(cloudSettings?.apiSecretKey) { mutableStateOf(cloudSettings?.apiSecretKey ?: "") }
     var testResultText by remember { mutableStateOf<String?>(null) }
     var isTestingConnection by remember { mutableStateOf(false) }
@@ -808,23 +815,47 @@ fun SettingsScreen(
                         if (updateInfo != null) {
                             Spacer(modifier = Modifier.height(10.dp))
                             val info = updateInfo!!
-                            if (info.isUpdateAvailable) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(theme.accentColor.copy(alpha = 0.15f))
-                                        .border(1.dp, theme.accentColor, RoundedCornerShape(8.dp))
-                                        .padding(10.dp)
-                                ) {
-                                    Column {
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (info.isUpdateAvailable) theme.accentColor.copy(alpha = 0.15f)
+                                        else theme.surfaceVariantColor.copy(alpha = 0.6f)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (info.isUpdateAvailable) theme.accentColor else theme.inactiveBorderColor,
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(12.dp)
+                            ) {
+                                Column {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                         Text(
-                                            text = "★ NEW VERSION AVAILABLE: ${info.tagName}",
+                                            text = if (info.isUpdateAvailable) "★ NEW VERSION: ${info.tagName}" else "✔ LATEST BUILD: ${info.tagName}",
                                             color = theme.accentColor,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 12.sp,
                                             fontFamily = FontFamily.Monospace
                                         )
+
+                                        if (info.formattedSize.isNotBlank()) {
+                                            Text(
+                                                text = info.formattedSize,
+                                                color = theme.textSecondaryColor,
+                                                fontSize = 10.5.sp,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                        }
+                                    }
+
+                                    if (info.releaseNotes.isNotBlank()) {
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
                                             text = info.releaseNotes,
@@ -833,40 +864,160 @@ fun SettingsScreen(
                                             maxLines = 3,
                                             overflow = TextOverflow.Ellipsis
                                         )
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(theme.accentColor)
-                                                .clickable {
-                                                    HyprUpdateManager.downloadAndInstallApk(context, info.downloadUrl)
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    when (val state = downloadState) {
+                                        is UpdateDownloadState.Downloading -> {
+                                            Column {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text(
+                                                        text = "Downloading: ${state.percent}%",
+                                                        color = theme.accentColor,
+                                                        fontSize = 11.sp,
+                                                        fontFamily = FontFamily.Monospace,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    Text(
+                                                        text = "${state.downloadedMb} / ${state.totalMb} MB (${state.speedText})",
+                                                        color = theme.textSecondaryColor,
+                                                        fontSize = 10.5.sp,
+                                                        fontFamily = FontFamily.Monospace
+                                                    )
                                                 }
-                                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                                        ) {
-                                            Text(
-                                                text = "DOWNLOAD & UPDATE",
-                                                color = theme.backgroundColor,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                fontFamily = FontFamily.Monospace
-                                            )
+
+                                                Spacer(modifier = Modifier.height(6.dp))
+
+                                                LinearProgressIndicator(
+                                                    progress = { state.progressFraction },
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(6.dp)
+                                                        .clip(RoundedCornerShape(3.dp)),
+                                                    color = theme.accentColor,
+                                                    trackColor = theme.surfaceColor
+                                                )
+
+                                                Spacer(modifier = Modifier.height(8.dp))
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(theme.surfaceColor)
+                                                        .border(1.dp, theme.inactiveBorderColor, RoundedCornerShape(6.dp))
+                                                        .clickable { HyprUpdateManager.cancelDownload() }
+                                                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "[ CANCEL DOWNLOAD ]",
+                                                        color = theme.textSecondaryColor,
+                                                        fontSize = 10.sp,
+                                                        fontFamily = FontFamily.Monospace,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        is UpdateDownloadState.ReadyToInstall -> {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(theme.accentColor)
+                                                        .clickable {
+                                                            HyprUpdateManager.installApk(context, state.apkFile)
+                                                        }
+                                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = "INSTALL UPDATE NOW",
+                                                        color = theme.backgroundColor,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontFamily = FontFamily.Monospace
+                                                    )
+                                                }
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(theme.surfaceColor)
+                                                        .border(1.dp, theme.inactiveBorderColor, RoundedCornerShape(6.dp))
+                                                        .clickable {
+                                                            HyprUpdateManager.startApkDownload(context, info.downloadUrl)
+                                                        }
+                                                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = "RE-DOWNLOAD",
+                                                        color = theme.textSecondaryColor,
+                                                        fontSize = 10.sp,
+                                                        fontFamily = FontFamily.Monospace
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        else -> {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(theme.accentColor)
+                                                        .clickable {
+                                                            HyprUpdateManager.startApkDownload(context, info.downloadUrl)
+                                                        }
+                                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = if (info.isUpdateAvailable) "DOWNLOAD & UPDATE" else "RE-DOWNLOAD / TEST OTA",
+                                                        color = theme.backgroundColor,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontFamily = FontFamily.Monospace
+                                                    )
+                                                }
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(theme.surfaceColor)
+                                                        .border(1.dp, theme.inactiveBorderColor, RoundedCornerShape(6.dp))
+                                                        .clickable {
+                                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl)).apply {
+                                                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                                            }
+                                                            context.startActivity(intent)
+                                                        }
+                                                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = "RELEASES",
+                                                        color = theme.textSecondaryColor,
+                                                        fontSize = 10.sp,
+                                                        fontFamily = FontFamily.Monospace
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
-                                }
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(theme.surfaceVariantColor)
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text(
-                                        text = "✔ You are running the latest bit-perfect build (${info.tagName})",
-                                        color = theme.accentColor,
-                                        fontSize = 11.sp,
-                                        fontFamily = FontFamily.Monospace
-                                    )
                                 }
                             }
                         }

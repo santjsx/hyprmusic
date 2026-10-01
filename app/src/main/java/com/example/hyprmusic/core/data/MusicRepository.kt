@@ -18,24 +18,89 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.io.File
 
 class MusicRepository(private val context: Context) {
 
     val favoritesRepository = FavoritesRepository(context)
     val playbackStatsRepository = PlaybackStatsRepository(context)
 
-    // Initial state is strictly empty - no fake mock tracks!
-    private val _tracks = MutableStateFlow<List<Track>>(emptyList())
+    private val jsonSerializer = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        encodeDefaults = true
+    }
+
+    private val cacheFile = File(context.filesDir, "tracks_cache.json")
+
+    // Load disk cache synchronously on initialization to eliminate startup screen flash
+    private val initialCachedTracks: List<Track> = loadCachedTracksFromDisk()
+
+    private val _hasInitialScanCompleted = MutableStateFlow(initialCachedTracks.isNotEmpty())
+    val hasInitialScanCompleted: StateFlow<Boolean> = _hasInitialScanCompleted.asStateFlow()
+
+    private val _tracks = MutableStateFlow<List<Track>>(initialCachedTracks)
     val tracks: StateFlow<List<Track>> = _tracks.asStateFlow()
 
-    private val _albums = MutableStateFlow<List<Album>>(emptyList())
+    private val _albums = MutableStateFlow<List<Album>>(aggregateAlbums(initialCachedTracks))
     val albums: StateFlow<List<Album>> = _albums.asStateFlow()
 
-    private val _artists = MutableStateFlow<List<Artist>>(emptyList())
+    private val _artists = MutableStateFlow<List<Artist>>(aggregateArtists(initialCachedTracks))
     val artists: StateFlow<List<Artist>> = _artists.asStateFlow()
 
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
+
+    private fun loadCachedTracksFromDisk(): List<Track> {
+        return try {
+            if (cacheFile.exists()) {
+                val content = cacheFile.readText()
+                if (content.isNotBlank()) {
+                    jsonSerializer.decodeFromString<List<Track>>(content)
+                } else emptyList()
+            } else emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun saveTracksToDisk(tracks: List<Track>) {
+        try {
+            val content = jsonSerializer.encodeToString(tracks)
+            cacheFile.writeText(content)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun aggregateAlbums(tracks: List<Track>): List<Album> {
+        return tracks
+            .groupBy { it.album }
+            .map { (albumTitle, trackList) ->
+                Album(
+                    id = albumTitle.hashCode().toString(),
+                    title = albumTitle,
+                    artist = trackList.firstOrNull()?.artist ?: "Unknown Artist",
+                    coverUri = trackList.firstOrNull { it.albumArtUri != null }?.albumArtUri,
+                    trackCount = trackList.size
+                )
+            }
+    }
+
+    private fun aggregateArtists(tracks: List<Track>): List<Artist> {
+        return tracks
+            .groupBy { it.artist }
+            .map { (artistName, trackList) ->
+                Artist(
+                    id = artistName.hashCode().toString(),
+                    name = artistName,
+                    trackCount = trackList.size,
+                    albumCount = trackList.map { it.album }.distinct().size
+                )
+            }
+    }
 
     suspend fun scanLocalMedia() = withContext(Dispatchers.IO) {
         _isScanning.value = true
@@ -167,43 +232,25 @@ class MusicRepository(private val context: Context) {
         }
 
         // Real tracks only: no mock data fallback!
-        _tracks.value = localTracks
-
-        // Aggregate Albums
-        val aggregatedAlbums = localTracks
-            .groupBy { it.album }
-            .map { (albumTitle, tracks) ->
-                Album(
-                    id = albumTitle.hashCode().toString(),
-                    title = albumTitle,
-                    artist = tracks.firstOrNull()?.artist ?: "Unknown Artist",
-                    coverUri = tracks.firstOrNull { it.albumArtUri != null }?.albumArtUri,
-                    trackCount = tracks.size
-                )
+        // Prevent wiping cached library if a scan was empty due to delayed permission grant
+        if (localTracks.isNotEmpty() || initialCachedTracks.isEmpty()) {
+            _tracks.value = localTracks
+            _albums.value = aggregateAlbums(localTracks)
+            _artists.value = aggregateArtists(localTracks)
+            if (localTracks.isNotEmpty()) {
+                saveTracksToDisk(localTracks)
             }
-        _albums.value = aggregatedAlbums
+        }
 
-        // Aggregate Artists
-        val aggregatedArtists = localTracks
-            .groupBy { it.artist }
-            .map { (artistName, tracks) ->
-                Artist(
-                    id = artistName.hashCode().toString(),
-                    name = artistName,
-                    trackCount = tracks.size,
-                    albumCount = tracks.map { it.album }.distinct().size
-                )
-            }
-        _artists.value = aggregatedArtists
-
+        _hasInitialScanCompleted.value = true
         _isScanning.value = false
     }
 
     fun toggleFavorite(trackId: String): Boolean {
         val isNowFav = favoritesRepository.toggleFavorite(trackId)
-        _tracks.update { list ->
-            list.map { if (it.id == trackId) it.copy(isFavorite = isNowFav) else it }
-        }
+        val updated = _tracks.value.map { if (it.id == trackId) it.copy(isFavorite = isNowFav) else it }
+        _tracks.value = updated
+        saveTracksToDisk(updated)
         return isNowFav
     }
 

@@ -129,6 +129,7 @@ fun HyprMusicApp(
     val albums by musicRepository.albums.collectAsState()
     val artists by musicRepository.artists.collectAsState()
     val isScanning by musicRepository.isScanning.collectAsState()
+    val hasInitialScanCompleted by musicRepository.hasInitialScanCompleted.collectAsState()
 
     var currentWorkspace by remember { mutableStateOf(HyprWorkspace.HOME) }
     var isNowPlayingExpanded by remember { mutableStateOf(false) }
@@ -329,6 +330,8 @@ fun HyprMusicApp(
                                 playbackState = playbackState,
                                 tracks = tracks,
                                 heavyRotationTracks = heavyRotation,
+                                isScanning = isScanning,
+                                hasInitialScanCompleted = hasInitialScanCompleted,
                                 onTrackSelected = { track, queue ->
                                     audioPlayer.playTrack(track, queue)
                                 },
@@ -450,7 +453,8 @@ fun HyprMusicApp(
                         }
                     },
                     onToggleSearch = { isSearchActive = !isSearchActive },
-                    isSearchActive = isSearchActive
+                    isSearchActive = isSearchActive,
+                    isPlaying = playbackState.isPlaying
                 )
             }
         }

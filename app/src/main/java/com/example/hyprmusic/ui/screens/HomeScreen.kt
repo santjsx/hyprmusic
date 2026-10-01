@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -55,6 +56,8 @@ fun HomeScreen(
     playbackState: PlaybackState,
     tracks: List<Track>,
     heavyRotationTracks: List<Track> = emptyList(),
+    isScanning: Boolean = false,
+    hasInitialScanCompleted: Boolean = true,
     onTrackSelected: (Track, List<Track>) -> Unit,
     onTogglePlayPause: () -> Unit,
     onRandomMix: () -> Unit,
@@ -77,57 +80,85 @@ fun HomeScreen(
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(
-                    imageVector = Icons.Default.MusicNote,
-                    contentDescription = null,
-                    tint = theme.accentColor,
-                    modifier = Modifier.size(48.dp)
-                )
+                if (isScanning || !hasInitialScanCompleted) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(36.dp),
+                        color = theme.accentColor,
+                        strokeWidth = 3.dp
+                    )
 
-                Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                Text(
-                    text = "[ hypr-storage: 0 tracks ]",
-                    color = theme.textPrimaryColor,
-                    fontSize = 15.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold
-                )
+                    Text(
+                        text = "[ hypr-storage: indexing... ]",
+                        color = theme.textPrimaryColor,
+                        fontSize = 14.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                Text(
-                    text = "No audio tracks indexed on device storage.\nPlace FLAC, WAV, or MP3 files into your Music or Downloads folder.",
-                    color = theme.textSecondaryColor,
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
-                    textAlign = TextAlign.Center
-                )
+                    Text(
+                        text = "Querying MediaStore audio buffers...\nPlease wait.",
+                        color = theme.textSecondaryColor,
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        textAlign = TextAlign.Center
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = null,
+                        tint = theme.accentColor,
+                        modifier = Modifier.size(48.dp)
+                    )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(8).dp))
-                        .background(theme.accentColor)
-                        .clickable { onRescan() }
-                        .padding(horizontal = 16.dp, vertical = 10.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = null,
-                            tint = theme.backgroundColor,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "[ SCAN STORAGE ]",
-                            color = theme.backgroundColor,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                    Text(
+                        text = "[ hypr-storage: 0 tracks ]",
+                        color = theme.textPrimaryColor,
+                        fontSize = 15.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "No audio tracks indexed on device storage.\nPlace FLAC, WAV, or MP3 files into your Music or Downloads folder.",
+                        color = theme.textSecondaryColor,
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(8).dp))
+                            .background(theme.accentColor)
+                            .clickable { onRescan() }
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = null,
+                                tint = theme.backgroundColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "[ SCAN STORAGE ]",
+                                color = theme.backgroundColor,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
