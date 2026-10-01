@@ -246,6 +246,16 @@ class HyprAudioPlayer private constructor(private val context: Context) {
         _playbackState.update { it.copy(currentPositionMs = target) }
     }
 
+    fun setVolume(volume: Float) {
+        val factor = HyprEqualizer.getHeadroomVolumeFactor()
+        exoPlayer.volume = (volume.coerceIn(0f, 1f) * factor).coerceIn(0f, 1f)
+    }
+
+    fun getVolume(): Float {
+        val factor = HyprEqualizer.getHeadroomVolumeFactor()
+        return if (factor > 0f) (exoPlayer.volume / factor).coerceIn(0f, 1f) else exoPlayer.volume
+    }
+
     fun updateFavoriteStatus(trackId: String, isFav: Boolean) {
         _playbackState.update { state ->
             val updatedCurrent = if (state.currentTrack?.id == trackId) {

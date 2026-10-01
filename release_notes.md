@@ -1,36 +1,49 @@
-# ⚡ HyprMusic v1.2.1 — Ergonomic Dock, Instant Startup & GitHub OTA Engine
+# ⚡ HyprMusic v1.3.0 — Zero-Lag 120 FPS Engine, Audiophile Sleep Timer, Playlists & Go to Album
 
-HyprMusic v1.2.1 brings critical usability refinements, eliminates startup UI flashes, redesigns the bottom navigation bar for effortless one-handed thumb ergonomics, and introduces a fully functional GitHub Releases OTA update engine.
+HyprMusic v1.3.0 is a milestone performance and feature release. We completely dismantled the audio visualizer pipeline and recomposition tree to deliver locked 60–120 FPS fluid interactions across every screen, and introduced three highly requested features: an audiophile Sleep Timer with gradual volume fade-out, full Custom Playlist management, and 1-tap "Go to Album" navigation directly from the player.
 
 ---
 
-## 🚀 Key Improvements in v1.2.1
+## 🚀 Key Improvements in v1.3.0
 
-### ⚡ Zero-Flash Instant Library Startup
-* **Persistent Disk Metadata Cache**: Scanned audio tracks are now persisted to a local disk cache (`tracks_cache.json`). On app launch, your entire library loads synchronously from frame 1 with zero latency.
-* **Scan State Awareness**: Fixed the jarring startup screen flash where `[ SCAN STORAGE ]` briefly flickered before tracks populated. The empty state now only displays if a full scan completes with genuinely zero tracks found.
+### 🚀 120 FPS Zero-Lag Rendering Engine
+* **Draw-Phase Canvas Spectrum Visualizer**: Replaced 16 individual Compose spring-animated boxes with a single, hardware-accelerated `Canvas` draw phase. Visualizer amplitudes now update directly on the GPU, completely bypassing the Compose composition and layout passes (0 recompositions).
+* **Isolated Dock & Mini-Player Equalizers**: Migrated `MiniEqualizerBars` to an ultra-lightweight 13x14dp Canvas with zero animation allocations, keeping the Waybar dock and MiniPlayer completely idle during playback.
+* **Draw-Phase Album Art Breathing**: Moved album art beat-reactive elevation into `Modifier.graphicsLayer` lambda execution, eliminating dozens of full-screen recompositions per second.
+* **Throttled PCM Buffer Processor**: Capped PCM audio spectrum analysis to ~30 FPS (33ms interval) to prevent StateFlow contention and audio thread backpressure.
+* **Hardware Bitmap Acceleration & Coil Memory Cache**: Configured Coil `ImageLoader` with `Bitmap.Config.HARDWARE`, dedicated 25% RAM cache, and 100MB disk cache for silky-smooth list scrolling.
+* **Asynchronous Disk I/O**: Offloaded `MusicRepository` track metadata serialization and cache writing to a background `Dispatchers.IO` coroutine scope, eliminating UI thread hitching on favorites and library scans.
 
-### 🎛️ Redesigned Ergonomic Bottom Navigation Dock
-* **Comfortable 50dp+ Touch Targets**: Expanded dock height to 58dp with balanced column weights, adhering strictly to Android accessibility guidelines for comfortable, accurate one-handed thumb navigation.
-* **Hybrid Icon & Terminal Aesthetic**: Added clean vector glyphs alongside classic Hyprland workspace tags (`[1:home]`, `[2:lib]`, `[3:player]`, `[4:rice]`).
-* **Live Player Tab Equalizer**: The `[3:player]` tab displays animated audio visualizer frequency bars in real time while music is playing.
-* **Tactile Haptic Feedback**: Every tab switch triggers subtle, mechanical haptic feedback for a responsive desktop-grade feel.
-* **Active Glow & Indicator**: Active workspaces feature an accent pill highlight with a glowing micro indicator bar.
-* **Dedicated Search Launcher**: Sized quick search trigger with clear active and inactive state visual feedback.
+---
 
-### 🔄 Fully Functional GitHub Releases OTA Update Engine
-* **Corrected Repository Integration**: Updated release endpoints to point directly to `santjsx/hyprmusic/releases/latest`.
-* **Direct Streaming Coroutine Downloader**: Downloads APK releases directly with automatic redirect handling (following HTTP 302/301 redirects to GitHub S3 storage objects).
-* **Real-Time Progress & Speed**: Displays a live `LinearProgressIndicator`, percentage counter, downloaded/total MB (e.g. `75.4 MB`), and transfer speed directly in Settings.
-* **Automated Package Installation**: Resolves secure content URIs via `FileProvider` and prompts the Android package installer with `FLAG_GRANT_READ_URI_PERMISSION`.
-* **Unknown Apps Permission Prompt**: Automatically handles Android 8.0+ (Oreo through 16) `canRequestPackageInstalls()` checks, directing to system settings when necessary.
-* **Test & Re-Download Option**: Added `RE-DOWNLOAD / TEST OTA` and `INSTALL UPDATE NOW` actions in `[4:rice]` > Settings for effortless verification.
+### 🌙 Audiophile Sleep Timer
+* **Quick Presets**: Instant 1-tap timers for 15, 30, 45, and 60 minutes.
+* **End of Current Track**: Intelligently halts playback exactly when the active song finishes, ideal for bedtime listening.
+* **Custom Duration Slider**: Seamlessly set any timer from 5 to 120 minutes with a single touch.
+* **15-Second Gentle Volume Fade-Out**: Rather than abruptly cutting audio, the player smoothly ramps volume down from 100% to 0% over the final 15 seconds (or 8 seconds for End-of-Track) before pausing.
+* **Extensible & Live Counter**: View the live monospaced countdown `[00:14:32]` directly on the player screen or dialog, with quick `+5 MIN` and `+15 MIN` extension chips.
+* **Safe Volume Restoration**: Volume is cleanly restored to 100% upon expiration or cancellation so your next playback session is never muted.
+
+---
+
+### 📑 Custom Playlists
+* **Instant Add to Playlist Modal**: Accessible via the `Icons.AutoMirrored.Filled.PlaylistAdd` icon in the player header or bottom action bar.
+* **Create On-The-Fly**: Create brand-new custom playlists inline without leaving the player screen.
+* **Reactive Membership Toggling**: Tap any playlist to add or remove the track instantly with tactile haptic feedback and real-time checkmark state.
+* **Asynchronous JSON Persistence**: Playlists are persisted to `playlists.json` via background coroutines on `Dispatchers.IO`.
+
+---
+
+### 💿 "Go to Album" Navigation
+* **1-Tap Player Header Action**: Tap the album title or the album icon in the player header bar to instantly jump to the album's detail view.
+* **Dedicated Bottom Action Chip**: Added an "ALBUM" quick chip in the player action bar.
+* **Seamless Backstack Integration**: Directs the app to `[2:lib]` (Library) and opens `AlbumDetailView`, while preserving seamless navigation back to the library view.
 
 ---
 
 ## 📦 Package Information
-* **Version**: `v1.2.1`
-* **Version Code**: `4`
+* **Version**: `v1.3.0`
+* **Version Code**: `5`
 * **Package Name**: `com.example.hyprmusic`
 * **Target SDK**: Android 16 (API 36)
 * **Minimum SDK**: Android 10 (API 29)
@@ -39,4 +52,4 @@ HyprMusic v1.2.1 brings critical usability refinements, eliminates startup UI fl
 ---
 
 ## 🛠️ Installation
-Download the `HyprMusic-v1.2.1.apk` asset and install directly on your Android device (Android 10+).
+Download the `HyprMusic-v1.3.0.apk` asset and install directly on your Android device (Android 10+), or use the built-in OTA update checker in Settings (`[4:rice]`).

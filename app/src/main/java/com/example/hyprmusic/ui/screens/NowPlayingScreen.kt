@@ -32,11 +32,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -51,6 +57,7 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -70,6 +77,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
@@ -82,7 +92,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.hyprmusic.core.data.PlaylistRepository
 import com.example.hyprmusic.core.lyrics.LyricsRepository
+import com.example.hyprmusic.core.media.HyprAudioPlayer
+import com.example.hyprmusic.core.media.HyprSleepTimer
 import com.example.hyprmusic.core.media.HyprVisualizerState
 import com.example.hyprmusic.core.model.LyricLine
 import com.example.hyprmusic.core.model.PlaybackState
@@ -91,6 +104,8 @@ import com.example.hyprmusic.core.theming.HyprThemeConfig
 import com.example.hyprmusic.core.theming.hyprAnimatedGlow
 import com.example.hyprmusic.core.theming.hyprBounceClick
 import com.example.hyprmusic.core.theming.hyprTile
+import com.example.hyprmusic.ui.components.AddToPlaylistDialog
+import com.example.hyprmusic.ui.components.SleepTimerDialog
 import com.example.hyprmusic.ui.components.SyncedLyricsView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -99,6 +114,8 @@ import kotlinx.coroutines.withContext
 fun NowPlayingScreen(
     theme: HyprThemeConfig,
     playbackState: PlaybackState,
+    audioPlayer: HyprAudioPlayer? = null,
+    playlistRepository: PlaylistRepository? = null,
     onPlayPause: () -> Unit,
     onSkipNext: () -> Unit,
     onSkipPrevious: () -> Unit,
@@ -107,6 +124,7 @@ fun NowPlayingScreen(
     onToggleRepeat: () -> Unit,
     onToggleFavorite: (String) -> Unit,
     onOpenEqualizer: () -> Unit = {},
+    onNavigateToAlbum: (String) -> Unit = {},
     onBrowseLibrary: () -> Unit = {},
     onRandomMix: () -> Unit = {},
     onDismiss: () -> Unit,
@@ -133,24 +151,9 @@ fun NowPlayingScreen(
     var isLyricsLoading by remember { mutableStateOf(false) }
     var lyricsRetryKey by remember { mutableIntStateOf(0) }
 
-    // Real-time audio waveform / frequency spectrum data directly synced with PCM sink
-    val amplitudes by HyprVisualizerState.amplitudes.collectAsState()
-    val rmsEnergy by HyprVisualizerState.rmsEnergy.collectAsState()
-
-    // Smooth, clean album art scaling & beat-reactive breathing (NO rotation!)
-    val targetCoverScale = if (playbackState.isPlaying) {
-        (0.98f + rmsEnergy * 0.05f).coerceIn(0.98f, 1.04f)
-    } else {
-        0.91f
-    }
-    val coverScale by animateFloatAsState(
-        targetValue = targetCoverScale,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "cover_scale"
-    )
+    val sleepTimerState by HyprSleepTimer.timerState.collectAsState()
+    var showSleepTimerDialog by remember { mutableStateOf(false) }
+    var showAddToPlaylistDialog by remember { mutableStateOf(false) }
 
     // Fetch real lyrics from local storage (.lrc) or LRCLIB multi-search
     LaunchedEffect(track.id, lyricsRetryKey) {
@@ -211,25 +214,90 @@ fun NowPlayingScreen(
                     )
                 }
 
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable {
+                            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                            onNavigateToAlbum(track.album)
+                        }
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
                     Text(
                         text = "PLAYING FROM STORAGE",
                         color = theme.textSecondaryColor,
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
                     )
-                    Text(
-                        text = track.album,
-                        color = theme.accentColor,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = track.album,
+                            color = theme.accentColor,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.Album,
+                            contentDescription = "Go to Album",
+                            tint = theme.accentColor.copy(alpha = 0.8f),
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (audioPlayer != null) {
+                        IconButton(
+                            onClick = {
+                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                                showSleepTimerDialog = true
+                            }
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Bedtime,
+                                    contentDescription = "Sleep Timer",
+                                    tint = if (sleepTimerState.isActive) theme.accentColor else theme.textSecondaryColor,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                if (sleepTimerState.isActive) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(theme.accentColor)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (playlistRepository != null) {
+                        IconButton(
+                            onClick = {
+                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                                showAddToPlaylistDialog = true
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                                contentDescription = "Add to Playlist",
+                                tint = theme.accentColor,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+
                     IconButton(onClick = onOpenEqualizer) {
                         Icon(
                             imageVector = Icons.Default.GraphicEq,
@@ -293,8 +361,14 @@ fun NowPlayingScreen(
                                 .fillMaxWidth(0.85f)
                                 .aspectRatio(1f)
                                 .graphicsLayer {
-                                    scaleX = coverScale
-                                    scaleY = coverScale
+                                    val rms = if (playbackState.isPlaying) HyprVisualizerState.rmsEnergy.value else 0f
+                                    val scale = if (playbackState.isPlaying) {
+                                        (0.98f + rms * 0.04f).coerceIn(0.98f, 1.03f)
+                                    } else {
+                                        0.94f
+                                    }
+                                    scaleX = scale
+                                    scaleY = scale
                                 }
                                 .hyprTile(theme = theme, isActive = playbackState.isPlaying)
                                 .then(if (playbackState.isPlaying) Modifier.hyprAnimatedGlow(theme) else Modifier)
@@ -330,52 +404,15 @@ fun NowPlayingScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Song-Synchronized Audiophile Spectrum Visualizer (PCM Direct)
-            Row(
+            // Song-Synchronized Audiophile Spectrum Visualizer (PCM Direct, Hardware-Accelerated Canvas)
+            AudiophileSpectrumVisualizer(
+                theme = theme,
+                isPlaying = playbackState.isPlaying,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(34.dp)
-                    .padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val barCount = 16
-                for (i in 0 until barCount) {
-                    val rawAmp = amplitudes.getOrElse(i) { 0f }
-                    // Real-time amplitude from PCM audio buffer: 4dp resting line up to 32dp on peaks
-                    val targetHeight = if (playbackState.isPlaying) {
-                        (4f + rawAmp * 28f).coerceIn(4f, 32f)
-                    } else {
-                        4f
-                    }
-                    val animatedBarHeight by animateFloatAsState(
-                        targetValue = targetHeight,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = Spring.StiffnessHigh
-                        ),
-                        label = "bar_h_$i"
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .width(5.dp)
-                            .height(animatedBarHeight.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        theme.accentColor,
-                                        theme.accentColor.copy(alpha = 0.45f)
-                                    )
-                                )
-                            )
-                    )
-                    if (i < barCount - 1) {
-                        Spacer(modifier = Modifier.width(5.dp))
-                    }
-                }
-            }
+                    .padding(horizontal = 20.dp)
+            )
 
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -587,12 +624,15 @@ fun NowPlayingScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Bottom Actions: Lyrics Toggle & DSP EQ Action
+            // Bottom Action Chips: Synced Lyrics, Add to Playlist, Sleep Timer, Go to Album & DSP EQ
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Synced Lyrics Toggle
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
@@ -601,18 +641,18 @@ fun NowPlayingScreen(
                             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                             showLyrics = !showLyrics
                         }
-                        .padding(horizontal = 14.dp, vertical = 7.dp)
+                        .padding(horizontal = 12.dp, vertical = 7.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.FormatAlignLeft,
                             contentDescription = null,
                             tint = if (showLyrics) theme.accentColor else theme.textSecondaryColor,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (showLyrics) "SHOW COVER ART" else "SYNCED LYRICS",
+                            text = if (showLyrics) "COVER ART" else "LYRICS",
                             color = if (showLyrics) theme.accentColor else theme.textSecondaryColor,
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
@@ -621,6 +661,103 @@ fun NowPlayingScreen(
                     }
                 }
 
+                // Add to Playlist Action
+                if (playlistRepository != null) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(theme.surfaceVariantColor)
+                            .hyprBounceClick {
+                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                                showAddToPlaylistDialog = true
+                            }
+                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                                contentDescription = null,
+                                tint = theme.accentColor,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "PLAYLIST",
+                                color = theme.textPrimaryColor,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                // Sleep Timer Action
+                if (audioPlayer != null) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (sleepTimerState.isActive) theme.accentColor.copy(alpha = 0.25f) else theme.surfaceVariantColor)
+                            .border(
+                                1.dp,
+                                if (sleepTimerState.isActive) theme.accentColor else theme.surfaceVariantColor,
+                                RoundedCornerShape(8.dp)
+                            )
+                            .hyprBounceClick {
+                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                                showSleepTimerDialog = true
+                            }
+                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Bedtime,
+                                contentDescription = null,
+                                tint = if (sleepTimerState.isActive) theme.accentColor else theme.textSecondaryColor,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (sleepTimerState.isActive) "SLEEP ${sleepTimerState.formattedRemaining}" else "SLEEP TIMER",
+                                color = if (sleepTimerState.isActive) theme.accentColor else theme.textPrimaryColor,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                // Go to Album Action
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(theme.surfaceVariantColor)
+                        .hyprBounceClick {
+                            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                            onNavigateToAlbum(track.album)
+                        }
+                        .padding(horizontal = 12.dp, vertical = 7.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Album,
+                            contentDescription = null,
+                            tint = theme.accentColor,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "ALBUM",
+                            color = theme.textPrimaryColor,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // DSP Equalizer Action
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
@@ -629,18 +766,18 @@ fun NowPlayingScreen(
                             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                             onOpenEqualizer()
                         }
-                        .padding(horizontal = 14.dp, vertical = 7.dp)
+                        .padding(horizontal = 12.dp, vertical = 7.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.Tune,
                             contentDescription = null,
                             tint = theme.accentColor,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "DSP EQUALIZER",
+                            text = "EQUALIZER",
                             color = theme.accentColor,
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
@@ -651,6 +788,72 @@ fun NowPlayingScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // Modals / Dialogs
+        if (showSleepTimerDialog && audioPlayer != null) {
+            SleepTimerDialog(
+                theme = theme,
+                audioPlayer = audioPlayer,
+                onDismiss = { showSleepTimerDialog = false }
+            )
+        }
+
+        if (showAddToPlaylistDialog && playlistRepository != null) {
+            AddToPlaylistDialog(
+                theme = theme,
+                track = track,
+                playlistRepository = playlistRepository,
+                onDismiss = { showAddToPlaylistDialog = false }
+            )
+        }
+    }
+}
+
+/**
+ * Ultra-smooth, hardware-accelerated spectrum visualizer.
+ * Renders on a single Canvas DrawScope with zero recompositions of the parent screen.
+ */
+@Composable
+fun AudiophileSpectrumVisualizer(
+    theme: HyprThemeConfig,
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val amplitudes by HyprVisualizerState.amplitudes.collectAsState()
+
+    Canvas(modifier = modifier) {
+        val barCount = 16
+        val totalWidth = size.width
+        val barWidth = 5.dp.toPx()
+        val totalBarsWidth = barWidth * barCount
+        val spacing = if (barCount > 1) {
+            ((totalWidth - totalBarsWidth) / (barCount - 1)).coerceAtLeast(2.dp.toPx())
+        } else 0f
+        val startX = (totalWidth - (totalBarsWidth + spacing * (barCount - 1))) / 2f
+        val maxHeight = size.height
+        val minHeight = 4.dp.toPx()
+        val cornerRadius = CornerRadius(2.5.dp.toPx(), 2.5.dp.toPx())
+
+        for (i in 0 until barCount) {
+            val rawAmp = if (isPlaying) amplitudes.getOrElse(i) { 0f } else 0f
+            val barH = (minHeight + rawAmp * (maxHeight - minHeight)).coerceIn(minHeight, maxHeight)
+            val left = startX + i * (barWidth + spacing)
+            val top = (maxHeight - barH) / 2f
+
+            drawRoundRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        theme.accentColor,
+                        theme.accentColor.copy(alpha = 0.45f)
+                    ),
+                    startY = top,
+                    endY = top + barH
+                ),
+                topLeft = Offset(left, top),
+                size = Size(barWidth, barH),
+                cornerRadius = cornerRadius
+            )
         }
     }
 }

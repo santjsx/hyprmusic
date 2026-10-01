@@ -69,51 +69,57 @@ class HyprVisualizerProcessor : BaseAudioProcessor() {
         return inputAudioFormat
     }
 
+    private var lastProcessTime = 0L
+
     override fun queueInput(inputBuffer: ByteBuffer) {
         val remaining = inputBuffer.remaining()
         if (remaining == 0) return
 
         val buffer = replaceOutputBuffer(remaining)
 
-        // Read samples for visualization without disrupting playback
-        val duplicate = inputBuffer.asReadOnlyBuffer().order(ByteOrder.LITTLE_ENDIAN)
-        val shortBuffer = duplicate.asShortBuffer()
-        val totalSamples = shortBuffer.remaining()
+        val now = System.currentTimeMillis()
+        if (now - lastProcessTime >= 33L) {
+            lastProcessTime = now
+            // Read samples for visualization without disrupting playback
+            val duplicate = inputBuffer.asReadOnlyBuffer().order(ByteOrder.LITTLE_ENDIAN)
+            val shortBuffer = duplicate.asShortBuffer()
+            val totalSamples = shortBuffer.remaining()
 
-        if (totalSamples > 0) {
-            var sumSquare = 0.0
-            val bandSize = max(1, totalSamples / HyprVisualizerState.BAR_COUNT)
-            val currentAmps = FloatArray(HyprVisualizerState.BAR_COUNT)
+            if (totalSamples > 0) {
+                var sumSquare = 0.0
+                val bandSize = max(1, totalSamples / HyprVisualizerState.BAR_COUNT)
+                val currentAmps = FloatArray(HyprVisualizerState.BAR_COUNT)
 
-            var bandIndex = 0
-            var bandPeak = 0f
-            var samplesInBand = 0
+                var bandIndex = 0
+                var bandPeak = 0f
+                var samplesInBand = 0
 
-            for (i in 0 until totalSamples) {
-                val sample = shortBuffer.get()
-                val normalized = abs(sample.toFloat()) / 32768.0f
-                sumSquare += (normalized * normalized)
+                for (i in 0 until totalSamples) {
+                    val sample = shortBuffer.get()
+                    val normalized = abs(sample.toFloat()) / 32768.0f
+                    sumSquare += (normalized * normalized)
 
-                if (normalized > bandPeak) {
-                    bandPeak = normalized
+                    if (normalized > bandPeak) {
+                        bandPeak = normalized
+                    }
+                    samplesInBand++
+
+                    if (samplesInBand >= bandSize && bandIndex < HyprVisualizerState.BAR_COUNT) {
+                        currentAmps[bandIndex] = min(1f, bandPeak * 1.5f) // Boost visibility
+                        bandIndex++
+                        bandPeak = 0f
+                        samplesInBand = 0
+                    }
                 }
-                samplesInBand++
 
-                if (samplesInBand >= bandSize && bandIndex < HyprVisualizerState.BAR_COUNT) {
-                    currentAmps[bandIndex] = min(1f, bandPeak * 1.5f) // Boost visibility
+                while (bandIndex < HyprVisualizerState.BAR_COUNT) {
+                    currentAmps[bandIndex] = currentAmps[max(0, bandIndex - 1)] * 0.8f
                     bandIndex++
-                    bandPeak = 0f
-                    samplesInBand = 0
                 }
-            }
 
-            while (bandIndex < HyprVisualizerState.BAR_COUNT) {
-                currentAmps[bandIndex] = currentAmps[max(0, bandIndex - 1)] * 0.8f
-                bandIndex++
+                val rms = min(1f, (sqrt(sumSquare / totalSamples) * 2.0).toFloat())
+                HyprVisualizerState.updateRaw(currentAmps, rms)
             }
-
-            val rms = min(1f, (sqrt(sumSquare / totalSamples) * 2.0).toFloat())
-            HyprVisualizerState.updateRaw(currentAmps, rms)
         }
 
         // Copy raw audio into output buffer to pass to AudioSink

@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +21,9 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -331,7 +335,8 @@ fun HyprBottomDock(
 }
 
 /**
- * Animated frequency visualizer bars for MiniPlayer & NowPlaying.
+ * Ultra-smooth, hardware-accelerated equalizer bars for MiniPlayer & Waybar Bottom Dock.
+ * Drawn entirely in Canvas DrawScope with zero animation allocations and zero parent recompositions.
  */
 @Composable
 fun MiniEqualizerBars(
@@ -339,46 +344,53 @@ fun MiniEqualizerBars(
     isPlaying: Boolean,
     modifier: Modifier = Modifier
 ) {
+    if (!isPlaying) {
+        Canvas(modifier = modifier.size(width = 13.dp, height = 14.dp)) {
+            val barW = 2.5.dp.toPx()
+            val corner = CornerRadius(1.dp.toPx(), 1.dp.toPx())
+            val restH = 3.dp.toPx()
+            val top = size.height - restH
+            val spacing = 2.dp.toPx()
+            for (i in 0..2) {
+                drawRoundRect(
+                    color = theme.accentColor.copy(alpha = 0.45f),
+                    topLeft = Offset(i * (barW + spacing), top),
+                    size = Size(barW, restH),
+                    cornerRadius = corner
+                )
+            }
+        }
+        return
+    }
+
     val amplitudes by HyprVisualizerState.amplitudes.collectAsState()
 
-    val raw1 = if (isPlaying) amplitudes.getOrElse(1) { 0.2f } else 0.15f
-    val raw2 = if (isPlaying) amplitudes.getOrElse(5) { 0.4f } else 0.15f
-    val raw3 = if (isPlaying) amplitudes.getOrElse(9) { 0.25f } else 0.15f
+    Canvas(modifier = modifier.size(width = 13.dp, height = 14.dp)) {
+        val barW = 2.5.dp.toPx()
+        val corner = CornerRadius(1.dp.toPx(), 1.dp.toPx())
+        val spacing = 2.dp.toPx()
+        val maxH = size.height
+        val minH = 2.5.dp.toPx()
 
-    val h1 by animateFloatAsState(targetValue = (0.2f + raw1 * 0.8f).coerceIn(0.2f, 1f), label = "m_eq1")
-    val h2 by animateFloatAsState(targetValue = (0.2f + raw2 * 0.8f).coerceIn(0.2f, 1f), label = "m_eq2")
-    val h3 by animateFloatAsState(targetValue = (0.2f + raw3 * 0.8f).coerceIn(0.2f, 1f), label = "m_eq3")
+        val raw1 = amplitudes.getOrElse(1) { 0.2f }
+        val raw2 = amplitudes.getOrElse(5) { 0.4f }
+        val raw3 = amplitudes.getOrElse(9) { 0.25f }
 
-    Row(
-        modifier = modifier.height(14.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.5.dp),
-        verticalAlignment = Alignment.Bottom
-    ) {
-        val bar1 = if (isPlaying) h1 else 0.2f
-        val bar2 = if (isPlaying) h2 else 0.2f
-        val bar3 = if (isPlaying) h3 else 0.2f
+        val h1 = (minH + raw1 * (maxH - minH)).coerceIn(minH, maxH)
+        val h2 = (minH + raw2 * (maxH - minH)).coerceIn(minH, maxH)
+        val h3 = (minH + raw3 * (maxH - minH)).coerceIn(minH, maxH)
 
-        Box(
-            modifier = Modifier
-                .width(2.5.dp)
-                .height((14 * bar1).dp.coerceAtLeast(2.5.dp))
-                .clip(RoundedCornerShape(1.dp))
-                .background(theme.accentColor)
-        )
-        Box(
-            modifier = Modifier
-                .width(2.5.dp)
-                .height((14 * bar2).dp.coerceAtLeast(2.5.dp))
-                .clip(RoundedCornerShape(1.dp))
-                .background(theme.accentColor)
-        )
-        Box(
-            modifier = Modifier
-                .width(2.5.dp)
-                .height((14 * bar3).dp.coerceAtLeast(2.5.dp))
-                .clip(RoundedCornerShape(1.dp))
-                .background(theme.accentColor)
-        )
+        val heights = floatArrayOf(h1, h2, h3)
+        for (i in 0..2) {
+            val h = heights[i]
+            val top = maxH - h
+            drawRoundRect(
+                color = theme.accentColor,
+                topLeft = Offset(i * (barW + spacing), top),
+                size = Size(barW, h),
+                cornerRadius = corner
+            )
+        }
     }
 }
 

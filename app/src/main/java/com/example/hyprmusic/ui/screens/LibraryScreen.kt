@@ -70,6 +70,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -134,12 +135,20 @@ fun LibraryScreen(
     onTrackSelected: (Track, List<Track>) -> Unit,
     onToggleFavorite: (String) -> Unit,
     telegramRepository: TelegramMusicRepository? = null,
+    initialAlbum: Album? = null,
+    onAlbumCleared: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var currentScope by remember { mutableStateOf(LibraryScope.LOCAL) }
     var viewState by remember { mutableStateOf<LibraryViewState>(LibraryViewState.Main(LibraryFilter.TRACKS)) }
     var searchQuery by remember { mutableStateOf("") }
     var activeFilter by remember { mutableStateOf(LibraryFilter.TRACKS) }
+
+    LaunchedEffect(initialAlbum) {
+        if (initialAlbum != null) {
+            viewState = LibraryViewState.AlbumDetail(initialAlbum)
+        }
+    }
 
     val cloudTracks = telegramRepository?.cloudTracks?.collectAsState()?.value ?: emptyList()
 
@@ -259,7 +268,10 @@ fun LibraryScreen(
                                 album = state.album,
                                 allTracks = tracks,
                                 playbackState = playbackState,
-                                onBack = { viewState = LibraryViewState.Main(activeFilter) },
+                                onBack = {
+                                    viewState = LibraryViewState.Main(activeFilter)
+                                    onAlbumCleared()
+                                },
                                 onTrackSelected = onTrackSelected,
                                 onToggleFavorite = onToggleFavorite
                             )

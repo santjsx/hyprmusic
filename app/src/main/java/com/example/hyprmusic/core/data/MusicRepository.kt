@@ -8,7 +8,9 @@ import android.provider.MediaStore
 import com.example.hyprmusic.core.model.Album
 import com.example.hyprmusic.core.model.Artist
 import com.example.hyprmusic.core.model.Track
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +19,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -26,6 +29,7 @@ class MusicRepository(private val context: Context) {
 
     val favoritesRepository = FavoritesRepository(context)
     val playbackStatsRepository = PlaybackStatsRepository(context)
+    private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val jsonSerializer = Json {
         ignoreUnknownKeys = true
@@ -67,11 +71,13 @@ class MusicRepository(private val context: Context) {
     }
 
     private fun saveTracksToDisk(tracks: List<Track>) {
-        try {
-            val content = jsonSerializer.encodeToString(tracks)
-            cacheFile.writeText(content)
-        } catch (e: Exception) {
-            e.printStackTrace()
+        repositoryScope.launch {
+            try {
+                val content = jsonSerializer.encodeToString(tracks)
+                cacheFile.writeText(content)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 

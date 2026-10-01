@@ -55,8 +55,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.hyprmusic.core.data.MusicRepository
+import com.example.hyprmusic.core.data.PlaylistRepository
 import com.example.hyprmusic.core.media.HyprAudioPlayer
 import com.example.hyprmusic.core.media.HyprEqualizer
+import com.example.hyprmusic.core.model.Album
 import com.example.hyprmusic.core.theming.HyprThemeProvider
 import com.example.hyprmusic.core.theming.ThemeManager
 import com.example.hyprmusic.core.theming.hyprBounceClick
@@ -79,6 +81,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var audioPlayer: HyprAudioPlayer
     private lateinit var musicRepository: MusicRepository
     private lateinit var telegramRepository: TelegramMusicRepository
+    private lateinit var playlistRepository: PlaylistRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,10 +91,29 @@ class MainActivity : ComponentActivity() {
         audioPlayer = HyprAudioPlayer.getInstance(applicationContext)
         musicRepository = MusicRepository(applicationContext)
         telegramRepository = TelegramMusicRepository(applicationContext, musicRepository)
+        playlistRepository = PlaylistRepository(applicationContext)
 
         try {
             HyprEqualizer.init(applicationContext, audioPlayer.audioSessionId)
         } catch (_: Exception) {}
+
+        val imageLoader = coil.ImageLoader.Builder(applicationContext)
+            .memoryCache {
+                coil.memory.MemoryCache.Builder(applicationContext)
+                    .maxSizePercent(0.25)
+                    .build()
+            }
+            .diskCache {
+                coil.disk.DiskCache.Builder()
+                    .directory(applicationContext.cacheDir.resolve("image_cache"))
+                    .maxSizeBytes(100L * 1024 * 1024)
+                    .build()
+            }
+            .bitmapConfig(android.graphics.Bitmap.Config.HARDWARE)
+            .respectCacheHeaders(false)
+            .crossfade(true)
+            .build()
+        coil.Coil.setImageLoader(imageLoader)
 
         setContent {
             val themeConfig by ThemeManager.themeConfig.collectAsState()
@@ -104,7 +126,8 @@ class MainActivity : ComponentActivity() {
                     HyprMusicApp(
                         audioPlayer = audioPlayer,
                         musicRepository = musicRepository,
-                        telegramRepository = telegramRepository
+                        telegramRepository = telegramRepository,
+                        playlistRepository = playlistRepository
                     )
                 }
             }
@@ -121,7 +144,8 @@ class MainActivity : ComponentActivity() {
 fun HyprMusicApp(
     audioPlayer: HyprAudioPlayer,
     musicRepository: MusicRepository,
-    telegramRepository: TelegramMusicRepository
+    telegramRepository: TelegramMusicRepository,
+    playlistRepository: PlaylistRepository
 ) {
     val themeConfig by ThemeManager.themeConfig.collectAsState()
     val playbackState by audioPlayer.playbackState.collectAsState()
@@ -136,7 +160,22 @@ fun HyprMusicApp(
     var showEqualizerDialog by remember { mutableStateOf(false) }
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var selectedAlbumForLibrary by remember { mutableStateOf<Album?>(null) }
     val coroutineScope = rememberCoroutineScope()
+
+    val navigateToAlbum: (String) -> Unit = { albumTitle ->
+        val matchedAlbum = albums.firstOrNull { it.title.equals(albumTitle, ignoreCase = true) }
+            ?: Album(
+                id = albumTitle.hashCode().toString(),
+                title = albumTitle,
+                artist = playbackState.currentTrack?.artist ?: "Unknown Artist",
+                coverUri = playbackState.currentTrack?.albumArtUri,
+                trackCount = tracks.count { it.album.equals(albumTitle, ignoreCase = true) }.coerceAtLeast(1)
+            )
+        selectedAlbumForLibrary = matchedAlbum
+        isNowPlayingExpanded = false
+        currentWorkspace = HyprWorkspace.LIBRARY
+    }
 
     // Permissions check
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -362,7 +401,9 @@ fun HyprMusicApp(
                                     val isFav = musicRepository.toggleFavorite(trackId)
                                     audioPlayer.updateFavoriteStatus(trackId, isFav)
                                 },
-                                telegramRepository = telegramRepository
+                                telegramRepository = telegramRepository,
+                                initialAlbum = selectedAlbumForLibrary,
+                                onAlbumCleared = { selectedAlbumForLibrary = null }
                             )
                         }
 
@@ -370,6 +411,8 @@ fun HyprMusicApp(
                             NowPlayingScreen(
                                 theme = themeConfig,
                                 playbackState = playbackState,
+                                audioPlayer = audioPlayer,
+                                playlistRepository = playlistRepository,
                                 onPlayPause = { audioPlayer.togglePlayPause() },
                                 onSkipNext = { audioPlayer.skipNext() },
                                 onSkipPrevious = { audioPlayer.skipPrevious() },
@@ -381,6 +424,7 @@ fun HyprMusicApp(
                                     audioPlayer.updateFavoriteStatus(trackId, isFav)
                                 },
                                 onOpenEqualizer = { showEqualizerDialog = true },
+                                onNavigateToAlbum = navigateToAlbum,
                                 onBrowseLibrary = { currentWorkspace = HyprWorkspace.LIBRARY },
                                 onRandomMix = {
                                     if (tracks.isNotEmpty()) {
@@ -468,6 +512,8 @@ fun HyprMusicApp(
             NowPlayingScreen(
                 theme = themeConfig,
                 playbackState = playbackState,
+                audioPlayer = audioPlayer,
+                playlistRepository = playlistRepository,
                 onPlayPause = { audioPlayer.togglePlayPause() },
                 onSkipNext = { audioPlayer.skipNext() },
                 onSkipPrevious = { audioPlayer.skipPrevious() },
@@ -479,6 +525,7 @@ fun HyprMusicApp(
                     audioPlayer.updateFavoriteStatus(trackId, isFav)
                 },
                 onOpenEqualizer = { showEqualizerDialog = true },
+                onNavigateToAlbum = navigateToAlbum,
                 onBrowseLibrary = {
                     isNowPlayingExpanded = false
                     currentWorkspace = HyprWorkspace.LIBRARY
