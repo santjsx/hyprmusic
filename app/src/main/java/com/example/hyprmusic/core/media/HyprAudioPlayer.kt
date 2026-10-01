@@ -220,12 +220,14 @@ class HyprAudioPlayer private constructor(private val context: Context) {
         playTrack(track, queue, autoPlay = false)
     }
 
-    fun togglePlayPause() {
+    fun togglePlayPause(fallbackQueue: List<Track> = emptyList()) {
         if (exoPlayer.isPlaying) {
             exoPlayer.pause()
         } else {
             if (_playbackState.value.currentTrack != null) {
                 resume()
+            } else if (fallbackQueue.isNotEmpty()) {
+                playTrack(fallbackQueue.first(), fallbackQueue, autoPlay = true)
             }
         }
     }
@@ -235,6 +237,11 @@ class HyprAudioPlayer private constructor(private val context: Context) {
     }
 
     fun resume() {
+        if (exoPlayer.playbackState == Player.STATE_IDLE) {
+            exoPlayer.prepare()
+        } else if (exoPlayer.playbackState == Player.STATE_ENDED) {
+            exoPlayer.seekTo(0)
+        }
         exoPlayer.play()
         ensureServiceRunning()
     }
@@ -308,6 +315,17 @@ class HyprAudioPlayer private constructor(private val context: Context) {
 
     fun toggleShuffle() {
         _playbackState.update { it.copy(isShuffle = !it.isShuffle) }
+    }
+
+    fun setShuffle(enabled: Boolean) {
+        _playbackState.update { it.copy(isShuffle = enabled) }
+    }
+
+    fun playRandomMix(allTracks: List<Track>) {
+        if (allTracks.isEmpty()) return
+        val shuffled = allTracks.shuffled()
+        _playbackState.update { it.copy(isShuffle = true) }
+        playTrack(shuffled.first(), shuffled, autoPlay = true)
     }
 
     fun toggleRepeat() {

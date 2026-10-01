@@ -521,12 +521,13 @@ fun Modifier.hyprAnimatedGlow(
  */
 fun Modifier.hyprBounceClick(
     targetScale: Float = 0.95f,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ): Modifier = composed {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) targetScale else 1f,
+        targetValue = if (isPressed && enabled) targetScale else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMedium
@@ -541,6 +542,7 @@ fun Modifier.hyprBounceClick(
         .clickable(
             interactionSource = interactionSource,
             indication = null,
+            enabled = enabled,
             onClick = onClick
         )
 }

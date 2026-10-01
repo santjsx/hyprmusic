@@ -1,8 +1,15 @@
 package com.example.hyprmusic.ui.screens
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.rotate
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +39,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -186,6 +195,7 @@ fun HomeScreen(
             theme = theme,
             playbackState = playbackState,
             tracks = tracks,
+            isScanning = isScanning,
             listState = listState,
             onTrackSelected = onTrackSelected,
             onTogglePlayPause = onTogglePlayPause,
@@ -652,6 +662,7 @@ private fun TerminalRowsHomeScreen(
     theme: HyprThemeConfig,
     playbackState: PlaybackState,
     tracks: List<Track>,
+    isScanning: Boolean,
     listState: LazyListState,
     onTrackSelected: (Track, List<Track>) -> Unit,
     onTogglePlayPause: () -> Unit,
@@ -659,8 +670,20 @@ private fun TerminalRowsHomeScreen(
     onRescan: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val spec = HyprTheme.spec
     val currentTrack = playbackState.currentTrack
+
+    val infiniteTransition = rememberInfiniteTransition(label = "rescanSpin")
+    val spinAngle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rescanAngle"
+    )
 
     LazyColumn(
         state = listState,
@@ -692,17 +715,26 @@ private fun TerminalRowsHomeScreen(
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
+
+                        val statusText = when {
+                            isScanning -> "SCANNING"
+                            playbackState.isPlaying -> "PLAYING"
+                            playbackState.currentTrack != null -> "PAUSED"
+                            else -> "IDLE"
+                        }
+                        val isEngineActive = isScanning || playbackState.isPlaying
+
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(if (playbackState.isPlaying) spec.borderActive.copy(alpha = 0.2f) else spec.surfaceVariant)
-                                .border(1.dp, if (playbackState.isPlaying) spec.borderActive else spec.borderInactive, RoundedCornerShape(4.dp))
+                                .background(if (isEngineActive) spec.borderActive.copy(alpha = 0.2f) else spec.surfaceVariant)
+                                .border(1.dp, if (isEngineActive) spec.borderActive else spec.borderInactive, RoundedCornerShape(4.dp))
                                 .padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
                             Text(
-                                text = if (playbackState.isPlaying) "PLAYING" else "IDLE",
+                                text = statusText,
                                 fontFamily = spec.fontFamily,
-                                color = if (playbackState.isPlaying) spec.borderActive else spec.textSecondary,
+                                color = if (isEngineActive) spec.borderActive else spec.textSecondary,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -738,84 +770,104 @@ private fun TerminalRowsHomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        // Action 1: PLAY / PAUSE
+                        val isPlaying = playbackState.isPlaying
+                        val isPlayActive = isPlaying || currentTrack != null
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp)))
-                                .background(spec.surfaceVariant)
-                                .border(1.dp, spec.borderActive, RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp)))
-                                .clickable { onTogglePlayPause() }
+                                .background(if (isPlaying) spec.borderActive.copy(alpha = 0.16f) else spec.surfaceVariant)
+                                .border(
+                                    width = if (isPlayActive) 1.dp else 0.8.dp,
+                                    color = if (isPlayActive) spec.borderActive else spec.borderInactive,
+                                    shape = RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp))
+                                )
+                                .hyprBounceClick { onTogglePlayPause() }
                                 .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
-                                    imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    contentDescription = null,
-                                    tint = spec.borderActive,
+                                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    contentDescription = if (isPlaying) "Pause" else "Play",
+                                    tint = if (isPlayActive) spec.borderActive else spec.textPrimary,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = if (playbackState.isPlaying) "PAUSE" else "PLAY",
+                                    text = if (isPlaying) "PAUSE" else "PLAY",
                                     fontFamily = spec.fontFamily,
-                                    color = spec.borderActive,
+                                    color = if (isPlayActive) spec.borderActive else spec.textPrimary,
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
 
+                        // Action 2: SHUFFLE
+                        val isShuffleActive = playbackState.isShuffle
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp)))
-                                .background(spec.surfaceVariant)
-                                .border(1.dp, spec.borderInactive, RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp)))
-                                .clickable { onRandomMix() }
+                                .background(if (isShuffleActive) spec.borderActive.copy(alpha = 0.14f) else spec.surfaceVariant)
+                                .border(
+                                    width = if (isShuffleActive) 1.dp else 0.8.dp,
+                                    color = if (isShuffleActive) spec.borderActive else spec.borderInactive,
+                                    shape = RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp))
+                                )
+                                .hyprBounceClick { onRandomMix() }
                                 .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Default.Shuffle,
-                                    contentDescription = null,
-                                    tint = spec.textPrimary,
+                                    contentDescription = "Shuffle",
+                                    tint = if (isShuffleActive) spec.borderActive else spec.textPrimary,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "SHUFFLE",
                                     fontFamily = spec.fontFamily,
-                                    color = spec.textPrimary,
+                                    color = if (isShuffleActive) spec.borderActive else spec.textPrimary,
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
 
+                        // Action 3: RESCAN
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp)))
-                                .background(spec.surfaceVariant)
-                                .border(1.dp, spec.borderInactive, RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp)))
-                                .clickable { onRescan() }
+                                .background(if (isScanning) spec.borderActive.copy(alpha = 0.14f) else spec.surfaceVariant)
+                                .border(
+                                    width = if (isScanning) 1.dp else 0.8.dp,
+                                    color = if (isScanning) spec.borderActive else spec.borderInactive,
+                                    shape = RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp))
+                                )
+                                .hyprBounceClick(enabled = !isScanning) { onRescan() }
                                 .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Default.Refresh,
-                                    contentDescription = null,
-                                    tint = spec.textSecondary,
-                                    modifier = Modifier.size(16.dp)
+                                    contentDescription = "Rescan",
+                                    tint = if (isScanning) spec.borderActive else spec.textSecondary,
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .rotate(if (isScanning) spinAngle else 0f)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "RESCAN",
+                                    text = if (isScanning) "SCANNING" else "RESCAN",
                                     fontFamily = spec.fontFamily,
-                                    color = spec.textSecondary,
+                                    color = if (isScanning) spec.borderActive else spec.textSecondary,
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -858,37 +910,86 @@ private fun TerminalRowsHomeScreen(
                         shape = RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp))
                     )
                     .clickable { onTrackSelected(track, tracks) }
-                    .padding(horizontal = 12.dp, vertical = 9.dp)
+                    .padding(horizontal = 10.dp, vertical = 7.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (isPlaying) {
-                        Icon(
-                            imageVector = Icons.Default.GraphicEq,
-                            contentDescription = null,
-                            tint = spec.borderActive,
-                            modifier = Modifier
-                                .width(28.dp)
-                                .size(16.dp)
-                        )
+                    // Track Index Number
+                    val indexText = if (tracks.size >= 100) {
+                        String.format("%03d", index + 1)
                     } else {
-                        val indexWidth = if (tracks.size >= 100) 34.dp else 28.dp
-                        val indexText = if (tracks.size >= 100) {
-                            String.format("%03d", index + 1)
-                        } else {
-                            String.format("%02d", index + 1)
-                        }
-                        Text(
-                            text = indexText,
-                            fontFamily = spec.fontFamily,
-                            color = if (isCurrent) spec.borderActive else spec.textSecondary,
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.width(indexWidth)
-                        )
+                        String.format("%02d", index + 1)
                     }
+                    Text(
+                        text = indexText,
+                        fontFamily = spec.fontFamily,
+                        color = if (isCurrent) spec.borderActive else spec.textSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.width(26.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    // Compact Album Artwork Jacket Thumbnail (38.dp x 38.dp)
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(spec.surfaceVariant)
+                            .border(
+                                width = if (isCurrent) 1.dp else 0.5.dp,
+                                color = if (isCurrent) spec.borderActive else spec.borderInactive.copy(alpha = 0.4f),
+                                shape = RoundedCornerShape(6.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!track.albumArtUri.isNullOrBlank()) {
+                            val rowReq = remember(track.albumArtUri) {
+                                ImageRequest.Builder(context)
+                                    .data(track.albumArtUri)
+                                    .size(120, 120)
+                                    .allowHardware(true)
+                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                    .crossfade(false)
+                                    .build()
+                            }
+                            AsyncImage(
+                                model = rowReq,
+                                contentDescription = track.title,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.MusicNote,
+                                contentDescription = null,
+                                tint = if (isCurrent) spec.borderActive else spec.textSecondary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        // Live Equalizer overlay on art when active
+                        if (isPlaying) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(spec.surface.copy(alpha = 0.55f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                MiniEqualizerBars(
+                                    theme = theme,
+                                    isPlaying = true,
+                                    modifier = Modifier.height(13.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(10.dp))
 
                     // Track Title & Artist
                     Column(modifier = Modifier.weight(1f)) {

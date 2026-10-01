@@ -1,103 +1,62 @@
-# HyprMusic v1.7.0 — Gesture Navigation Shield, Audiophile Turntable & Component Uniqueness Overhaul
+# HyprMusic v1.8.0 — Audiophile Tonearm Physics, Physical Digipak Sleeve & Quick Actions Overhaul
 
-HyprMusic v1.7.0 introduces full system-wide Android edge gesture navigation protection, an audiophile centerpiece overhaul featuring a dual-mode master vinyl turntable and digipak sleeve, an integrated custom playlist engine with multi-quadrant collage artwork, a floating glass bottom dock with kinetic spring indicators, an interactive floating island mini player with 33 RPM spinning vinyl record, depth-of-field kinetic lyrics typography, and machined telemetry rack settings.
-
----
-
-## What's New in v1.7.0
-
-### Intelligent Android Gesture Navigation & Hierarchical Dismissal Shield
-* **Edge Swipe Back Protection**: Single-swipe back gestures on secondary or child screens now cleanly pop the current view (dismissing equalizer dialog, collapsing Now Playing player, closing search runner, or popping album/artist/playlist detail views) sequentially without terminating playback or abruptly closing the app.
-* **Home Screen Double-Back Safety**: When on the primary Home workspace, edge swipe gestures are protected by a 2000ms double-tap threshold with terminal notification toast `[ PRESS BACK AGAIN TO EXIT ]`, preventing accidental app termination during navigation.
-* **Child Screen Local Back Handlers**: `LibraryScreen` intercepts system back gestures locally inside Album, Artist, and Playlist views, returning to the catalog index smoothly.
+HyprMusic v1.8.0 delivers an authentic physical audiophile centerpiece overhaul, a complete rewrite of the Home screen Audio Engine quick actions, album art restoration across all terminal theme rows, and a decluttered Settings page.
 
 ---
 
-### Audiophile Centerpiece: Master Turntable vs Digipak Sleeve
-* **Dual-Mode Interactive Switcher**: Seamlessly toggle between direct-drive vinyl turntable and high-fidelity digipak sleeve presentation via screen tap or action chip.
-* **Master Vinyl Turntable**:
-  * 12-inch micro-grooved vinyl record rotating continuously at 33 1/3 RPM during playback with realistic light sheen.
-  * Heavy direct-drive platter base with 36-point strobe perimeter speed calibration dots.
-  * 4-inch center circular album art label with central spindle hole.
-  * Precision tonearm assembly with pivot gimbal, counterweight, stainless steel tube, headshell cartridge, and needle stylus that tracks onto the groove when playing and smoothly parks when paused.
-* **Digipak Sleeve Mode**:
-  * Dual-layer zero-crop sleeve architecture with ambient reactive backdrop and fitted foreground jacket.
-  * Beat-synchronized RMS audio pulsation.
-  * Vinyl record peeking out of the right sleeve opening with grooved reflections.
+## What's New in v1.8.0
+
+### Ultra-Realistic Master Vinyl Turntable Centerpiece
+* **Fixed-Pivot Tonearm Physics**: Replaced container-level canvas rotation with a mathematically anchored pivot at `(width * 0.85f, height * 0.17f)` using DrawScope rotation around the plinth bearing base. The tonearm pivot stays permanently anchored to the turntable body.
+* **Lead-In to Lead-Out Needle Tracking**: When playback is paused or stopped, the tonearm smoothly parks at `-12°` on the physical cueing arm-rest clip. While playing, the tonearm dynamically interpolates from `7°` (lead-in groove) to `20°` (lead-out runoff), tracking song progress strictly across the sound grooves and never piercing the circular center label.
+* **Audiophile S-Curve Aluminum Tube**: Rendered an authentic cubic Bezier S-curved tonearm tube with polished chrome reflection gradient, rear knurled counterweight cylinder, angled headshell, phono cartridge body with accent highlight, and diamond stylus tip.
+* **Platter Stroboscopic Detailing**: Features a recessed platter well with radial drop-shadow, heavy cast aluminum bevel rim with 4 rings of strobe calibration dots, and an anisotropic bowtie/butterfly optical reflection sheen across the rotating vinyl microgrooves.
 
 ---
 
-### Zero-Crop Album Cover & Digipak Sleeve Engine
-* **Dual-Layer Zero-Crop Architecture**:
-  * Wide movie posters, horizontal film soundtrack covers, and non-square album art now render 100% of their imagery without cropped heads or sliced titles.
-  * Ambient blurred backdrop scales with `ContentScale.Crop` at 35% alpha to eliminate empty black letterboxing.
-  * Foreground jacket renders with `ContentScale.Fit` inside a true 1:1 vinyl sleeve aspect ratio.
-  * Corner audio chip badge (`[ X TRK ]`) and tactile bounce feedback.
+### Tangible Physical Gatefold Digipak Sleeve
+* **Authentic Cardboard Jacket**: Eliminated harsh wireframe neon borders in favor of soft ambient underglow, an authentic physical book-spine fold crease highlight on the left, and an open pocket edge on the right.
+* **Sliding 12-Inch Vinyl LP**: Features an authentic vinyl disc that slides out from the sleeve pocket (58dp when playing with subtle RMS sway, 36dp when paused), showcasing grooved optical reflection sweep gradients and a circular center album artwork label with center spindle pin.
 
 ---
 
-### Complete Playlists Engine & Management Screen
-* **Dedicated Playlists Tab**: Added `PLAYLISTS` filter tab with live match count badges.
-* **2-Column Playlists Grid**:
-  * Hero card: `+ NEW PLAYLIST` (`mkplaylist <name>`).
-  * Dynamic 4-Quadrant Artwork Collages: Automatically generated from tracks inside each playlist.
-* **Playlist Detail Screen**:
-  * Real-time aggregate duration calculation, Play All, Shuffle Mix, and Playlist Delete confirmation dialog.
-  * Track rows with individual removal actions and direct audio launching.
-* **`CreatePlaylistDialog`**:
-  * Fast modal dialog for creating new playlists on demand.
+### Home Screen Audio Engine Quick Actions Overhaul
+* **Play / Pause Button**:
+  * Added fallback support for idle or newly launched states: clicking `PLAY` when no track is actively loaded automatically initiates playback with the first track from the indexed library rather than failing silently.
+  * Hardened ExoPlayer resume logic against `STATE_IDLE` and `STATE_ENDED` edge conditions, ensuring instantaneous playback recovery.
+  * Enhanced with `hyprBounceClick` and active state borders.
+* **Shuffle Button**:
+  * Implemented `playRandomMix`, which shuffles the entire library queue, persists `isShuffle = true` to the playback state, and starts audio immediately. Subsequent track skips remain in shuffle mode throughout the session.
+  * Added visual active-state tracking: when shuffle is active, the button renders `spec.borderActive`, an active background fill, and accent-tinted iconography.
+  * Tactile bounce feedback and a brief confirmation toast (`Shuffled X tracks`).
+* **Rescan Button**:
+  * Wired full observation of `isScanning` into the terminal rows home layout.
+  * Added a smooth 360-degree rotation animation on the refresh icon while scanning is underway, accompanied by `SCANNING...` status typography.
+  * Implemented atomic concurrency guards in `MusicRepository.scanLocalMedia()` to eliminate redundant background scans.
+  * Interactive click-lock disables the button during an active scan to prevent double-tap storming.
+  * Displays a completion toast confirming indexed track counts.
+* **Dynamic Audio Engine Badge**:
+  * The top-right badge now dynamically displays `[ SCANNING ]` during media indexing, `[ PLAYING ]` when streaming audio, `[ PAUSED ]` when paused with loaded media, and `[ IDLE ]` when stopped.
 
 ---
 
-### Detached Floating Glass Capsule Bottom Dock
-* **Frosted Glass Styling**: Detached floating pill dock with vertical gradient translucency, subtle border highlights, and window gaps padding.
-* **Kinetic Sliding Indicator Pill**: Active workspace highlighted with `animateDpAsState` spring-loaded width indicator pill.
-* **Active Equalizer Tab**: The `PLAYING` tab features live dancing `MiniEqualizerBars` when playback is active.
-* **Cybernetic Runner Button**: Dedicated tactile `run` launcher button triggering the search command palette.
+### Universal Album Art in Terminal Layouts
+* **TerminalRowsHomeScreen Album Art Jackets**: Added a 38x38dp rounded album artwork jacket thumbnail with cached Coil loading, boundary border, and active mini equalizer bar overlay to `TerminalRowsHomeScreen`. Emerald Matrix, Monokai Pro, and all terminal theme layouts now display album art alongside track indices.
 
 ---
 
-### Floating Island MiniPlayer with 33 RPM Vinyl Record
-* **Interactive 46dp Mini Vinyl Record**:
-  * Concentric microgrooves drawn on Canvas with outer vinyl rim, spinning continuously at 33 RPM during playback.
-  * Center circular album art label with central spindle hole.
-* **Kinetic Drag-to-Skip Gestures**:
-  * Interactive horizontal drag translation with physical spring resistance and haptic feedback.
-  * Swiping past 70dp triggers previous or next track skip with instant spring-back return.
-* **Luminous Audio Progress Filament**:
-  * Ultra-thin gradient progress filament running along the bottom edge showing live playback progress.
+### Settings Page Cleanup
+* **Eliminated Architecture Slop**: Removed the verbose `GESTURE SYSTEM // NAVIGATION` card from the Settings screen. The page now flows cleanly and directly from the Engine telemetry header into `Audio DSP // Equalizer`.
 
 ---
 
-### Depth-of-Field Kinetic Typography Lyrics
-* **Kinetic Depth-of-Field**:
-  * Active line magnified in bold typography, highlighted in active accent color, and housed in an illuminated spotlight card with live timecode badges (`[02:15]`).
-  * Distant lines feature progressive opacity falloff (0.65f to 0.22f) for true spatial depth.
-  * Direct seek: Tapping any lyric line seeks playback directly with tactile haptic feedback.
-  * Automatic smooth scrolling centered on active lyrics.
-
----
-
-### Quick-Search Runner Command Palette
-* **Spotlight / Wofi Command Palette**: Monospace terminal prompt pill `find >`, active border accent glow, query clear action, and seamless keyboard dismissal.
-
----
-
-### Machined Telemetry Settings & Hardware Rack
-* **Live Pipeline Telemetry Bar**: Real-time display of audio rendering engine (`AAudio PCM`), bit-depth and sample rate (`44.1kHz / 16b`), studio headroom (`+0.0dB Direct`), and driver state (`Bit-Perfect`).
-* **Gesture System Monitoring Card**: Documents and verifies the Android edge gesture dismissal shield and double-back exit safety mechanism.
-
----
-
-## Package Information
-* **Version**: `v1.7.0`
-* **Version Code**: `10`
-* **Package Name**: `com.example.hyprmusic`
-* **Target SDK**: Android 16 (API 36)
-* **Minimum SDK**: Android 10 (API 29)
-* **License**: GNU General Public License v3.0
+## Technical Specifications & Compatibility
+* **Minimum Android Version**: Android 10.0 (API level 29)
+* **Target Android Version**: Android 16.0 (API level 36)
+* **Architecture**: Jetpack Compose 100% Kotlin Coroutines, ExoPlayer Media3, StateFlow Architecture
+* **Version**: `v1.8.0` (Build 11)
 
 ---
 
 ## Installation
-Download the `HyprMusic-v1.7.0.apk` asset and install directly on your Android device (Android 10+), or use the built-in OTA update checker in Settings.
+Download the `HyprMusic-v1.8.0.apk` asset and install directly on your Android device (Android 10+), or use the built-in OTA update checker in Settings.

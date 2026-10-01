@@ -3,6 +3,7 @@ package com.example.hyprmusic
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -418,14 +419,21 @@ fun HyprMusicApp(
                                 onTrackSelected = { track, queue ->
                                     audioPlayer.playTrack(track, queue)
                                 },
-                                onTogglePlayPause = { audioPlayer.togglePlayPause() },
+                                onTogglePlayPause = {
+                                    audioPlayer.togglePlayPause(fallbackQueue = tracks)
+                                },
                                 onRandomMix = {
                                     if (tracks.isNotEmpty()) {
-                                        val shuffled = tracks.shuffled()
-                                        audioPlayer.playTrack(shuffled.first(), shuffled)
+                                        audioPlayer.playRandomMix(tracks)
+                                        Toast.makeText(context, "Shuffled ${tracks.size} tracks", Toast.LENGTH_SHORT).show()
                                     }
                                 },
-                                onRescan = { coroutineScope.launch { musicRepository.scanLocalMedia() } }
+                                onRescan = {
+                                    coroutineScope.launch {
+                                        musicRepository.scanLocalMedia()
+                                        Toast.makeText(context, "Indexed ${tracks.size} tracks", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
                             )
                         }
 

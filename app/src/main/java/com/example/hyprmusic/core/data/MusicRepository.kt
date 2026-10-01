@@ -273,6 +273,7 @@ class MusicRepository(private val context: Context) {
     }.flowOn(Dispatchers.IO)
 
     suspend fun scanLocalMedia() = withContext(Dispatchers.IO) {
+        if (_isScanning.value) return@withContext
         _isScanning.value = true
         try {
             fetchLocalSongs().collect { localTracks ->
