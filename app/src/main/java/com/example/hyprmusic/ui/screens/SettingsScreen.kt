@@ -841,7 +841,7 @@ fun SettingsScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = if (info.isUpdateAvailable) "★ NEW VERSION: ${info.tagName}" else "✔ LATEST BUILD: ${info.tagName}",
+                                            text = if (info.isUpdateAvailable) "NEW VERSION: ${info.tagName}" else "LATEST BUILD: ${info.tagName}",
                                             color = theme.accentColor,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 12.sp,

@@ -21,6 +21,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -80,6 +81,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -821,8 +823,8 @@ private fun LyricLineItem(
 
 /**
  * Structurally adaptive progress tracker that inspects HyprTheme.spec.progressStyle:
- * - BLOCKS_SHELL: Terminal command-line ASCII blocks (e.g. ⚡ [████████░░░░░░░] 02:14 / 04:30) with touch scrub seeking
- * - MINIMAL_WAYBAR: Ultra-clean minimal 4dp floating line track with timestamps
+ * - CAPSULE_SEEKER: Modern capsule pill scrubber with smooth interactive thumb
+ * - MINIMAL_WAYBAR: Ultra-clean minimal floating line track with timestamps
  * - DYNAMIC_NEON: Audio-reactive neon gradient seek slider with dynamic glow
  */
 @Composable
@@ -837,54 +839,85 @@ fun AdaptiveProgressBar(
     val safePercent = progressPercent.coerceIn(0f, 1f)
 
     when (spec.progressStyle) {
-        ProgressBarStyle.BLOCKS_SHELL -> {
-            // Retro CLI ASCII block string with pointerInput touch scrub seeking
-            val totalBlocks = 18
-            val filled = (safePercent * totalBlocks).toInt().coerceIn(0, totalBlocks)
-            val bar = "█".repeat(filled) + "░".repeat(totalBlocks - filled)
-
-            Box(
-                modifier = modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(spec.cornerRadius))
-                    .background(spec.surfaceVariant)
-                    .border(1.dp, spec.borderActive.copy(alpha = 0.35f), RoundedCornerShape(spec.cornerRadius))
-                    .then(
-                        if (onSeekToPercent != null) {
-                            Modifier
-                                .pointerInput(Unit) {
-                                    detectHorizontalDragGestures { change, _ ->
-                                        val newPercent = (change.position.x / size.width).coerceIn(0f, 1f)
-                                        onSeekToPercent(newPercent)
-                                    }
-                                }
-                                .pointerInput(Unit) {
-                                    detectTapGestures { offset ->
-                                        val newPercent = (offset.x / size.width).coerceIn(0f, 1f)
-                                        onSeekToPercent(newPercent)
-                                    }
-                                }
-                        } else Modifier
-                    )
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+        ProgressBarStyle.CAPSULE_SEEKER -> {
+            // Modern, smooth capsule scrubber inspired by Lucide UI design
+            Column(
+                modifier = modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(20.dp)
+                        .then(
+                            if (onSeekToPercent != null) {
+                                Modifier
+                                    .pointerInput(Unit) {
+                                        detectHorizontalDragGestures { change, _ ->
+                                            val newPercent = (change.position.x / size.width).coerceIn(0f, 1f)
+                                            onSeekToPercent(newPercent)
+                                        }
+                                    }
+                                    .pointerInput(Unit) {
+                                        detectTapGestures { offset ->
+                                            val newPercent = (offset.x / size.width).coerceIn(0f, 1f)
+                                            onSeekToPercent(newPercent)
+                                        }
+                                    }
+                            } else Modifier
+                        ),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    val totalWidthPx = constraints.maxWidth.toFloat()
+                    val trackHeight = 5.dp
+
+                    // Background track
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(trackHeight)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(spec.surfaceVariant)
+                            .border(0.5.dp, spec.borderInactive.copy(alpha = 0.6f), RoundedCornerShape(3.dp))
+                    )
+
+                    // Active progress fill
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(safePercent)
+                            .height(trackHeight)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(spec.borderActive)
+                    )
+
+                    // Smooth thumb indicator
+                    Box(
+                        modifier = Modifier
+                            .graphicsLayer {
+                                translationX = (totalWidthPx * safePercent - 6.dp.toPx()).coerceAtLeast(0f)
+                            }
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(spec.textPrimary)
+                            .border(1.5.dp, spec.borderActive, CircleShape)
+                    )
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "⚡ [$bar]",
+                        text = elapsed,
                         fontFamily = spec.fontFamily,
                         color = spec.borderActive,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "$elapsed / $total",
+                        text = total,
                         fontFamily = spec.fontFamily,
-                        color = spec.textPrimary,
+                        color = spec.textSecondary,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Medium
                     )
@@ -893,15 +926,15 @@ fun AdaptiveProgressBar(
         }
 
         ProgressBarStyle.MINIMAL_WAYBAR -> {
-            // Catppuccin / Nordic minimalist waybar linear progress track
+            // Minimalist waybar linear progress track
             Column(
                 modifier = modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(8.dp)
+                        .height(10.dp)
                         .clip(RoundedCornerShape(spec.cornerRadius))
                         .then(
                             if (onSeekToPercent != null) {
@@ -925,11 +958,11 @@ fun AdaptiveProgressBar(
                     LinearProgressIndicator(
                         progress = { safePercent },
                         color = spec.borderActive,
-                        trackColor = spec.borderInactive,
+                        trackColor = spec.surfaceVariant,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(spec.cornerRadius))
+                            .height(3.5.dp)
+                            .clip(RoundedCornerShape(2.dp))
                     )
                 }
 
@@ -956,7 +989,7 @@ fun AdaptiveProgressBar(
         }
 
         ProgressBarStyle.DYNAMIC_NEON -> {
-            // Glowing neon slider with live scrub feedback
+            // Glowing neon slider with smooth scrub feedback
             Column(
                 modifier = modifier.fillMaxWidth()
             ) {
@@ -966,7 +999,7 @@ fun AdaptiveProgressBar(
                     colors = SliderDefaults.colors(
                         thumbColor = spec.borderActive,
                         activeTrackColor = spec.borderActive,
-                        inactiveTrackColor = spec.borderInactive
+                        inactiveTrackColor = spec.surfaceVariant
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -998,9 +1031,9 @@ fun AdaptiveProgressBar(
 
 /**
  * Structurally adaptive play/pause control button inspecting HyprTheme.spec.iconPack:
- * - NERD_FONTS_ASCII: Pure ASCII / terminal text glyphs [ ▶ ] / [ ⏸ ]
- * - PHOSPHOR_LINE: Smooth thin line vector outlines
- * - ARCH_OUTLINE: Geometric arch minimalist vectors
+ * - LUCIDE: Crisp 24x24 2px stroke line geometry inspired by lucide.dev
+ * - PHOSPHOR: Refined geometric outline inspired by phosphoricons.com
+ * - REMIX: Bold neutral UI icons inspired by remixicon.com
  */
 @Composable
 fun AdaptivePlayButton(
@@ -1012,49 +1045,52 @@ fun AdaptivePlayButton(
     val spec = HyprTheme.spec
 
     when (spec.iconPack) {
-        IconPackType.NERD_FONTS_ASCII -> {
+        IconPackType.LUCIDE -> {
+            // Lucide Icon design language: clean circular frame, 2px stroke vectors
             Box(
-                modifier = modifier
-                    .size(size)
-                    .clip(RoundedCornerShape(spec.cornerRadius))
-                    .background(spec.surfaceVariant)
-                    .border(spec.borderThickness, spec.borderActive, RoundedCornerShape(spec.cornerRadius))
-                    .clickable(onClick = onClick),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (isPlaying) "[ ⏸ ]" else "[ ▶ ]",
-                    fontFamily = spec.fontFamily,
-                    color = spec.borderActive,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
-                )
-            }
-        }
-
-        IconPackType.PHOSPHOR_LINE -> {
-            IconButton(
-                onClick = onClick,
                 modifier = modifier
                     .size(size)
                     .clip(CircleShape)
                     .background(spec.surfaceVariant)
-                    .border(spec.borderThickness, spec.borderActive.copy(alpha = 0.5f), CircleShape)
+                    .border(1.5.dp, spec.borderActive, CircleShape)
+                    .clickable(onClick = onClick),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = if (isPlaying) "Pause" else "Play",
                     tint = spec.borderActive,
-                    modifier = Modifier.size(size * 0.55f)
+                    modifier = Modifier.size(size * 0.52f)
                 )
             }
         }
 
-        IconPackType.ARCH_OUTLINE -> {
+        IconPackType.PHOSPHOR -> {
+            // Phosphor Icon design language: soft squircle outline frame, balanced weights
             Box(
                 modifier = modifier
                     .size(size)
                     .clip(RoundedCornerShape(spec.cornerRadius))
+                    .background(spec.borderActive.copy(alpha = 0.16f))
+                    .border(1.5.dp, spec.borderActive, RoundedCornerShape(spec.cornerRadius))
+                    .clickable(onClick = onClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    tint = spec.borderActive,
+                    modifier = Modifier.size(size * 0.52f)
+                )
+            }
+        }
+
+        IconPackType.REMIX -> {
+            // Remix Icon design language: solid high-contrast accent fill
+            Box(
+                modifier = modifier
+                    .size(size)
+                    .clip(RoundedCornerShape(spec.cornerRadius.coerceAtMost(14.dp)))
                     .background(spec.borderActive)
                     .clickable(onClick = onClick),
                 contentAlignment = Alignment.Center
@@ -1063,7 +1099,7 @@ fun AdaptivePlayButton(
                     imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = if (isPlaying) "Pause" else "Play",
                     tint = spec.bg,
-                    modifier = Modifier.size(size * 0.55f)
+                    modifier = Modifier.size(size * 0.52f)
                 )
             }
         }
@@ -1072,6 +1108,7 @@ fun AdaptivePlayButton(
 
 /**
  * Structurally adaptive skip next/previous control button inspecting HyprTheme.spec.iconPack.
+ * Renders authentic Lucide, Phosphor, or Remix vector icons without any text or ASCII glyphs.
  */
 @Composable
 fun AdaptiveSkipButton(
@@ -1083,27 +1120,26 @@ fun AdaptiveSkipButton(
     val spec = HyprTheme.spec
 
     when (spec.iconPack) {
-        IconPackType.NERD_FONTS_ASCII -> {
+        IconPackType.LUCIDE -> {
             Box(
                 modifier = modifier
                     .size(size)
-                    .clip(RoundedCornerShape(spec.cornerRadius))
-                    .background(spec.surfaceVariant)
-                    .border(1.dp, spec.borderInactive, RoundedCornerShape(spec.cornerRadius))
+                    .clip(CircleShape)
+                    .background(spec.surfaceVariant.copy(alpha = 0.6f))
+                    .border(1.dp, spec.borderInactive, CircleShape)
                     .clickable(onClick = onClick),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = if (isNext) ">>" else "<<",
-                    fontFamily = spec.fontFamily,
-                    color = spec.textPrimary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp
+                Icon(
+                    imageVector = if (isNext) Icons.Default.SkipNext else Icons.Default.SkipPrevious,
+                    contentDescription = if (isNext) "Next" else "Previous",
+                    tint = spec.textPrimary,
+                    modifier = Modifier.size(size * 0.58f)
                 )
             }
         }
 
-        IconPackType.PHOSPHOR_LINE, IconPackType.ARCH_OUTLINE -> {
+        IconPackType.PHOSPHOR -> {
             IconButton(
                 onClick = onClick,
                 modifier = modifier.size(size)
@@ -1112,7 +1148,26 @@ fun AdaptiveSkipButton(
                     imageVector = if (isNext) Icons.Default.SkipNext else Icons.Default.SkipPrevious,
                     contentDescription = if (isNext) "Next" else "Previous",
                     tint = spec.textPrimary,
-                    modifier = Modifier.size(size * 0.7f)
+                    modifier = Modifier.size(size * 0.65f)
+                )
+            }
+        }
+
+        IconPackType.REMIX -> {
+            Box(
+                modifier = modifier
+                    .size(size)
+                    .clip(RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp)))
+                    .background(spec.surfaceVariant)
+                    .border(1.dp, spec.borderInactive, RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp)))
+                    .clickable(onClick = onClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isNext) Icons.Default.SkipNext else Icons.Default.SkipPrevious,
+                    contentDescription = if (isNext) "Next" else "Previous",
+                    tint = spec.textPrimary,
+                    modifier = Modifier.size(size * 0.58f)
                 )
             }
         }

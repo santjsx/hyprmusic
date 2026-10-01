@@ -1,37 +1,37 @@
-# 🎨 HyprMusic v1.4.0 — Dynamic Adaptive Design System & Modular Ricing Engine
+# HyprMusic v1.4.0 — Dynamic Adaptive Design System & Modular Architecture
 
-HyprMusic v1.4.0 introduces a brand-new **Structurally Adaptive Design System** driven by a unified `CompositionLocal` architecture (`HyprDesignSpec`). Users can now dynamically customize every layer of the compositor interface: Icon Pack architecture, Progress Bar visual engines, Home Grid layouts, and Monospace typography engines with instant, live reactive feedback.
+HyprMusic v1.4.0 introduces a refined, professional **Structurally Adaptive Design System** driven by a unified `CompositionLocal` architecture (`HyprDesignSpec`). Users can dynamically customize every layer of the interface: Icon Pack architecture (Lucide, Phosphor, Remix), Progress Bar visual engines (Capsule Seeker, Minimal Line, Dynamic Glow), Home Grid layouts, and Monospace typography engines with instant, live reactive feedback.
 
 ---
 
-## 🚀 What's New in v1.4.0
+## What's New in v1.4.0
 
-### 🎨 Structurally Adaptive Design System
+### Structurally Adaptive Design System
 * **Unified Design Contract (`HyprDesignSpec`)**: Centralized design tokens across color palettes, window geometry, squircle radiuses, active border gradients, and typography engines.
-* **Component-Level Modular Ricing**:
+* **Component-Level Modular Customization**:
   * **Icon Pack Architecture**:
-    * `Phosphor Line`: Ultra-clean, modern vector strokes.
-    * `Nerd Fonts ASCII`: Pure terminal monospace text glyphs (`[ ▶ ]`, `[ ⏸ ]`, `<<`, `>>`).
-    * `Arch Minimalist`: Solid geometric vectors with high-contrast accent fills.
+    * `Lucide`: Clean, minimalist 2px vector line geometry inspired by lucide.dev.
+    * `Phosphor`: Balanced, rounded outline vector glyphs inspired by phosphoricons.com.
+    * `Remix`: Solid, high-contrast UI vectors inspired by remixicon.com.
   * **Progress Bar Engines**:
-    * `Blocks Shell`: Interactive ASCII terminal scrubbing bar (`⚡ [████████░░░░░░░] 02:14 / 04:30`) with tactile touch & drag seeking.
-    * `Minimal Waybar`: Low-profile, high-density track line with smooth scrub head.
-    * `Dynamic Neon`: Luminous accent slider with responsive glowing borders.
+    * `Capsule Seeker`: Smooth rounded track with a 12dp tactile scrubber thumb and continuous horizontal drag/tap gestures.
+    * `Minimal Line`: High-density linear track with edge-to-edge scrubbing.
+    * `Dynamic Glow`: High-contrast slider with responsive glowing accents.
   * **Home Grid Layout Architecture**:
-    * `Asymmetric Bento Tiles`: Rich visual hierarchy with Hero Now Playing card, dual telemetry tiles, and Heavy Rotation horizontal carousel.
-    * `Tight Terminal Rows (CLI)`: High-performance, zero-image CLI audio console (`$ hyprctl audio get-sink-status`) rendering hundreds of songs at locked 120 FPS.
+    * `Asymmetric Bento Tiles`: Modern visual hierarchy featuring a Hero Now Playing card, dual telemetry tiles, and Heavy Rotation horizontal carousel.
+    * `High Density Table`: Fast, high-density audio track table rendering hundreds of songs at locked 120 FPS.
   * **Typography Engines**:
     * `JetBrains Mono`: Developer-first monospace typeface.
     * `IBM Plex Mono`: Industrial mid-century console font.
     * `System Monospace`: Native Android monospace engine.
     * `Minimal Sans`: Ultra-sleek contemporary sans-serif font.
-* **Live Interactive Rice Preview**: Themer screen now embeds real-time interactive playback controls and progress scrubber widgets to preview style changes instantly.
+* **Live Interactive Preview**: Themer screen embeds real-time interactive playback controls and progress scrubber widgets to preview style changes instantly.
 
 ---
 
-### ⚡ 120 FPS Zero-Lag Rendering Engine
+### 120 FPS Zero-Lag Rendering Engine
 * **Draw-Phase Canvas Spectrum Visualizer**: Replaced individual Compose animated views with a single, hardware-accelerated `Canvas` draw phase. Visualizer amplitudes update directly on the GPU, completely bypassing Compose layout and composition passes (0 recompositions).
-* **Isolated Equalizers**: Migrated `MiniEqualizerBars` to an ultra-lightweight Canvas with zero allocations, keeping the Waybar dock and MiniPlayer completely idle during playback.
+* **Isolated Equalizers**: Migrated `MiniEqualizerBars` to an ultra-lightweight Canvas with zero allocations, keeping the navigation dock and MiniPlayer completely idle during playback.
 * **Draw-Phase Album Art Breathing**: Moved album art beat-reactive elevation into `Modifier.graphicsLayer` lambda execution, eliminating redundant full-screen recompositions.
 * **Throttled PCM Buffer Processor**: Capped PCM audio spectrum analysis to ~30 FPS (33ms interval) to prevent StateFlow contention and audio thread backpressure.
 * **Hardware Bitmap Acceleration & Coil Cache**: Configured Coil `ImageLoader` with `Bitmap.Config.HARDWARE`, dedicated 25% RAM cache, and 100MB disk cache for silky-smooth list scrolling.
@@ -40,7 +40,7 @@ HyprMusic v1.4.0 introduces a brand-new **Structurally Adaptive Design System** 
 
 ---
 
-### 🌙 Audiophile Sleep Timer
+### Audiophile Sleep Timer
 * **Quick Presets**: Instant 1-tap timers for 15, 30, 45, and 60 minutes.
 * **End of Current Track**: Halts playback cleanly when the active song finishes, ideal for bedtime listening.
 * **Custom Duration Slider**: Seamlessly set any timer from 5 to 120 minutes with a single touch.
@@ -50,7 +50,7 @@ HyprMusic v1.4.0 introduces a brand-new **Structurally Adaptive Design System** 
 
 ---
 
-### 📑 Custom Playlists & Direct Navigation
+### Custom Playlists & Direct Navigation
 * **Instant Add to Playlist Modal**: Accessible from the player header bar and action chips.
 * **Create On-The-Fly**: Create brand-new custom playlists inline without leaving playback.
 * **Reactive Membership Toggling**: Tap any playlist to add or remove tracks instantly with haptic feedback.
@@ -58,7 +58,7 @@ HyprMusic v1.4.0 introduces a brand-new **Structurally Adaptive Design System** 
 
 ---
 
-## 📦 Package Information
+## Package Information
 * **Version**: `v1.4.0`
 * **Version Code**: `6`
 * **Package Name**: `com.example.hyprmusic`
@@ -68,5 +68,5 @@ HyprMusic v1.4.0 introduces a brand-new **Structurally Adaptive Design System** 
 
 ---
 
-## 🛠️ Installation
-Download the `HyprMusic-v1.4.0.apk` asset and install directly on your Android device (Android 10+), or use the built-in OTA update checker in Settings (`[4:rice]`).
+## Installation
+Download the `HyprMusic-v1.4.0.apk` asset and install directly on your Android device (Android 10+), or use the built-in OTA update checker in Settings.

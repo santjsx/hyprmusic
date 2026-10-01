@@ -1,7 +1,7 @@
-# 🎧 HyprMusic
+# HyprMusic
 
-> **High-Fidelity, Offline-First Android Music Orchestrator & Riceable Audio Canvas**  
-> *Crafted with ❤️ by [Santhosh Reddy](https://github.com/santjsx)*
+> **High-Fidelity, Offline-First Android Music Player & Riced Audio Canvas**  
+> *Crafted by [Santhosh Reddy](https://github.com/santjsx)*
 
 ---
 
@@ -13,45 +13,46 @@
 
 ---
 
-## ⚡ Overview
+## Overview
 
-**HyprMusic** bridges the aesthetic divide between traditional offline audio players and modern, ultra-responsive riced interfaces. Drawing direct design inspiration from the Linux Wayland ricing ecosystem—specifically the **Hyprland** dynamic tiling window manager—HyprMusic transforms local music listening into an interactive, audiophile-grade terminal canvas.
+**HyprMusic** bridges the aesthetic divide between traditional offline audio players and modern, ultra-responsive riced interfaces. Drawing design inspiration from the Linux Wayland ricing ecosystem—specifically the **Hyprland** dynamic tiling window manager—HyprMusic transforms local music listening into an interactive, audiophile-grade audio canvas.
 
 ---
 
-## ✨ Features
+## Features
 
-### 🎛️ Audiophile Audio Engine
+### Audiophile Audio Engine
 - **Bit-Perfect Pipeline**: Native 16-bit PCM playback directly aligned with hardware audio HALs for zero driver stalls and pure fidelity.
 - **Studio Headroom Compensation**: Real-time pre-cut attenuation factor ($10^{-\text{boost}/20}$) preventing digital clipping when equalizer bands or bass boost are adjusted.
 - **Hardware Buffer Protection**: 500 ms – 2000 ms PCM buffer duration provider preventing underruns during garbage collection or background task switching.
 - **Format Support**: High-resolution Lossless FLAC (up to 24-bit/96kHz), WAV, AAC, M4A, OGG, and MP3.
 - **Gapless Playback & Constant-Bitrate Seeking**: Zero audible clicks between tracks with instant timeline scrubbing.
 
-### 🎨 Wayland & Hyprland Terminal Aesthetic
-- **Workspace Navigation**: Terminal-inspired workspace bar (`[1:home]`, `[2:lib]`, `[3:player]`, `[4:config]`).
-- **Dynamic Theming**: Six curated color themes (**Tokyo Night**, **Catppuccin Mocha**, **Nord**, **Gruvbox Dark**, **Dracula**, and **Cyberpunk Neon**).
-- **Riced Window Aesthetics**: Glowing active borders, dynamic gaps, frosted glassmorphism, and smooth micro-interactions.
+### Clean Modern & Adaptive Theming
+- **Icon Pack Architecture**: Choose between vector icon sets inspired by **Lucide** (clean 2px lines), **Phosphor** (soft outlines), and **Remix** (high-contrast solids).
+- **Progress Bar Engines**: Dynamic seeking options including **Capsule Seeker**, **Minimal Line**, and **Dynamic Glow**.
+- **Dynamic Theming**: Eight curated color themes (**Catppuccin Mocha**, **Gruvbox Retro**, **Tokyo Night**, **Nordic Frost**, **OLED Cyberpunk**, **Dracula Void**, **Rose Pine**, and **Monokai Pro**).
+- **Riced Window Aesthetics**: Glowing active borders, dynamic gaps, frosted surfaces, and smooth micro-interactions.
 - **Floating Mini-Player Dock**: Compact floating player bar with real-time waveform visualization and playback controls.
 
-### 🎚️ DSP Equalizer & Audio FX
+### DSP Equalizer & Audio FX
 - **5-Band Parametric EQ**: Studio bands (60 Hz, 230 Hz, 910 Hz, 3.6 kHz, 14 kHz) with smooth cubic spline curve visualization.
 - **Acoustic Presets**: Balanced, subtractive bipolar curves for *Flat*, *Bass Boost*, *Rock*, *Pop*, *Electronic*, *Vocal*, *Jazz*, and *Acoustic*.
 - **Hardware Bass Boost & 3D Virtualizer**: Integrated with system DSP with automated device capability verification.
 
-### 📜 Synchronized Lyrics
+### Synchronized Lyrics
 - **Synchronized LRC Engine**: Line-by-line synchronized scrolling with smooth active-line highlighting.
 - **Offline & Local Lyrics Support**: Automatically pairs with local `.lrc` files in your music directories.
 - **Polished Fallback States**: Clean, minimal empty and no-lyrics found indicators.
 
-### 🚀 Scale & Performance
+### Scale & Performance
 - **Sub-16ms Query Latency**: High-speed scanning across local storage libraries with thousands of songs, albums, and artists.
 - **Unified MediaSession**: Seamless lockscreen playback controls, Bluetooth metadata support, and Android media notification integration.
 - **OTA Updates via GitHub Releases**: Direct in-app update checker querying GitHub Releases with automated background download and package installation.
 
 ---
 
-## 🏗️ Architecture & Tech Stack
+## Architecture & Tech Stack
 
 ```
 HyprMusic
@@ -77,7 +78,7 @@ HyprMusic
 
 ---
 
-## 📱 Screenshots
+## Screenshots
 
 | Workspace Home | Now Playing | DSP Equalizer | Terminal Settings |
 | :---: | :---: | :---: | :---: |
@@ -85,7 +86,7 @@ HyprMusic
 
 ---
 
-## 🛠️ Building & Installation
+## Building & Installation
 
 ### Prerequisites
 - Android Studio Ladybug / Meerkat or Command Line Tools
@@ -107,7 +108,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ---
 
-## 👨‍💻 Author
+## Author
 
 **Santhosh Reddy**
 - GitHub: [@santjsx](https://github.com/santjsx)
@@ -115,6 +116,6 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.

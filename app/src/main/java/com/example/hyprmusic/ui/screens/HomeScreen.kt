@@ -608,7 +608,7 @@ private fun TerminalRowsHomeScreen(
             .padding(horizontal = spec.gaps),
         verticalArrangement = Arrangement.spacedBy(spec.gaps.coerceAtMost(8.dp))
     ) {
-        // CLI Header Banner
+        // Professional High Density Header Banner
         item {
             Box(
                 modifier = Modifier
@@ -616,7 +616,7 @@ private fun TerminalRowsHomeScreen(
                     .clip(RoundedCornerShape(spec.cornerRadius))
                     .background(spec.surface)
                     .border(spec.borderThickness, spec.borderInactive, RoundedCornerShape(spec.cornerRadius))
-                    .padding(12.dp)
+                    .padding(14.dp)
             ) {
                 Column {
                     Row(
@@ -625,52 +625,54 @@ private fun TerminalRowsHomeScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "$ hyprctl audio get-sink-status",
+                            text = "AUDIO ENGINE",
                             fontFamily = spec.fontFamily,
                             color = spec.borderActive,
-                            fontSize = 12.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(if (playbackState.isPlaying) spec.borderActive else spec.surfaceVariant)
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .background(if (playbackState.isPlaying) spec.borderActive.copy(alpha = 0.2f) else spec.surfaceVariant)
+                                .border(1.dp, if (playbackState.isPlaying) spec.borderActive else spec.borderInactive, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
                             Text(
-                                text = if (playbackState.isPlaying) "BUFFER: ACTIVE" else "BUFFER: IDLE",
+                                text = if (playbackState.isPlaying) "PLAYING" else "IDLE",
                                 fontFamily = spec.fontFamily,
-                                color = if (playbackState.isPlaying) spec.bg else spec.textSecondary,
+                                color = if (playbackState.isPlaying) spec.borderActive else spec.textSecondary,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "[ CLI CONSOLE // TOTAL STREAMS: ${tracks.size} // SINK: PCM_16BIT ]",
+                        text = "Total tracks: ${tracks.size} • Bit-perfect PCM 16-bit",
                         fontFamily = spec.fontFamily,
                         color = spec.textSecondary,
-                        fontSize = 11.sp
+                        fontSize = 11.5.sp
                     )
 
                     if (currentTrack != null) {
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "CUED: ${currentTrack.artist} - ${currentTrack.title}",
+                            text = "Active: ${currentTrack.artist} - ${currentTrack.title}",
                             fontFamily = spec.fontFamily,
                             color = spec.textPrimary,
-                            fontSize = 11.5.sp,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    // Quick terminal actions row
+                    // Professional quick actions row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -678,58 +680,85 @@ private fun TerminalRowsHomeScreen(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(4.dp))
+                                .clip(RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp)))
                                 .background(spec.surfaceVariant)
-                                .border(1.dp, spec.borderActive, RoundedCornerShape(4.dp))
+                                .border(1.dp, spec.borderActive, RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp)))
                                 .clickable { onTogglePlayPause() }
-                                .padding(vertical = 6.dp),
+                                .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = if (playbackState.isPlaying) "[ $ PAUSE ]" else "[ $ PLAY ]",
-                                fontFamily = spec.fontFamily,
-                                color = spec.borderActive,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = spec.borderActive,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (playbackState.isPlaying) "PAUSE" else "PLAY",
+                                    fontFamily = spec.fontFamily,
+                                    color = spec.borderActive,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
 
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(4.dp))
+                                .clip(RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp)))
                                 .background(spec.surfaceVariant)
-                                .border(1.dp, spec.borderInactive, RoundedCornerShape(4.dp))
+                                .border(1.dp, spec.borderInactive, RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp)))
                                 .clickable { onRandomMix() }
-                                .padding(vertical = 6.dp),
+                                .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = "[ $ SHUF ]",
-                                fontFamily = spec.fontFamily,
-                                color = spec.textPrimary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Shuffle,
+                                    contentDescription = null,
+                                    tint = spec.textPrimary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "SHUFFLE",
+                                    fontFamily = spec.fontFamily,
+                                    color = spec.textPrimary,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
 
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(4.dp))
+                                .clip(RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp)))
                                 .background(spec.surfaceVariant)
-                                .border(1.dp, spec.borderInactive, RoundedCornerShape(4.dp))
+                                .border(1.dp, spec.borderInactive, RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp)))
                                 .clickable { onRescan() }
-                                .padding(vertical = 6.dp),
+                                .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = "[ $ RESCAN ]",
-                                fontFamily = spec.fontFamily,
-                                color = spec.textSecondary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    tint = spec.textSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "RESCAN",
+                                    fontFamily = spec.fontFamily,
+                                    color = spec.textSecondary,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }
@@ -739,7 +768,7 @@ private fun TerminalRowsHomeScreen(
         // Section label
         item {
             Text(
-                text = "INDEXED STREAMS [CLI TABLE FORMAT]",
+                text = "INDEXED TRACKS",
                 fontFamily = spec.fontFamily,
                 color = spec.textSecondary,
                 fontSize = 11.sp,
@@ -748,7 +777,7 @@ private fun TerminalRowsHomeScreen(
             )
         }
 
-        // CLI Table Rows
+        // Table Rows
         itemsIndexed(
             items = tracks,
             key = { _, it -> "cli_${it.id}" },
@@ -760,29 +789,39 @@ private fun TerminalRowsHomeScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(spec.cornerRadius.coerceAtMost(6.dp)))
+                    .clip(RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp)))
                     .background(if (isCurrent) spec.borderActive.copy(alpha = 0.12f) else spec.surface)
                     .border(
                         width = if (isCurrent) spec.borderThickness else 1.dp,
                         color = if (isCurrent) spec.borderActive else spec.borderInactive.copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(spec.cornerRadius.coerceAtMost(6.dp))
+                        shape = RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp))
                     )
                     .clickable { onTrackSelected(track, tracks) }
-                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                    .padding(horizontal = 12.dp, vertical = 9.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Line number / Status indicator
-                    Text(
-                        text = if (isPlaying) "▶" else String.format("%02d.", (index + 1) % 100),
-                        fontFamily = spec.fontFamily,
-                        color = if (isCurrent) spec.borderActive else spec.textSecondary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.width(28.dp)
-                    )
+                    if (isPlaying) {
+                        Icon(
+                            imageVector = Icons.Default.GraphicEq,
+                            contentDescription = null,
+                            tint = spec.borderActive,
+                            modifier = Modifier
+                                .width(28.dp)
+                                .size(16.dp)
+                        )
+                    } else {
+                        Text(
+                            text = String.format("%02d", (index + 1) % 100),
+                            fontFamily = spec.fontFamily,
+                            color = if (isCurrent) spec.borderActive else spec.textSecondary,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.width(28.dp)
+                        )
+                    }
 
                     // Track Title & Artist
                     Column(modifier = Modifier.weight(1f)) {
@@ -790,7 +829,7 @@ private fun TerminalRowsHomeScreen(
                             text = track.title,
                             fontFamily = spec.fontFamily,
                             color = if (isCurrent) spec.borderActive else spec.textPrimary,
-                            fontSize = 12.5.sp,
+                            fontSize = 13.sp,
                             fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -810,16 +849,16 @@ private fun TerminalRowsHomeScreen(
                     // Bitrate badge
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(3.dp))
+                            .clip(RoundedCornerShape(4.dp))
                             .background(spec.surfaceVariant)
-                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = "${track.bitrate}k",
                             fontFamily = spec.fontFamily,
                             color = if (isCurrent) spec.borderActive else spec.textSecondary,
                             fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
 
@@ -831,7 +870,7 @@ private fun TerminalRowsHomeScreen(
                         text = String.format("%d:%02d", durationSec / 60, durationSec % 60),
                         fontFamily = spec.fontFamily,
                         color = spec.textSecondary,
-                        fontSize = 11.sp
+                        fontSize = 11.5.sp
                     )
                 }
             }

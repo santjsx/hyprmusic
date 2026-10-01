@@ -254,9 +254,9 @@ fun ThemerScreen(
                     ) { pack ->
                         val isSelected = spec.iconPack == pack
                         val label = when (pack) {
-                            IconPackType.PHOSPHOR_LINE -> "Phosphor (Vector)"
-                            IconPackType.NERD_FONTS_ASCII -> "Nerd Font (ASCII)"
-                            IconPackType.ARCH_OUTLINE -> "Arch (Geometric)"
+                            IconPackType.LUCIDE -> "Lucide (Line)"
+                            IconPackType.PHOSPHOR -> "Phosphor (Outline)"
+                            IconPackType.REMIX -> "Remix (Solid)"
                         }
                         Box(
                             modifier = Modifier
@@ -310,9 +310,9 @@ fun ThemerScreen(
                     ) { style ->
                         val isSelected = spec.progressStyle == style
                         val label = when (style) {
-                            ProgressBarStyle.BLOCKS_SHELL -> "Blocks Shell [███░]"
-                            ProgressBarStyle.MINIMAL_WAYBAR -> "Minimal Waybar"
-                            ProgressBarStyle.DYNAMIC_NEON -> "Dynamic Neon"
+                            ProgressBarStyle.CAPSULE_SEEKER -> "Capsule Seeker"
+                            ProgressBarStyle.MINIMAL_WAYBAR -> "Minimal Line"
+                            ProgressBarStyle.DYNAMIC_NEON -> "Dynamic Glow"
                         }
                         Box(
                             modifier = Modifier
@@ -367,7 +367,7 @@ fun ThemerScreen(
                         val isSelected = spec.gridStyle == layout
                         val label = when (layout) {
                             GridLayoutStyle.ASYMMETRIC_TILES -> "Asymmetric Bento"
-                            GridLayoutStyle.TIGHT_TERMINAL_ROWS -> "Tight Terminal CLI"
+                            GridLayoutStyle.TIGHT_TERMINAL_ROWS -> "High Density Table"
                         }
                         Box(
                             modifier = Modifier

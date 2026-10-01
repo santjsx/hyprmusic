@@ -10,20 +10,20 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 enum class IconPackType(val displayName: String) {
-    PHOSPHOR_LINE("Phosphor Line"),
-    NERD_FONTS_ASCII("Nerd Fonts ASCII"),
-    ARCH_OUTLINE("Arch Outline")
+    LUCIDE("Lucide"),
+    PHOSPHOR("Phosphor"),
+    REMIX("Remix")
 }
 
 enum class ProgressBarStyle(val displayName: String) {
-    MINIMAL_WAYBAR("Minimal Waybar"),
-    BLOCKS_SHELL("Blocks Shell [████░░]"),
-    DYNAMIC_NEON("Dynamic Neon")
+    CAPSULE_SEEKER("Capsule Seeker"),
+    MINIMAL_WAYBAR("Minimal Line"),
+    DYNAMIC_NEON("Dynamic Glow")
 }
 
 enum class GridLayoutStyle(val displayName: String) {
     ASYMMETRIC_TILES("Asymmetric Tiles (Bento)"),
-    TIGHT_TERMINAL_ROWS("Tight Terminal Rows (CLI)")
+    TIGHT_TERMINAL_ROWS("High Density Table")
 }
 
 enum class HyprFontType(val displayName: String, val fontFamily: FontFamily) {
@@ -99,13 +99,13 @@ object ThemeRegistry {
         activeBorderGradient = listOf(Color(0xFFCBA6F7), Color(0xFF89B4FA)),
         fontType = HyprFontType.JETBRAINS_MONO,
         fontFamily = HyprFontType.JETBRAINS_MONO.fontFamily,
-        cornerRadius = 14.dp, // Cozy subtle rounding
+        cornerRadius = 14.dp,
         elementGap = 8.dp,
         borderThickness = 2.dp,
         blurRadiusDp = 18,
         isOledMode = false,
-        iconPack = IconPackType.PHOSPHOR_LINE,
-        progressStyle = ProgressBarStyle.MINIMAL_WAYBAR,
+        iconPack = IconPackType.PHOSPHOR,
+        progressStyle = ProgressBarStyle.CAPSULE_SEEKER,
         gridStyle = GridLayoutStyle.ASYMMETRIC_TILES
     )
 
@@ -124,13 +124,13 @@ object ThemeRegistry {
         activeBorderGradient = listOf(Color(0xFFFB4934), Color(0xFFFABD2F)),
         fontType = HyprFontType.IBM_PLEX_MONO,
         fontFamily = HyprFontType.IBM_PLEX_MONO.fontFamily,
-        cornerRadius = 0.dp, // Zero rounding - pure hard corners!
-        elementGap = 6.dp,   // Super compact tiling
+        cornerRadius = 10.dp,
+        elementGap = 6.dp,
         borderThickness = 2.dp,
         blurRadiusDp = 14,
         isOledMode = false,
-        iconPack = IconPackType.NERD_FONTS_ASCII, // pure code symbols
-        progressStyle = ProgressBarStyle.BLOCKS_SHELL, // [████░░]
+        iconPack = IconPackType.LUCIDE,
+        progressStyle = ProgressBarStyle.MINIMAL_WAYBAR,
         gridStyle = GridLayoutStyle.TIGHT_TERMINAL_ROWS
     )
 
@@ -154,7 +154,7 @@ object ThemeRegistry {
         borderThickness = 2.dp,
         blurRadiusDp = 20,
         isOledMode = false,
-        iconPack = IconPackType.ARCH_OUTLINE,
+        iconPack = IconPackType.REMIX,
         progressStyle = ProgressBarStyle.DYNAMIC_NEON,
         gridStyle = GridLayoutStyle.ASYMMETRIC_TILES
     )
@@ -179,7 +179,7 @@ object ThemeRegistry {
         borderThickness = 2.dp,
         blurRadiusDp = 16,
         isOledMode = false,
-        iconPack = IconPackType.ARCH_OUTLINE,
+        iconPack = IconPackType.LUCIDE,
         progressStyle = ProgressBarStyle.MINIMAL_WAYBAR,
         gridStyle = GridLayoutStyle.TIGHT_TERMINAL_ROWS
     )
@@ -204,7 +204,7 @@ object ThemeRegistry {
         borderThickness = 2.dp,
         blurRadiusDp = 24,
         isOledMode = true,
-        iconPack = IconPackType.PHOSPHOR_LINE,
+        iconPack = IconPackType.PHOSPHOR,
         progressStyle = ProgressBarStyle.DYNAMIC_NEON,
         gridStyle = GridLayoutStyle.ASYMMETRIC_TILES
     )
@@ -229,8 +229,8 @@ object ThemeRegistry {
         borderThickness = 2.dp,
         blurRadiusDp = 18,
         isOledMode = false,
-        iconPack = IconPackType.PHOSPHOR_LINE,
-        progressStyle = ProgressBarStyle.MINIMAL_WAYBAR,
+        iconPack = IconPackType.REMIX,
+        progressStyle = ProgressBarStyle.CAPSULE_SEEKER,
         gridStyle = GridLayoutStyle.ASYMMETRIC_TILES
     )
 
@@ -254,8 +254,8 @@ object ThemeRegistry {
         borderThickness = 2.dp,
         blurRadiusDp = 18,
         isOledMode = false,
-        iconPack = IconPackType.PHOSPHOR_LINE,
-        progressStyle = ProgressBarStyle.MINIMAL_WAYBAR,
+        iconPack = IconPackType.PHOSPHOR,
+        progressStyle = ProgressBarStyle.CAPSULE_SEEKER,
         gridStyle = GridLayoutStyle.ASYMMETRIC_TILES
     )
 
@@ -279,8 +279,8 @@ object ThemeRegistry {
         borderThickness = 2.dp,
         blurRadiusDp = 18,
         isOledMode = false,
-        iconPack = IconPackType.ARCH_OUTLINE,
-        progressStyle = ProgressBarStyle.DYNAMIC_NEON,
+        iconPack = IconPackType.LUCIDE,
+        progressStyle = ProgressBarStyle.MINIMAL_WAYBAR,
         gridStyle = GridLayoutStyle.TIGHT_TERMINAL_ROWS
     )
 
