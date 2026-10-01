@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="c2-grad-main" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7AA2F7" />
+      <stop offset="50%" stop-color="#89B4FA" />
+      <stop offset="100%" stop-color="#CBA6F7" />
+    </linearGradient>
+    <linearGradient id="c2-glow-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1E1E2E" />
+      <stop offset="100%" stop-color="#11111B" />
+    </linearGradient>
+  </defs>
+
+  <!-- Icon: Futuristic 'H' Waveform Monogram -->
+  <g id="icon" transform="translate(64, 64)">
+    <!-- Outer Octagonal Squircle Frame -->
+    <rect x="16" y="16" width="352" height="352" rx="80" fill="url(#c2-glow-bg)" stroke="#7AA2F7" stroke-width="3" stroke-opacity="0.3" />
+    
+    <!-- Active Corner Highlights -->
+    <path d="M 46 96 A 50 50 0 0 1 96 46" stroke="#7AA2F7" stroke-width="6" stroke-linecap="round" fill="none" />
+    <path d="M 288 338 A 50 50 0 0 1 338 288" stroke="#CBA6F7" stroke-width="6" stroke-linecap="round" fill="none" />
+
+    <!-- Monogram 'H' Left Pillar: Descending Waveform -->
+    <rect x="94" y="80" width="38" height="224" rx="19" fill="#7AA2F7" />
+    
+    <!-- Monogram 'H' Center Crossbar: Acoustic Amplitude Pulse -->
+    <path d="M 132 192 L 180 192 L 192 144 L 208 240 L 220 192 L 252 192" 
+          stroke="url(#c2-grad-main)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+
+    <!-- Monogram 'H' Right Pillar: Ascending Waveform -->
+    <rect x="252" y="80" width="38" height="224" rx="19" fill="#CBA6F7" />
+
+    <!-- Audiophile Central Core Orbit -->
+    <circle cx="200" cy="192" r="12" fill="#7AA2F7" />
+    <circle cx="200" cy="192" r="28" fill="none" stroke="#7AA2F7" stroke-width="2" stroke-dasharray="4 6" />
+  </g>
+
+  <!-- Wordmark: High-Tech Typography Section -->
+  <g id="wordmark" transform="translate(480, 160)">
+    <text x="0" y="88" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="88" font-weight="900" letter-spacing="4">
+      <tspan fill="#CDD6F4">HYPR</tspan><tspan fill="#7AA2F7">MUSIC</tspan>
+    </text>
+
+    <!-- Subtitle / High-Tech Audiophile Specs -->
+    <g id="tagline" transform="translate(4, 150)">
+      <line x1="0" y1="-30" x2="460" y2="-30" stroke="#7AA2F7" stroke-width="1.5" stroke-opacity="0.3" />
+      
+      <circle cx="8" cy="-5" r="5" fill="#7AA2F7" />
+      <text x="24" y="0" font-family="'JetBrains Mono', 'IBM Plex Mono', monospace" font-size="14" font-weight="700" fill="#CDD6F4" letter-spacing="3">
+        LOSSLESS AUDIO ENGINE
+      </text>
+
+      <text x="320" y="0" font-family="'JetBrains Mono', 'IBM Plex Mono', monospace" font-size="14" font-weight="500" fill="#7AA2F7" letter-spacing="2">
+        24-BIT / 96kHz
+      </text>
+    </g>
+  </g>
+</svg>

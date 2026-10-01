@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="c1-accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7AA2F7" />
+      <stop offset="100%" stop-color="#CBA6F7" />
+    </linearGradient>
+    <linearGradient id="c1-subtle" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#24273A" />
+      <stop offset="100%" stop-color="#181926" />
+    </linearGradient>
+  </defs>
+
+  <!-- Icon: Hyprland Master/Stack Tiling Window Equalizer -->
+  <g id="icon" transform="translate(48, 48)">
+    <!-- Base Squircle Container -->
+    <rect x="24" y="24" width="368" height="368" rx="72" fill="url(#c1-subtle)" stroke="#7AA2F7" stroke-width="4" stroke-opacity="0.35" />
+    
+    <!-- Active Tiling Border Accent -->
+    <rect x="24" y="24" width="368" height="368" rx="72" fill="none" stroke="url(#c1-accent)" stroke-width="3" />
+
+    <!-- Master Window Tile (Left Column: Audio Transducer Core) -->
+    <rect x="76" y="86" width="112" height="244" rx="28" fill="#7AA2F7" />
+    
+    <!-- Cutout sound pulse dot in Master Tile -->
+    <circle cx="132" cy="154" r="18" fill="#181926" />
+    <rect x="122" y="196" width="20" height="96" rx="10" fill="#181926" />
+
+    <!-- Stack Window Tiles (Right Column: Dynamic Equalizer Bars) -->
+    <!-- Top Stack Tile -->
+    <rect x="214" y="86" width="126" height="108" rx="26" fill="#CBA6F7" />
+    <path d="M 252 140 L 290 140 M 271 121 L 271 159" stroke="#181926" stroke-width="8" stroke-linecap="round" />
+
+    <!-- Bottom Stack Tile -->
+    <rect x="214" y="218" width="126" height="112" rx="26" fill="#1E2030" stroke="#7AA2F7" stroke-width="3" />
+    <!-- Mini Equalizer Bars inside Bottom Tile -->
+    <rect x="242" y="272" width="10" height="34" rx="5" fill="#7AA2F7" />
+    <rect x="262" y="250" width="10" height="56" rx="5" fill="#CBA6F7" />
+    <rect x="282" y="262" width="10" height="44" rx="5" fill="#7AA2F7" />
+    <rect x="302" y="280" width="10" height="26" rx="5" fill="#89B4FA" />
+  </g>
+
+  <!-- Wordmark: Typographic Section -->
+  <g id="wordmark" transform="translate(490, 160)">
+    <!-- Primary Brand Title -->
+    <text x="0" y="96" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="94" font-weight="900" letter-spacing="-1.5">
+      <tspan fill="#7AA2F7">hypr</tspan><tspan fill="#CDD6F4">music</tspan>
+    </text>
+
+    <!-- Subtitle / Architecture Descriptor -->
+    <g id="tagline" transform="translate(6, 154)">
+      <!-- Wayland / Audio Chip -->
+      <rect x="0" y="-24" width="210" height="34" rx="8" fill="#7AA2F7" fill-opacity="0.15" stroke="#7AA2F7" stroke-width="1.5" />
+      <text x="14" y="-1" font-family="'JetBrains Mono', 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="14" font-weight="700" fill="#7AA2F7" letter-spacing="2">
+        DYNAMIC RICED AUDIO
+      </text>
+
+      <text x="234" y="-1" font-family="'JetBrains Mono', 'IBM Plex Mono', monospace" font-size="14" font-weight="500" fill="#A6ADC8" letter-spacing="3">
+        BIT-PERFECT · 120 FPS
+      </text>
+    </g>
+  </g>
+</svg>

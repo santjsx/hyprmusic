@@ -1,5 +1,9 @@
 # HyprMusic
 
+<p align="center">
+  <img src="logos/export/logo-512.png" alt="HyprMusic Logo" width="480">
+</p>
+
 > **High-Fidelity, Offline-First Android Music Player & Riced Audio Canvas**  
 > *Crafted by [Santhosh Reddy](https://github.com/santjsx)*
 

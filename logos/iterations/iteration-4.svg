@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="it4-border" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7AA2F7" />
+      <stop offset="100%" stop-color="#CBA6F7" />
+    </linearGradient>
+  </defs>
+
+  <!-- Icon: Squircle Floating Chassis with Wayland Quadrants -->
+  <g id="icon" transform="translate(60, 60)">
+    <!-- Base Squircle with Active Gradient Border -->
+    <rect x="16" y="16" width="360" height="360" rx="80" fill="#181825" stroke="url(#it4-border)" stroke-width="3" />
+
+    <!-- 4 Segmented Ring Quadrants -->
+    <path d="M 196 66 A 130 130 0 0 1 326 196 L 286 196 A 90 90 0 0 0 196 106 Z" fill="#7AA2F7" />
+    <path d="M 326 196 A 130 130 0 0 1 196 326 L 196 286 A 90 90 0 0 0 286 196 Z" fill="#89B4FA" />
+    <path d="M 196 326 A 130 130 0 0 1 66 196 L 106 196 A 90 90 0 0 0 196 286 Z" fill="#313244" stroke="#7AA2F7" stroke-width="1.5" />
+    <path d="M 66 196 A 130 130 0 0 1 196 66 L 196 106 A 90 90 0 0 0 106 196 Z" fill="#CBA6F7" />
+
+    <!-- Core -->
+    <circle cx="196" cy="196" r="62" fill="#11111B" stroke="#7AA2F7" stroke-width="3" />
+    <polygon points="188,172 222,196 188,220" fill="#7AA2F7" />
+  </g>
+
+  <!-- Wordmark: Typographic Section -->
+  <g id="wordmark" transform="translate(480, 166)">
+    <text x="0" y="86" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="92" font-weight="900" letter-spacing="-1">
+      <tspan fill="#7AA2F7">hypr</tspan><tspan fill="#FFFFFF">music</tspan>
+    </text>
+
+    <!-- Subtitle / Terminal Pill -->
+    <g id="tagline" transform="translate(4, 150)">
+      <rect x="0" y="-26" width="220" height="32" rx="8" fill="#7AA2F7" fill-opacity="0.15" stroke="#7AA2F7" stroke-width="1.5" />
+      <text x="14" y="-5" font-family="'JetBrains Mono', 'IBM Plex Mono', monospace" font-size="12" font-weight="700" fill="#7AA2F7" letter-spacing="2">
+        WAYLAND COMPOSITOR
+      </text>
+
+      <text x="244" y="-5" font-family="'JetBrains Mono', 'IBM Plex Mono', monospace" font-size="14" font-weight="500" fill="#A6ADC8" letter-spacing="2">
+        HIGH-FIDELITY
+      </text>
+    </g>
+  </g>
+</svg>

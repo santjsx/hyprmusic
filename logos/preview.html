@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logo Preview — Iterations</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 2.5rem;
+    transition: background-color 0.3s, color 0.3s;
+  }
+  body.light { background: #f0f2f5; color: #1e1e2e; }
+  body.dark { background: #11111b; color: #cdd6f4; }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+  }
+  h1 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.5px; }
+  .subtitle { font-size: 0.95rem; opacity: 0.7; margin-top: 0.25rem; }
+  .toggle {
+    padding: 0.6rem 1.25rem;
+    border: 1px solid currentColor;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+  .toggle:hover {
+    background: rgba(128, 128, 128, 0.15);
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+    gap: 2rem;
+    margin-bottom: 3.5rem;
+  }
+  .card {
+    border: 1px solid rgba(128, 128, 128, 0.25);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  }
+  .card-img {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem;
+    min-height: 260px;
+  }
+  body.light .card-img { background: #ffffff; }
+  body.dark .card-img { background: #181825; }
+  .card-img img {
+    width: 100%;
+    max-height: 220px;
+    object-fit: contain;
+  }
+  .card-label {
+    padding: 1.25rem 1.5rem;
+    border-top: 1px solid rgba(128, 128, 128, 0.2);
+  }
+  body.light .card-label { background: #f8f9fa; }
+  body.dark .card-label { background: #1e1e2e; }
+  .card-num {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #7aa2f7;
+    margin-bottom: 0.35rem;
+  }
+  .card-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+  }
+  .card-desc {
+    font-size: 0.875rem;
+    opacity: 0.75;
+    line-height: 1.45;
+  }
+
+  /* Favicon check section */
+  .favicon-section {
+    padding: 2rem;
+    border-radius: 16px;
+    border: 1px solid rgba(128, 128, 128, 0.2);
+    margin-top: 2rem;
+  }
+  body.light .favicon-section { background: #ffffff; }
+  body.dark .favicon-section { background: #181825; }
+  .favicon-section h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+  }
+  .favicon-strip {
+    display: flex;
+    gap: 2.5rem;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  .favicon-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .favicon-group-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #7aa2f7;
+  }
+  .favicon-sizes {
+    display: flex;
+    gap: 1.25rem;
+    align-items: flex-end;
+  }
+  .favicon-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .favicon-item img {
+    border-radius: 4px;
+    border: 1px solid rgba(128, 128, 128, 0.2);
+    image-rendering: -webkit-optimize-contrast;
+  }
+  .favicon-item span {
+    font-size: 0.75rem;
+    opacity: 0.6;
+    font-family: monospace;
+  }
+</style>
+</head>
+<body class="dark">
+  <div class="header">
+    <div>
+      <h1>HyprMusic Logo Refinements</h1>
+      <div class="subtitle">Phase 3: Iterations (most recent first) · Favicon legibility check (64px, 32px, 16px)</div>
+    </div>
+    <button class="toggle" onclick="document.body.classList.toggle('dark'); document.body.classList.toggle('light'); this.textContent = document.body.classList.contains('dark') ? '☀️ Light Mode' : '🌙 Dark Mode';">☀️ Light Mode</button>
+  </div>
+
+  <div class="grid">
+    <!-- Iteration 4 -->
+    <div class="card">
+      <div class="card-img">
+        <img src="iterations/iteration-4.svg" alt="iteration-4">
+      </div>
+      <div class="card-label">
+        <div class="card-num">Iteration 04</div>
+        <div class="card-title">Squircle Chassis & Terminal Pill</div>
+        <div class="card-desc">Wayland ring embedded within a rounded squircle frame with dual-gradient active border highlight and terminal compositor badge.</div>
+      </div>
+    </div>
+
+    <!-- Iteration 3 -->
+    <div class="card">
+      <div class="card-img">
+        <img src="iterations/iteration-3.svg" alt="iteration-3">
+      </div>
+      <div class="card-label">
+        <div class="card-num">Iteration 03</div>
+        <div class="card-title">Phosphor Minimal Outline</div>
+        <div class="card-desc">Pure vector outline aesthetic inspired by phosphoricons.com with 24px rounded quadrant strokes and zero gradients.</div>
+      </div>
+    </div>
+
+    <!-- Iteration 2 -->
+    <div class="card">
+      <div class="card-img">
+        <img src="iterations/iteration-2.svg" alt="iteration-2">
+      </div>
+      <div class="card-label">
+        <div class="card-num">Iteration 02</div>
+        <div class="card-title">OLED Cyberpunk Neon</div>
+        <div class="card-desc">High-voltage Cyan (#00F0FF) and Hot Magenta (#FF003C) accents on deep OLED black with cyber telemetry typography.</div>
+      </div>
+    </div>
+
+    <!-- Iteration 1 -->
+    <div class="card">
+      <div class="card-img">
+        <img src="iterations/iteration-1.svg" alt="iteration-1">
+      </div>
+      <div class="card-label">
+        <div class="card-num">Iteration 01</div>
+        <div class="card-title">Refined Wayland Pulse Dock & Concentric Vinyl</div>
+        <div class="card-desc">Tokyo Night & Catppuccin accents with high-precision quadrant gaps, audio groove ticks, and balanced typography.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Favicon Size Check Section -->
+  <div class="favicon-section">
+    <h2>Favicon & App Icon Size Check</h2>
+    <div class="favicon-strip">
+      <!-- Iteration 4 Favicon -->
+      <div class="favicon-group">
+        <div class="favicon-group-label">Iteration 04 (Squircle)</div>
+        <div class="favicon-sizes">
+          <div class="favicon-item"><img src="iterations/favicons/favicon-4.svg" width="64" height="64"><span>64px</span></div>
+          <div class="favicon-item"><img src="iterations/favicons/favicon-4.svg" width="32" height="32"><span>32px</span></div>
+          <div class="favicon-item"><img src="iterations/favicons/favicon-4.svg" width="16" height="16"><span>16px</span></div>
+        </div>
+      </div>
+
+      <!-- Iteration 3 Favicon -->
+      <div class="favicon-group">
+        <div class="favicon-group-label">Iteration 03 (Phosphor)</div>
+        <div class="favicon-sizes">
+          <div class="favicon-item"><img src="iterations/favicons/favicon-3.svg" width="64" height="64"><span>64px</span></div>
+          <div class="favicon-item"><img src="iterations/favicons/favicon-3.svg" width="32" height="32"><span>32px</span></div>
+          <div class="favicon-item"><img src="iterations/favicons/favicon-3.svg" width="16" height="16"><span>16px</span></div>
+        </div>
+      </div>
+
+      <!-- Iteration 2 Favicon -->
+      <div class="favicon-group">
+        <div class="favicon-group-label">Iteration 02 (OLED)</div>
+        <div class="favicon-sizes">
+          <div class="favicon-item"><img src="iterations/favicons/favicon-2.svg" width="64" height="64"><span>64px</span></div>
+          <div class="favicon-item"><img src="iterations/favicons/favicon-2.svg" width="32" height="32"><span>32px</span></div>
+          <div class="favicon-item"><img src="iterations/favicons/favicon-2.svg" width="16" height="16"><span>16px</span></div>
+        </div>
+      </div>
+
+      <!-- Iteration 1 Favicon -->
+      <div class="favicon-group">
+        <div class="favicon-group-label">Iteration 01 (Base)</div>
+        <div class="favicon-sizes">
+          <div class="favicon-item"><img src="iterations/favicons/favicon-1.svg" width="64" height="64"><span>64px</span></div>
+          <div class="favicon-item"><img src="iterations/favicons/favicon-1.svg" width="32" height="32"><span>32px</span></div>
+          <div class="favicon-item"><img src="iterations/favicons/favicon-1.svg" width="16" height="16"><span>16px</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

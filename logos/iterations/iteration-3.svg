@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 512" width="100%" height="100%">
+  <!-- Icon: Minimalist Phosphor Outline Vector Dock -->
+  <g id="icon" transform="translate(60, 60)">
+    <circle cx="196" cy="196" r="176" fill="#181825" stroke="#313244" stroke-width="2" />
+
+    <!-- 4 Symmetrical Phosphor Outlines with 8px Gaps -->
+    <!-- Quadrant 1 -->
+    <path d="M 202 46 A 150 150 0 0 1 346 190" fill="none" stroke="#7AA2F7" stroke-width="24" stroke-linecap="round" />
+    
+    <!-- Quadrant 2 -->
+    <path d="M 346 202 A 150 150 0 0 1 202 346" fill="none" stroke="#89B4FA" stroke-width="24" stroke-linecap="round" />
+
+    <!-- Quadrant 3 -->
+    <path d="M 190 346 A 150 150 0 0 1 46 202" fill="none" stroke="#585B70" stroke-width="24" stroke-linecap="round" />
+
+    <!-- Quadrant 4 -->
+    <path d="M 46 190 A 150 150 0 0 1 190 46" fill="none" stroke="#CBA6F7" stroke-width="24" stroke-linecap="round" />
+
+    <!-- Center Play Core -->
+    <circle cx="196" cy="196" r="64" fill="#11111B" stroke="#7AA2F7" stroke-width="3" />
+    <polygon points="186,170 220,196 186,222" fill="#7AA2F7" />
+  </g>
+
+  <!-- Wordmark: Typographic Section -->
+  <g id="wordmark" transform="translate(480, 166)">
+    <text x="0" y="86" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="92" font-weight="800" letter-spacing="1">
+      <tspan fill="#CDD6F4">HYPR</tspan><tspan fill="#7AA2F7">MUSIC</tspan>
+    </text>
+
+    <!-- Subtitle / Minimal Specs -->
+    <g id="tagline" transform="translate(4, 148)">
+      <line x1="0" y1="-26" x2="420" y2="-26" stroke="#7AA2F7" stroke-width="1.5" stroke-opacity="0.3" />
+      <text x="0" y="0" font-family="'JetBrains Mono', 'IBM Plex Mono', monospace" font-size="13" font-weight="600" fill="#7AA2F7" letter-spacing="3">
+        PHOSPHOR MINIMAL OUTLINE
+      </text>
+    </g>
+  </g>
+</svg>

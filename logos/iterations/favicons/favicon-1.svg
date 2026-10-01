@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="fav1-ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7AA2F7" />
+      <stop offset="100%" stop-color="#CBA6F7" />
+    </linearGradient>
+    <radialGradient id="fav1-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#7AA2F7" stop-opacity="0.22" />
+      <stop offset="100%" stop-color="#11111B" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="128" fill="#11111B" />
+  
+  <g transform="translate(60, 60)">
+    <circle cx="196" cy="196" r="190" fill="url(#fav1-glow)" />
+    <circle cx="196" cy="196" r="176" fill="#181825" stroke="#7AA2F7" stroke-width="3" stroke-opacity="0.4" />
+
+    <!-- 4 Workspace Quadrant Ring Segments -->
+    <path d="M 203 44 A 152 152 0 0 1 348 189 L 306 189 A 110 110 0 0 0 203 86 Z" fill="url(#fav1-ring)" />
+    <path d="M 348 203 A 152 152 0 0 1 203 348 L 203 306 A 110 110 0 0 0 306 203 Z" fill="#7AA2F7" fill-opacity="0.8" />
+    <path d="M 189 348 A 152 152 0 0 1 44 203 L 86 203 A 110 110 0 0 0 189 306 Z" fill="#24273A" stroke="#7AA2F7" stroke-width="2.5" />
+    <path d="M 44 189 A 152 152 0 0 1 189 44 L 189 86 A 110 110 0 0 0 86 189 Z" fill="#CBA6F7" />
+
+    <!-- Inner Core -->
+    <circle cx="196" cy="196" r="74" fill="#11111B" stroke="#7AA2F7" stroke-width="4" />
+    <circle cx="196" cy="196" r="62" fill="#1E1E2E" />
+
+    <!-- Center Play Triangle -->
+    <polygon points="186,168 224,196 186,224" fill="#7AA2F7" />
+  </g>
+</svg>

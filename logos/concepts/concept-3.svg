@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="c3-ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7AA2F7" />
+      <stop offset="100%" stop-color="#CBA6F7" />
+    </linearGradient>
+    <radialGradient id="c3-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#7AA2F7" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#181825" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Icon: Wayland Workspace Quadrants & Acoustic Disc -->
+  <g id="icon" transform="translate(60, 60)">
+    <!-- Ambient Radial Glow -->
+    <circle cx="196" cy="196" r="190" fill="url(#c3-glow)" />
+
+    <!-- Outer Disc Body -->
+    <circle cx="196" cy="196" r="172" fill="#181825" stroke="#7AA2F7" stroke-width="2.5" stroke-opacity="0.4" />
+
+    <!-- Four Segmented Workspace Ring Sectors (Representing Workspaces 1, 2, 3, 4 with 8px Gaps) -->
+    <!-- Top-Right Sector (Workspace 1: Active) -->
+    <path d="M 204 44 A 152 152 0 0 1 348 188 L 308 188 A 112 112 0 0 0 204 84 Z" fill="url(#c3-ring-grad)" />
+    
+    <!-- Bottom-Right Sector (Workspace 2) -->
+    <path d="M 348 204 A 152 152 0 0 1 204 348 L 204 308 A 112 112 0 0 0 308 204 Z" fill="#7AA2F7" fill-opacity="0.65" />
+
+    <!-- Bottom-Left Sector (Workspace 3) -->
+    <path d="M 188 348 A 152 152 0 0 1 44 204 L 84 204 A 112 112 0 0 0 188 308 Z" fill="#313244" stroke="#7AA2F7" stroke-width="1.5" />
+
+    <!-- Top-Left Sector (Workspace 4) -->
+    <path d="M 44 188 A 152 152 0 0 1 188 44 L 188 84 A 112 112 0 0 0 84 188 Z" fill="#CBA6F7" fill-opacity="0.8" />
+
+    <!-- Inner Core: Transducer Center -->
+    <circle cx="196" cy="196" r="76" fill="#11111B" stroke="#7AA2F7" stroke-width="3" />
+    <circle cx="196" cy="196" r="64" fill="#1E1E2E" />
+
+    <!-- Central Precision Vector Play Arrow -->
+    <polygon points="186,168 222,196 186,224" fill="#7AA2F7" />
+  </g>
+
+  <!-- Wordmark: Geometric & Minimalist Typographic Section -->
+  <g id="wordmark" transform="translate(480, 166)">
+    <!-- Primary Brand Title with Dot Separator -->
+    <text x="0" y="86" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="90" font-weight="800" letter-spacing="-1">
+      <tspan fill="#7AA2F7">hypr</tspan><tspan fill="#CBA6F7">.</tspan><tspan fill="#CDD6F4">music</tspan>
+    </text>
+
+    <!-- Subtitle / Minimal Tagline -->
+    <g id="tagline" transform="translate(6, 150)">
+      <rect x="0" y="-26" width="138" height="32" rx="16" fill="#7AA2F7" />
+      <text x="18" y="-5" font-family="'JetBrains Mono', 'IBM Plex Mono', monospace" font-size="12" font-weight="900" fill="#11111B" letter-spacing="1.5">
+        OFFLINE
+      </text>
+
+      <text x="156" y="-5" font-family="'JetBrains Mono', 'IBM Plex Mono', monospace" font-size="14" font-weight="600" fill="#A6ADC8" letter-spacing="3">
+        RICED AUDIO CANVAS
+      </text>
+    </g>
+  </g>
+</svg>

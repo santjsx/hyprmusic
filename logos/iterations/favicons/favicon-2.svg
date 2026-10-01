@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="fav2-cyber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F0FF" />
+      <stop offset="100%" stop-color="#FF003C" />
+    </linearGradient>
+    <radialGradient id="fav2-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00F0FF" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#050508" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="128" fill="#050508" />
+
+  <g transform="translate(60, 60)">
+    <circle cx="196" cy="196" r="190" fill="url(#fav2-glow)" />
+    <circle cx="196" cy="196" r="176" fill="#0A0A0F" stroke="#00F0FF" stroke-width="3" stroke-opacity="0.6" />
+
+    <path d="M 203 44 A 152 152 0 0 1 348 189 L 306 189 A 110 110 0 0 0 203 86 Z" fill="url(#fav2-cyber)" />
+    <path d="M 348 203 A 152 152 0 0 1 203 348 L 203 306 A 110 110 0 0 0 306 203 Z" fill="#00F0FF" />
+    <path d="M 189 348 A 152 152 0 0 1 44 203 L 86 203 A 110 110 0 0 0 189 306 Z" fill="#14141E" stroke="#FF003C" stroke-width="3" />
+    <path d="M 44 189 A 152 152 0 0 1 189 44 L 189 86 A 110 110 0 0 0 86 189 Z" fill="#FF003C" />
+
+    <circle cx="196" cy="196" r="74" fill="#050508" stroke="#00F0FF" stroke-width="4" />
+    <polygon points="186,168 224,196 186,224" fill="#00F0FF" />
+  </g>
+</svg>

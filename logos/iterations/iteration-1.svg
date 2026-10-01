@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="it1-ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7AA2F7" />
+      <stop offset="100%" stop-color="#CBA6F7" />
+    </linearGradient>
+    <radialGradient id="it1-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#7AA2F7" stop-opacity="0.18" />
+      <stop offset="100%" stop-color="#181825" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Icon: Wayland Pulse Dock & Concentric Vinyl -->
+  <g id="icon" transform="translate(60, 60)">
+    <!-- Radial Backlight Glow -->
+    <circle cx="196" cy="196" r="190" fill="url(#it1-glow)" />
+
+    <!-- Outer Sub-Chassis -->
+    <circle cx="196" cy="196" r="176" fill="#181825" stroke="#7AA2F7" stroke-width="2.5" stroke-opacity="0.35" />
+
+    <!-- Outer Precision Tick Marks (Audio Grooves / Minute Markers) -->
+    <circle cx="196" cy="196" r="162" fill="none" stroke="#313244" stroke-width="1.5" stroke-dasharray="2 10" />
+
+    <!-- 4 Workspace Quadrant Ring Segments (10px Dynamic Gaps) -->
+    <!-- Quadrant 1 (Top-Right: Active Compositor Focus) -->
+    <path d="M 203 44 A 152 152 0 0 1 348 189 L 306 189 A 110 110 0 0 0 203 86 Z" fill="url(#it1-ring)" />
+
+    <!-- Quadrant 2 (Bottom-Right: Library Stack) -->
+    <path d="M 348 203 A 152 152 0 0 1 203 348 L 203 306 A 110 110 0 0 0 306 203 Z" fill="#7AA2F7" fill-opacity="0.75" />
+
+    <!-- Quadrant 3 (Bottom-Left: Audio Buffer Engine) -->
+    <path d="M 189 348 A 152 152 0 0 1 44 203 L 86 203 A 110 110 0 0 0 189 306 Z" fill="#24273A" stroke="#7AA2F7" stroke-width="2" />
+
+    <!-- Quadrant 4 (Top-Left: Ricing Core) -->
+    <path d="M 44 189 A 152 152 0 0 1 189 44 L 189 86 A 110 110 0 0 0 86 189 Z" fill="#CBA6F7" fill-opacity="0.85" />
+
+    <!-- Middle Concentric Vinyl Groove -->
+    <circle cx="196" cy="196" r="92" fill="none" stroke="#313244" stroke-width="2" stroke-dasharray="6 4" />
+
+    <!-- Inner Transducer Core -->
+    <circle cx="196" cy="196" r="74" fill="#11111B" stroke="#7AA2F7" stroke-width="3.5" />
+    <circle cx="196" cy="196" r="62" fill="#1E1E2E" />
+
+    <!-- Precision Centered Vector Play Glyph -->
+    <polygon points="186,168 224,196 186,224" fill="#7AA2F7" />
+  </g>
+
+  <!-- Wordmark: Typographic Section -->
+  <g id="wordmark" transform="translate(480, 166)">
+    <!-- Primary Brand Title -->
+    <text x="0" y="86" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="92" font-weight="900" letter-spacing="-1">
+      <tspan fill="#7AA2F7">hypr</tspan><tspan fill="#CBA6F7">.</tspan><tspan fill="#CDD6F4">music</tspan>
+    </text>
+
+    <!-- Subtitle / Tagline Metadata Bar -->
+    <g id="tagline" transform="translate(6, 150)">
+      <rect x="0" y="-26" width="144" height="32" rx="16" fill="#7AA2F7" />
+      <text x="18" y="-5" font-family="'JetBrains Mono', 'IBM Plex Mono', monospace" font-size="12" font-weight="900" fill="#11111B" letter-spacing="1.5">
+        WAYLAND
+      </text>
+
+      <text x="162" y="-5" font-family="'JetBrains Mono', 'IBM Plex Mono', monospace" font-size="14" font-weight="600" fill="#A6ADC8" letter-spacing="3">
+        OFFLINE AUDIO CANVAS
+      </text>
+    </g>
+  </g>
+</svg>
