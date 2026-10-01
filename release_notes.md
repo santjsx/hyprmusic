@@ -1,62 +1,76 @@
-# HyprMusic v1.5.0 — Modern Brand Identity & Clean Professional Architecture
+# HyprMusic v1.6.0 — Next-Gen Theme Uniqueness & Deep Customization Architecture
 
-HyprMusic v1.5.0 delivers an official brand identity overhaul and a refined, professional design architecture. This release establishes a unified visual standard across all icon sets (Lucide, Phosphor, Remix), introduces responsive progress bar engines, eliminates all emojis and terminal ASCII artifacts in favor of clean digital typography, and equips the application with native adaptive vector launcher icons and high-density WebP mipmaps.
-
----
-
-## What's New in v1.5.0
-
-### Official Brand Identity & Design System
-* **Wayland Pulse Dock & Concentric Vinyl**: New official emblem fusing audiophile vinyl geometry with Wayland's four compositor workspaces (`[1:home]`, `[2:lib]`, `[3:player]`, `[4:rice]`), dynamic 10px gaps, and an active vector play core.
-* **Full Multi-Resolution Family**: Master vector assets (`logo.svg`, `icon.svg`) and high-fidelity PNG exports spanning 16px to 2048px for favicons, notification badges, headers, and social previews.
-* **Native Android Adaptive Launcher Icons**: Replaced default robot drawables with hardware-accelerated vector XMLs (`ic_launcher_foreground.xml`, `ic_launcher_background.xml`) on an OLED dark backdrop (`#11111B`).
-* **Multi-Density Mipmaps**: Fully refreshed square and circular WebP launcher bitmaps across all DPI tiers (`mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi`).
+HyprMusic v1.6.0 delivers a major overhaul of the theming engine, introducing deep visual uniqueness to every preset and granular runtime customization through the expanded Rice Studio. Every theme now functions as a distinct audiophile interface personality, calibrated across 5 visual dimensions: bespoke color palettes, specialized icon pack architectures, distinct progress bar visual engines, tactile playback control button geometries, and dynamic typography engines.
 
 ---
 
-### Clean Icon Architecture & Modern Progress Engines
-* **Vector Icon Packs**: Integrated authentic icon designs inspired by:
-  * `Lucide`: Clean 2px stroke line geometry.
-  * `Phosphor`: Balanced, rounded outline vectors.
-  * `Remix`: High-contrast solid UI glyphs.
-* **Responsive Progress Bar Engines**:
-  * `Capsule Seeker`: 5dp rounded track with a smooth 12dp tactile thumb and continuous horizontal drag/tap gestures.
-  * `Minimal Line`: High-density linear track with edge-to-edge scrubbing.
-  * `Dynamic Glow`: High-contrast accent slider with responsive glowing feedback.
-* **High Density Audio Table**: Transformed the terminal view into a clean, modern audio table featuring vector playback controls and dynamic equalizer indicators.
-* **Strict Aesthetic Polish**: Removed all emojis (`⚡`, `★`, `✔`, etc.) and ASCII text bars (`[████░░░]`) across the application, status indicators, and documentation.
+## What's New in v1.6.0
+
+### 10 Curated Bespoke Theme Personalities
+* **Catppuccin Mocha**: Soft pastel luxury with Phosphor Rounded icons, Capsule Seeker progress engine, and Floating Squircle control buttons.
+* **Gruvbox Retro**: 1970s analog Hi-Fi stereo aesthetic featuring Retro Console vectors, 24-step Segmented LED VU meters, Tactile Hi-Fi Beveled buttons, and IBM Plex Mono typography.
+* **Tokyo Night**: Electric cyberpunk cityscape with Lucide Geometric line vectors, Dynamic Neon glow slider, and Neon Glow Pill controls.
+* **Nordic Frost**: Scandinavian minimalism with Tabler Minimal airy strokes, Minimal Waybar 2.5dp line track, Minimal Glass Halo controls, and Inter Clean modern sans.
+* **OLED Cyberpunk**: Pitch black true-void backdrop with Remix Solid silhouettes, Dynamic Neon sliders, 45-degree Cyber Chamfered buttons, and Space Grotesk typography.
+* **Dracula Void**: Atmospheric synthwave featuring Phosphor Rounded icons, multi-band Waveform EQ Scrubber, and Floating Squircle controls.
+* **Rose Pine**: Boutique luxury aesthetic with Tabler Minimal vectors, Capsule Seeker scrubber, and Minimal Glass Halo controls.
+* **Monokai Pro**: Developer syntax theme with Lucide Geometric vectors, Segmented LED VU meter, and Bracket Console terminal controls.
+* **Solarized Amber (New)**: Sci-Fi telemetry terminal featuring Retro Console vectors, vintage Analog Tape Gauge with precision tick marks, and Tactile Bevel buttons.
+* **Emerald Matrix (New)**: Classic hacker terminal with Lucide line vectors, ultra-thin Minimal Waybar line, Bracket Console controls, and Retro Terminal monospace.
 
 ---
 
-### 120 FPS Zero-Lag Audio Engine
-* **Draw-Phase Canvas Spectrum Visualizer**: Hardware-accelerated GPU canvas rendering with zero Compose layout/recomposition passes.
-* **Isolated MiniEqualizers**: Zero-allocation Canvas equalizers keeping navigation docks and the MiniPlayer completely idle during playback.
-* **Draw-Phase Album Art Breathing**: GPU-level graphicsLayer elevation eliminating full-screen recompositions.
-* **Throttled PCM Buffer Processor**: 30 FPS analysis interval preventing audio thread backpressure and state contention.
-* **Hardware Bitmap Recycling**: Coil `ImageLoader` with `Bitmap.Config.HARDWARE`, dedicated 25% RAM cache, and 100MB disk cache.
-* **Asynchronous Disk I/O**: Background `Dispatchers.IO` coroutine scope for track metadata serialization and library scanning.
+### 6 Specialized Progress Bar Engines
+* **Capsule Seeker**: 5dp rounded track with a 12dp smooth tactile scrubber thumb and continuous horizontal drag/tap gestures.
+* **Waveform EQ Scrubber**: 32-band organic audio spectrum rendered in hardware Canvas with elapsed bars illuminated in active accent.
+* **Segmented LED VU**: 24 discrete illuminated studio audio VU meter blocks with calibrated amber warning and red peak overload thresholds.
+* **Minimal Waybar Line**: Ultra-thin 2.5dp low-profile line track with edge-to-edge touch seeking.
+* **Dynamic Neon Glow**: Luminous accent slider with radiant glowing borders and responsive scrub feedback.
+* **Analog Tape Gauge**: Vintage reel-to-reel style dual-rail track with precision tick marks and a sliding needle indicator.
 
 ---
 
-### Audiophile Sleep Timer
-* **Quick Presets**: 15, 30, 45, and 60-minute instant timer chips.
-* **End of Current Track**: Clean playback stop when the active song finishes.
-* **Custom Duration Slider**: Smooth duration adjustment from 5 to 120 minutes.
-* **15-Second Gentle Volume Fade-Out**: Natural volume taper from 100% to 0% prior to pausing.
-* **Live Monospace Counter**: Dynamic countdown display with quick `+5 MIN` and `+15 MIN` extension options.
+### 6 Playback Control Button Geometries
+* **Floating Squircle**: Soft rounded squircle with subtle elevation and active border.
+* **Neon Glow Pill**: Stadium pill shape with radiant outer glow aura and high contrast.
+* **Tactile Hi-Fi Bevel**: Physical stereo hardware button with 3D drop-shadow and tactile pressed depth.
+* **Minimal Glass Halo**: Translucent frosted circular ring with hairline vector stroke.
+* **Cyber Chamfer**: Futuristic 45-degree technical polygon with angular corner cuts.
+* **Bracket Console**: Retro terminal bracket frame (`[ ▶ ]`) with crisp vector bounding lines.
 
 ---
 
-### Custom Playlists & Direct Navigation
-* **Inline Playlist Creation**: Create and name new playlists directly from the playback modal without interrupting listening.
-* **Reactive Membership Toggling**: Instant track addition and removal with tactile haptic feedback.
-* **Direct "Go to Album" Navigation**: 1-tap jump from the active track header to its library album view.
+### 5 Specialized Icon Theme Systems
+* **Centralized Vector Icon Provider (`HyprIconProvider`)**: Hardware-accelerated Canvas vector rendering tailoring every icon to the active icon pack:
+  * `Phosphor Rounded`: Soft rounded geometry with warm 2.0dp strokes and curved corner joins.
+  * `Lucide Geometric`: Sharp, razor-clean 1.8dp geometric lines with technical precision.
+  * `Remix Solid`: High-contrast solid silhouettes and bold weights for maximum visibility.
+  * `Tabler Minimal`: Delicate, airy 1.5dp minimalist vector strokes.
+  * `Retro Console`: Industrial, mechanical right-angled and segmented technical lines.
+
+---
+
+### 5 Dynamic Typography Engines
+* **JetBrains Mono**: Clean, high-readability developer monospace.
+* **IBM Plex Mono**: Industrial retro monospace with distinct character terminals.
+* **Space Grotesk**: Contemporary geometric sans-serif for sleek futuristic interfaces.
+* **Inter Clean**: Modern, neutral sans-serif optimized for legibility.
+* **Retro Terminal**: High-density monospace calibrated for telemetry and terminal aesthetics.
+
+---
+
+### Live Interactive "Rice Studio" Customizer
+* **Live Sandbox Preview**: Real-time interactive playback preview tile supporting live seek drag and play/pause controls.
+* **One-Tap Preset Carousel**: Visual cards displaying live color dots, icon pack badges, and progress engine tags.
+* **Modular Engine Selectors**: Independent selection tabs for Control Button Style, Progress Bar Engine, Icon Pack Architecture, Typography, and Grid Layout.
+* **Compositor Sliders**: Smooth adjustments for Window Gaps (0–24dp), Corner Radius (0–28dp), Border Thickness (1–6dp), Frosted Glass Blur (0–40dp), and Outer Glow Aura Intensity (0–100%).
+* **OLED Pure Black Mode**: One-tap toggle converting backgrounds to `#000000` for battery conservation on OLED displays.
 
 ---
 
 ## Package Information
-* **Version**: `v1.5.0`
-* **Version Code**: `7`
+* **Version**: `v1.6.0`
+* **Version Code**: `8`
 * **Package Name**: `com.example.hyprmusic`
 * **Target SDK**: Android 16 (API 36)
 * **Minimum SDK**: Android 10 (API 29)
@@ -65,4 +79,4 @@ HyprMusic v1.5.0 delivers an official brand identity overhaul and a refined, pro
 ---
 
 ## Installation
-Download the `HyprMusic-v1.5.0.apk` asset and install directly on your Android device (Android 10+), or use the built-in OTA update checker in Settings.
+Download the `HyprMusic-v1.6.0.apk` asset and install directly on your Android device (Android 10+), or use the built-in OTA update checker in Settings.

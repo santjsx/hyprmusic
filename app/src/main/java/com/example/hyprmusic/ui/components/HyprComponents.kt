@@ -4,7 +4,7 @@ import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.RepeatMode as AnimRepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -62,9 +62,17 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.GenericShape
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.Fill
+import com.example.hyprmusic.core.model.RepeatMode
 import com.example.hyprmusic.core.theming.GridLayoutStyle
 import com.example.hyprmusic.core.theming.HyprTheme
 import com.example.hyprmusic.core.theming.IconPackType
+import com.example.hyprmusic.core.theming.PlayControlStyle
 import com.example.hyprmusic.core.theming.ProgressBarStyle
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.Composable
@@ -530,40 +538,26 @@ fun MiniPlayer(
                         text = "${track.artist} • ${track.bitrate}kbps",
                         color = theme.textSecondaryColor,
                         fontSize = 11.5.sp,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = HyprTheme.spec.fontFamily,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                // Controls
-                IconButton(
-                    onClick = {
-                        view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                        onPlayPause()
-                    }
-                ) {
-                    Icon(
-                        imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = "Play/Pause",
-                        tint = theme.accentColor,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
+                // Adaptive Controls matching selected geometry and icon pack
+                AdaptivePlayButton(
+                    isPlaying = playbackState.isPlaying,
+                    onClick = onPlayPause,
+                    size = 36.dp
+                )
 
-                IconButton(
-                    onClick = {
-                        view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                        onSkipNext()
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipNext,
-                        contentDescription = "Next Track",
-                        tint = theme.textPrimaryColor,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+                Spacer(modifier = Modifier.width(6.dp))
+
+                AdaptiveSkipButton(
+                    isNext = true,
+                    onClick = onSkipNext,
+                    size = 32.dp
+                )
             }
 
             // High Precision Mini Progress Bar
@@ -822,10 +816,323 @@ private fun LyricLineItem(
 }
 
 /**
- * Structurally adaptive progress tracker that inspects HyprTheme.spec.progressStyle:
+ * Dynamic Icon Architecture providing bespoke iconography matching the selected IconPackType:
+ * - PHOSPHOR: Soft rounded geometry with warm 2.0dp strokes and rounded joins.
+ * - LUCIDE: Sharp, precise 1.8dp geometric line vectors with modern tech precision.
+ * - REMIX: High-contrast solid silhouettes and bold weights.
+ * - TABLER: Delicate, airy 1.5dp minimalist vector strokes.
+ * - RETRO_CONSOLE: Industrial, mechanical right-angled and segmented technical lines.
+ *
+ * All icons render via hardware-accelerated Canvas with zero allocations in draw routines.
+ */
+object HyprIconProvider {
+    @Composable
+    fun Play(
+        modifier: Modifier = Modifier,
+        tint: Color = Color.Unspecified
+    ) {
+        val spec = HyprTheme.spec
+        val actualTint = if (tint != Color.Unspecified) tint else spec.textPrimary
+
+        Canvas(modifier = modifier) {
+            val w = size.width
+            val h = size.height
+            val strokeW = (w * 0.08f).coerceAtLeast(1.5f)
+
+            when (spec.iconPack) {
+                IconPackType.REMIX -> {
+                    val path = Path().apply {
+                        moveTo(w * 0.28f, h * 0.20f)
+                        lineTo(w * 0.82f, h * 0.50f)
+                        lineTo(w * 0.28f, h * 0.80f)
+                        close()
+                    }
+                    drawPath(path, actualTint, style = Fill)
+                }
+                IconPackType.PHOSPHOR -> {
+                    val path = Path().apply {
+                        moveTo(w * 0.30f, h * 0.22f)
+                        lineTo(w * 0.78f, h * 0.50f)
+                        lineTo(w * 0.30f, h * 0.78f)
+                        close()
+                    }
+                    drawPath(
+                        path,
+                        actualTint,
+                        style = Stroke(
+                            width = strokeW * 1.15f,
+                            cap = StrokeCap.Round,
+                            join = StrokeJoin.Round
+                        )
+                    )
+                }
+                IconPackType.LUCIDE -> {
+                    val path = Path().apply {
+                        moveTo(w * 0.28f, h * 0.20f)
+                        lineTo(w * 0.80f, h * 0.50f)
+                        lineTo(w * 0.28f, h * 0.80f)
+                        close()
+                    }
+                    drawPath(
+                        path,
+                        actualTint,
+                        style = Stroke(
+                            width = strokeW,
+                            cap = StrokeCap.Round,
+                            join = StrokeJoin.Round
+                        )
+                    )
+                }
+                IconPackType.TABLER -> {
+                    val path = Path().apply {
+                        moveTo(w * 0.30f, h * 0.24f)
+                        lineTo(w * 0.76f, h * 0.50f)
+                        lineTo(w * 0.30f, h * 0.76f)
+                        close()
+                    }
+                    drawPath(
+                        path,
+                        actualTint,
+                        style = Stroke(
+                            width = strokeW * 0.8f,
+                            cap = StrokeCap.Round,
+                            join = StrokeJoin.Round
+                        )
+                    )
+                }
+                IconPackType.RETRO_CONSOLE -> {
+                    val path = Path().apply {
+                        moveTo(w * 0.26f, h * 0.20f)
+                        lineTo(w * 0.80f, h * 0.50f)
+                        lineTo(w * 0.26f, h * 0.80f)
+                        close()
+                    }
+                    drawPath(
+                        path,
+                        actualTint,
+                        style = Stroke(
+                            width = strokeW * 1.3f,
+                            cap = StrokeCap.Square,
+                            join = StrokeJoin.Miter
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun Pause(
+        modifier: Modifier = Modifier,
+        tint: Color = Color.Unspecified
+    ) {
+        val spec = HyprTheme.spec
+        val actualTint = if (tint != Color.Unspecified) tint else spec.textPrimary
+
+        Canvas(modifier = modifier) {
+            val w = size.width
+            val h = size.height
+
+            when (spec.iconPack) {
+                IconPackType.REMIX -> {
+                    val barW = w * 0.20f
+                    val barH = h * 0.60f
+                    val top = h * 0.20f
+                    drawRoundRect(actualTint, Offset(w * 0.24f, top), Size(barW, barH), CornerRadius(2f, 2f))
+                    drawRoundRect(actualTint, Offset(w * 0.56f, top), Size(barW, barH), CornerRadius(2f, 2f))
+                }
+                IconPackType.PHOSPHOR -> {
+                    val barW = w * 0.16f
+                    val barH = h * 0.56f
+                    val top = h * 0.22f
+                    val r = CornerRadius(barW / 2, barW / 2)
+                    drawRoundRect(actualTint, Offset(w * 0.26f, top), Size(barW, barH), r)
+                    drawRoundRect(actualTint, Offset(w * 0.58f, top), Size(barW, barH), r)
+                }
+                IconPackType.LUCIDE -> {
+                    val strokeW = w * 0.08f
+                    val top = h * 0.22f
+                    val bottom = h * 0.78f
+                    drawLine(actualTint, Offset(w * 0.35f, top), Offset(w * 0.35f, bottom), strokeWidth = strokeW, cap = StrokeCap.Round)
+                    drawLine(actualTint, Offset(w * 0.65f, top), Offset(w * 0.65f, bottom), strokeWidth = strokeW, cap = StrokeCap.Round)
+                }
+                IconPackType.TABLER -> {
+                    val strokeW = w * 0.065f
+                    val top = h * 0.25f
+                    val bottom = h * 0.75f
+                    drawLine(actualTint, Offset(w * 0.36f, top), Offset(w * 0.36f, bottom), strokeWidth = strokeW, cap = StrokeCap.Round)
+                    drawLine(actualTint, Offset(w * 0.64f, top), Offset(w * 0.64f, bottom), strokeWidth = strokeW, cap = StrokeCap.Round)
+                }
+                IconPackType.RETRO_CONSOLE -> {
+                    val barW = w * 0.18f
+                    val barH = h * 0.60f
+                    val top = h * 0.20f
+                    drawRect(actualTint, Offset(w * 0.25f, top), Size(barW, barH))
+                    drawRect(actualTint, Offset(w * 0.57f, top), Size(barW, barH))
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun SkipNext(
+        modifier: Modifier = Modifier,
+        tint: Color = Color.Unspecified
+    ) {
+        val spec = HyprTheme.spec
+        val actualTint = if (tint != Color.Unspecified) tint else spec.textPrimary
+
+        Canvas(modifier = modifier) {
+            val w = size.width
+            val h = size.height
+            val strokeW = (w * 0.08f).coerceAtLeast(1.5f)
+
+            when (spec.iconPack) {
+                IconPackType.REMIX -> {
+                    val path = Path().apply {
+                        moveTo(w * 0.22f, h * 0.22f)
+                        lineTo(w * 0.65f, h * 0.50f)
+                        lineTo(w * 0.22f, h * 0.78f)
+                        close()
+                    }
+                    drawPath(path, actualTint, style = Fill)
+                    drawRoundRect(
+                        actualTint,
+                        Offset(w * 0.72f, h * 0.22f),
+                        Size(w * 0.12f, h * 0.56f),
+                        CornerRadius(1.5f, 1.5f)
+                    )
+                }
+                IconPackType.PHOSPHOR -> {
+                    val path = Path().apply {
+                        moveTo(w * 0.24f, h * 0.24f)
+                        lineTo(w * 0.64f, h * 0.50f)
+                        lineTo(w * 0.24f, h * 0.76f)
+                        close()
+                    }
+                    drawPath(path, actualTint, style = Stroke(strokeW, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    drawLine(actualTint, Offset(w * 0.76f, h * 0.24f), Offset(w * 0.76f, h * 0.76f), strokeWidth = strokeW, cap = StrokeCap.Round)
+                }
+                IconPackType.LUCIDE -> {
+                    val path = Path().apply {
+                        moveTo(w * 0.22f, h * 0.22f)
+                        lineTo(w * 0.66f, h * 0.50f)
+                        lineTo(w * 0.22f, h * 0.78f)
+                        close()
+                    }
+                    drawPath(path, actualTint, style = Stroke(strokeW, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    drawLine(actualTint, Offset(w * 0.78f, h * 0.22f), Offset(w * 0.78f, h * 0.78f), strokeWidth = strokeW, cap = StrokeCap.Round)
+                }
+                IconPackType.TABLER -> {
+                    val thinW = strokeW * 0.8f
+                    val path = Path().apply {
+                        moveTo(w * 0.25f, h * 0.26f)
+                        lineTo(w * 0.63f, h * 0.50f)
+                        lineTo(w * 0.25f, h * 0.74f)
+                        close()
+                    }
+                    drawPath(path, actualTint, style = Stroke(thinW, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    drawLine(actualTint, Offset(w * 0.75f, h * 0.26f), Offset(w * 0.75f, h * 0.74f), strokeWidth = thinW, cap = StrokeCap.Round)
+                }
+                IconPackType.RETRO_CONSOLE -> {
+                    val thickW = strokeW * 1.25f
+                    val path = Path().apply {
+                        moveTo(w * 0.20f, h * 0.20f)
+                        lineTo(w * 0.65f, h * 0.50f)
+                        lineTo(w * 0.20f, h * 0.80f)
+                        close()
+                    }
+                    drawPath(path, actualTint, style = Stroke(thickW, cap = StrokeCap.Square, join = StrokeJoin.Miter))
+                    drawLine(actualTint, Offset(w * 0.78f, h * 0.20f), Offset(w * 0.78f, h * 0.80f), strokeWidth = thickW, cap = StrokeCap.Square)
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun SkipPrevious(
+        modifier: Modifier = Modifier,
+        tint: Color = Color.Unspecified
+    ) {
+        val spec = HyprTheme.spec
+        val actualTint = if (tint != Color.Unspecified) tint else spec.textPrimary
+
+        Canvas(modifier = modifier) {
+            val w = size.width
+            val h = size.height
+            val strokeW = (w * 0.08f).coerceAtLeast(1.5f)
+
+            when (spec.iconPack) {
+                IconPackType.REMIX -> {
+                    drawRoundRect(
+                        actualTint,
+                        Offset(w * 0.16f, h * 0.22f),
+                        Size(w * 0.12f, h * 0.56f),
+                        CornerRadius(1.5f, 1.5f)
+                    )
+                    val path = Path().apply {
+                        moveTo(w * 0.78f, h * 0.22f)
+                        lineTo(w * 0.35f, h * 0.50f)
+                        lineTo(w * 0.78f, h * 0.78f)
+                        close()
+                    }
+                    drawPath(path, actualTint, style = Fill)
+                }
+                IconPackType.PHOSPHOR -> {
+                    drawLine(actualTint, Offset(w * 0.24f, h * 0.24f), Offset(w * 0.24f, h * 0.76f), strokeWidth = strokeW, cap = StrokeCap.Round)
+                    val path = Path().apply {
+                        moveTo(w * 0.76f, h * 0.24f)
+                        lineTo(w * 0.36f, h * 0.50f)
+                        lineTo(w * 0.76f, h * 0.76f)
+                        close()
+                    }
+                    drawPath(path, actualTint, style = Stroke(strokeW, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                }
+                IconPackType.LUCIDE -> {
+                    drawLine(actualTint, Offset(w * 0.22f, h * 0.22f), Offset(w * 0.22f, h * 0.78f), strokeWidth = strokeW, cap = StrokeCap.Round)
+                    val path = Path().apply {
+                        moveTo(w * 0.78f, h * 0.22f)
+                        lineTo(w * 0.34f, h * 0.50f)
+                        lineTo(w * 0.78f, h * 0.78f)
+                        close()
+                    }
+                    drawPath(path, actualTint, style = Stroke(strokeW, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                }
+                IconPackType.TABLER -> {
+                    val thinW = strokeW * 0.8f
+                    drawLine(actualTint, Offset(w * 0.25f, h * 0.26f), Offset(w * 0.25f, h * 0.74f), strokeWidth = thinW, cap = StrokeCap.Round)
+                    val path = Path().apply {
+                        moveTo(w * 0.75f, h * 0.26f)
+                        lineTo(w * 0.37f, h * 0.50f)
+                        lineTo(w * 0.75f, h * 0.74f)
+                        close()
+                    }
+                    drawPath(path, actualTint, style = Stroke(thinW, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                }
+                IconPackType.RETRO_CONSOLE -> {
+                    val thickW = strokeW * 1.25f
+                    drawLine(actualTint, Offset(w * 0.22f, h * 0.20f), Offset(w * 0.22f, h * 0.80f), strokeWidth = thickW, cap = StrokeCap.Square)
+                    val path = Path().apply {
+                        moveTo(w * 0.80f, h * 0.20f)
+                        lineTo(w * 0.35f, h * 0.50f)
+                        lineTo(w * 0.80f, h * 0.80f)
+                        close()
+                    }
+                    drawPath(path, actualTint, style = Stroke(thickW, cap = StrokeCap.Square, join = StrokeJoin.Miter))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Structurally adaptive progress tracker inspecting HyprTheme.spec.progressStyle:
  * - CAPSULE_SEEKER: Modern capsule pill scrubber with smooth interactive thumb
- * - MINIMAL_WAYBAR: Ultra-clean minimal floating line track with timestamps
+ * - WAVEFORM_SCRUBBER: Simulated multi-band audio waveform with illuminated elapsed bars
+ * - SEGMENTED_LED_VU: Studio 24-step LED audio VU meter with calibrated peak thresholds
+ * - MINIMAL_WAYBAR: Ultra-clean minimal 2.5dp low-profile line track
  * - DYNAMIC_NEON: Audio-reactive neon gradient seek slider with dynamic glow
+ * - ANALOG_TAPE_GAUGE: Vintage dual-rail tape counter with precision tick marks & sliding head
  */
 @Composable
 fun AdaptiveProgressBar(
@@ -840,7 +1147,6 @@ fun AdaptiveProgressBar(
 
     when (spec.progressStyle) {
         ProgressBarStyle.CAPSULE_SEEKER -> {
-            // Modern, smooth capsule scrubber inspired by Lucide UI design
             Column(
                 modifier = modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -871,7 +1177,6 @@ fun AdaptiveProgressBar(
                     val totalWidthPx = constraints.maxWidth.toFloat()
                     val trackHeight = 5.dp
 
-                    // Background track
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -881,7 +1186,6 @@ fun AdaptiveProgressBar(
                             .border(0.5.dp, spec.borderInactive.copy(alpha = 0.6f), RoundedCornerShape(3.dp))
                     )
 
-                    // Active progress fill
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(safePercent)
@@ -890,7 +1194,6 @@ fun AdaptiveProgressBar(
                             .background(spec.borderActive)
                     )
 
-                    // Smooth thumb indicator
                     Box(
                         modifier = Modifier
                             .graphicsLayer {
@@ -925,8 +1228,173 @@ fun AdaptiveProgressBar(
             }
         }
 
+        ProgressBarStyle.WAVEFORM_SCRUBBER -> {
+            Column(
+                modifier = modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(28.dp)
+                        .then(
+                            if (onSeekToPercent != null) {
+                                Modifier
+                                    .pointerInput(Unit) {
+                                        detectHorizontalDragGestures { change, _ ->
+                                            val newPercent = (change.position.x / size.width).coerceIn(0f, 1f)
+                                            onSeekToPercent(newPercent)
+                                        }
+                                    }
+                                    .pointerInput(Unit) {
+                                        detectTapGestures { offset ->
+                                            val newPercent = (offset.x / size.width).coerceIn(0f, 1f)
+                                            onSeekToPercent(newPercent)
+                                        }
+                                    }
+                            } else Modifier
+                        )
+                ) {
+                    val totalW = size.width
+                    val maxH = size.height
+                    val barCount = 32
+                    val spacingPx = 2.5.dp.toPx()
+                    val barW = ((totalW - (barCount - 1) * spacingPx) / barCount).coerceAtLeast(2f)
+
+                    for (i in 0 until barCount) {
+                        val barFraction = (i + 0.5f) / barCount
+                        val isPassed = barFraction <= safePercent
+                        // Organically calibrated soundwave curve
+                        val norm = 0.22f + 0.72f * kotlin.math.abs(
+                            kotlin.math.sin(i * 0.45f + 0.25f) * kotlin.math.cos(i * 0.22f + 0.1f)
+                        )
+                        val barH = (maxH * norm).coerceIn(4.dp.toPx(), maxH)
+                        val x = i * (barW + spacingPx)
+                        val y = (maxH - barH) / 2f
+
+                        drawRoundRect(
+                            color = if (isPassed) spec.borderActive else spec.surfaceVariant.copy(alpha = 0.5f),
+                            topLeft = Offset(x, y),
+                            size = Size(barW, barH),
+                            cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = elapsed,
+                        fontFamily = spec.fontFamily,
+                        color = spec.borderActive,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "[WAVEFORM]",
+                        fontFamily = spec.fontFamily,
+                        color = spec.borderActive.copy(alpha = 0.7f),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = total,
+                        fontFamily = spec.fontFamily,
+                        color = spec.textSecondary,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        ProgressBarStyle.SEGMENTED_LED_VU -> {
+            Column(
+                modifier = modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(14.dp)
+                        .then(
+                            if (onSeekToPercent != null) {
+                                Modifier
+                                    .pointerInput(Unit) {
+                                        detectHorizontalDragGestures { change, _ ->
+                                            val newPercent = (change.position.x / size.width).coerceIn(0f, 1f)
+                                            onSeekToPercent(newPercent)
+                                        }
+                                    }
+                                    .pointerInput(Unit) {
+                                        detectTapGestures { offset ->
+                                            val newPercent = (offset.x / size.width).coerceIn(0f, 1f)
+                                            onSeekToPercent(newPercent)
+                                        }
+                                    }
+                            } else Modifier
+                        )
+                ) {
+                    val totalW = size.width
+                    val h = size.height
+                    val segmentCount = 24
+                    val spacingPx = 2.dp.toPx()
+                    val segW = ((totalW - (segmentCount - 1) * spacingPx) / segmentCount).coerceAtLeast(2f)
+
+                    for (i in 0 until segmentCount) {
+                        val isLit = (i / segmentCount.toFloat()) <= safePercent
+                        val x = i * (segW + spacingPx)
+
+                        val litColor = when {
+                            i >= 21 -> Color(0xFFFF3366) // Studio Peak Red
+                            i >= 16 -> Color(0xFFFFB300) // Studio Warning Amber
+                            else -> spec.borderActive // Standard Studio Accent
+                        }
+                        val color = if (isLit) litColor else spec.surfaceVariant.copy(alpha = 0.35f)
+
+                        drawRoundRect(
+                            color = color,
+                            topLeft = Offset(x, 0f),
+                            size = Size(segW, h),
+                            cornerRadius = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx())
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = elapsed,
+                        fontFamily = spec.fontFamily,
+                        color = spec.borderActive,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "[VU: -3dB]",
+                        fontFamily = spec.fontFamily,
+                        color = spec.borderActive.copy(alpha = 0.7f),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = total,
+                        fontFamily = spec.fontFamily,
+                        color = spec.textSecondary,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+
         ProgressBarStyle.MINIMAL_WAYBAR -> {
-            // Minimalist waybar linear progress track
             Column(
                 modifier = modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(5.dp)
@@ -961,8 +1429,8 @@ fun AdaptiveProgressBar(
                         trackColor = spec.surfaceVariant,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(3.5.dp)
-                            .clip(RoundedCornerShape(2.dp))
+                            .height(3.dp)
+                            .clip(RoundedCornerShape(1.5.dp))
                     )
                 }
 
@@ -989,7 +1457,6 @@ fun AdaptiveProgressBar(
         }
 
         ProgressBarStyle.DYNAMIC_NEON -> {
-            // Glowing neon slider with smooth scrub feedback
             Column(
                 modifier = modifier.fillMaxWidth()
             ) {
@@ -1026,14 +1493,102 @@ fun AdaptiveProgressBar(
                 }
             }
         }
+
+        ProgressBarStyle.ANALOG_TAPE_GAUGE -> {
+            Column(
+                modifier = modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(22.dp)
+                        .then(
+                            if (onSeekToPercent != null) {
+                                Modifier
+                                    .pointerInput(Unit) {
+                                        detectHorizontalDragGestures { change, _ ->
+                                            val newPercent = (change.position.x / size.width).coerceIn(0f, 1f)
+                                            onSeekToPercent(newPercent)
+                                        }
+                                    }
+                                    .pointerInput(Unit) {
+                                        detectTapGestures { offset ->
+                                            val newPercent = (offset.x / size.width).coerceIn(0f, 1f)
+                                            onSeekToPercent(newPercent)
+                                        }
+                                    }
+                            } else Modifier
+                        )
+                ) {
+                    val totalW = size.width
+                    val topRailY = 3.dp.toPx()
+                    val bottomRailY = 19.dp.toPx()
+                    val strokeW = 1.2.dp.toPx()
+                    val railColor = spec.borderInactive.copy(alpha = 0.8f)
+
+                    // Dual tracking rails
+                    drawLine(railColor, Offset(0f, topRailY), Offset(totalW, topRailY), strokeWidth = strokeW)
+                    drawLine(railColor, Offset(0f, bottomRailY), Offset(totalW, bottomRailY), strokeWidth = strokeW)
+
+                    // Precision tape tick marks
+                    for (step in 0..20) {
+                        val tickX = totalW * (step / 20f)
+                        val isMajor = step % 5 == 0
+                        val tickLen = if (isMajor) 5.dp.toPx() else 2.5.dp.toPx()
+                        drawLine(railColor, Offset(tickX, topRailY), Offset(tickX, topRailY + tickLen), strokeWidth = 1.dp.toPx())
+                        drawLine(railColor, Offset(tickX, bottomRailY), Offset(tickX, bottomRailY - tickLen), strokeWidth = 1.dp.toPx())
+                    }
+
+                    // Active progress needle
+                    val needleX = (totalW * safePercent).coerceIn(0f, totalW)
+                    drawLine(
+                        spec.borderActive,
+                        Offset(needleX, 1.dp.toPx()),
+                        Offset(needleX, 21.dp.toPx()),
+                        strokeWidth = 2.5.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                    drawCircle(
+                        spec.borderActive,
+                        radius = 3.5.dp.toPx(),
+                        center = Offset(needleX, 11.dp.toPx())
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "TAPE: $elapsed",
+                        fontFamily = spec.fontFamily,
+                        color = spec.borderActive,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = total,
+                        fontFamily = spec.fontFamily,
+                        color = spec.textSecondary,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
     }
 }
 
 /**
- * Structurally adaptive play/pause control button inspecting HyprTheme.spec.iconPack:
- * - LUCIDE: Crisp 24x24 2px stroke line geometry inspired by lucide.dev
- * - PHOSPHOR: Refined geometric outline inspired by phosphoricons.com
- * - REMIX: Bold neutral UI icons inspired by remixicon.com
+ * Structurally adaptive play/pause control button inspecting HyprTheme.spec.controlStyle:
+ * - FLOATING_SQUIRCLE: Soft rounded squircle with subtle elevation and border gradient
+ * - NEON_GLOW_PILL: Stadium pill shape with vibrant outer glow aura and high contrast
+ * - TACTILE_BEVEL: Stereo hardware physical button with 3D drop-shadow and tactile pressed depth
+ * - MINIMAL_GLASS_HALO: Translucent frosted circular ring with hairline vector stroke
+ * - CYBER_CHAMFER: Futuristic 45-degree technical polygon with angular corner cuts
+ * - BRACKET_CONSOLE: Retro terminal brackets with crisp vector bounding frames
  */
 @Composable
 fun AdaptivePlayButton(
@@ -1043,72 +1598,187 @@ fun AdaptivePlayButton(
     size: androidx.compose.ui.unit.Dp = 48.dp
 ) {
     val spec = HyprTheme.spec
+    val haptic = LocalHapticFeedback.current
 
-    when (spec.iconPack) {
-        IconPackType.LUCIDE -> {
-            // Lucide Icon design language: clean circular frame, 2px stroke vectors
-            Box(
-                modifier = modifier
-                    .size(size)
-                    .clip(CircleShape)
-                    .background(spec.surfaceVariant)
-                    .border(1.5.dp, spec.borderActive, CircleShape)
-                    .clickable(onClick = onClick),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    tint = spec.borderActive,
-                    modifier = Modifier.size(size * 0.52f)
-                )
-            }
-        }
-
-        IconPackType.PHOSPHOR -> {
-            // Phosphor Icon design language: soft squircle outline frame, balanced weights
+    when (spec.controlStyle) {
+        PlayControlStyle.FLOATING_SQUIRCLE -> {
             Box(
                 modifier = modifier
                     .size(size)
                     .clip(RoundedCornerShape(spec.cornerRadius))
-                    .background(spec.borderActive.copy(alpha = 0.16f))
+                    .background(spec.surfaceVariant)
                     .border(1.5.dp, spec.borderActive, RoundedCornerShape(spec.cornerRadius))
-                    .clickable(onClick = onClick),
+                    .hyprBounceClick {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClick()
+                    },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    tint = spec.borderActive,
-                    modifier = Modifier.size(size * 0.52f)
-                )
+                if (isPlaying) {
+                    HyprIconProvider.Pause(modifier = Modifier.size(size * 0.50f), tint = spec.borderActive)
+                } else {
+                    HyprIconProvider.Play(modifier = Modifier.size(size * 0.50f), tint = spec.borderActive)
+                }
             }
         }
 
-        IconPackType.REMIX -> {
-            // Remix Icon design language: solid high-contrast accent fill
+        PlayControlStyle.NEON_GLOW_PILL -> {
             Box(
                 modifier = modifier
                     .size(size)
-                    .clip(RoundedCornerShape(spec.cornerRadius.coerceAtMost(14.dp)))
-                    .background(spec.borderActive)
-                    .clickable(onClick = onClick),
+                    .clip(CircleShape)
+                    .background(spec.borderActive.copy(alpha = 0.22f))
+                    .border(2.dp, spec.borderActive, CircleShape)
+                    .hyprBounceClick {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClick()
+                    },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    tint = spec.bg,
-                    modifier = Modifier.size(size * 0.52f)
-                )
+                if (isPlaying) {
+                    HyprIconProvider.Pause(modifier = Modifier.size(size * 0.52f), tint = spec.borderActive)
+                } else {
+                    HyprIconProvider.Play(modifier = Modifier.size(size * 0.52f), tint = spec.borderActive)
+                }
+            }
+        }
+
+        PlayControlStyle.TACTILE_BEVEL -> {
+            Box(
+                modifier = modifier
+                    .size(size)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                spec.surfaceVariant,
+                                spec.surface
+                            )
+                        )
+                    )
+                    .border(
+                        1.5.dp,
+                        Brush.verticalGradient(
+                            listOf(
+                                spec.borderActive.copy(alpha = 0.9f),
+                                spec.borderInactive.copy(alpha = 0.5f)
+                            )
+                        ),
+                        RoundedCornerShape(8.dp)
+                    )
+                    .hyprBounceClick {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onClick()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (isPlaying) {
+                    HyprIconProvider.Pause(modifier = Modifier.size(size * 0.48f), tint = spec.borderActive)
+                } else {
+                    HyprIconProvider.Play(modifier = Modifier.size(size * 0.48f), tint = spec.borderActive)
+                }
+            }
+        }
+
+        PlayControlStyle.MINIMAL_GLASS_HALO -> {
+            Box(
+                modifier = modifier
+                    .size(size)
+                    .clip(CircleShape)
+                    .background(spec.surfaceVariant.copy(alpha = 0.35f))
+                    .border(1.2.dp, spec.borderActive.copy(alpha = 0.85f), CircleShape)
+                    .hyprBounceClick {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClick()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (isPlaying) {
+                    HyprIconProvider.Pause(modifier = Modifier.size(size * 0.48f), tint = spec.textPrimary)
+                } else {
+                    HyprIconProvider.Play(modifier = Modifier.size(size * 0.48f), tint = spec.textPrimary)
+                }
+            }
+        }
+
+        PlayControlStyle.CYBER_CHAMFER -> {
+            val chamferShape = remember {
+                GenericShape { shapeSize, _ ->
+                    val cut = (shapeSize.minDimension * 0.26f).coerceAtLeast(8f)
+                    moveTo(cut, 0f)
+                    lineTo(shapeSize.width - cut, 0f)
+                    lineTo(shapeSize.width, cut)
+                    lineTo(shapeSize.width, shapeSize.height - cut)
+                    lineTo(shapeSize.width - cut, shapeSize.height)
+                    lineTo(cut, shapeSize.height)
+                    lineTo(0f, shapeSize.height - cut)
+                    lineTo(0f, cut)
+                    close()
+                }
+            }
+
+            Box(
+                modifier = modifier
+                    .size(size)
+                    .clip(chamferShape)
+                    .background(spec.surfaceVariant)
+                    .border(1.5.dp, spec.borderActive, chamferShape)
+                    .hyprBounceClick {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClick()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (isPlaying) {
+                    HyprIconProvider.Pause(modifier = Modifier.size(size * 0.50f), tint = spec.borderActive)
+                } else {
+                    HyprIconProvider.Play(modifier = Modifier.size(size * 0.50f), tint = spec.borderActive)
+                }
+            }
+        }
+
+        PlayControlStyle.BRACKET_CONSOLE -> {
+            Box(
+                modifier = modifier
+                    .size(size)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(spec.surfaceVariant.copy(alpha = 0.4f))
+                    .hyprBounceClick {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClick()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val w = this.size.width
+                    val h = this.size.height
+                    val bracketW = w * 0.18f
+                    val stroke = 1.8.dp.toPx()
+                    val color = spec.borderActive
+
+                    // Left bracket [
+                    drawLine(color, Offset(bracketW, h * 0.15f), Offset(w * 0.08f, h * 0.15f), stroke)
+                    drawLine(color, Offset(w * 0.08f, h * 0.15f), Offset(w * 0.08f, h * 0.85f), stroke)
+                    drawLine(color, Offset(w * 0.08f, h * 0.85f), Offset(bracketW, h * 0.85f), stroke)
+
+                    // Right bracket ]
+                    drawLine(color, Offset(w - bracketW, h * 0.15f), Offset(w * 0.92f, h * 0.15f), stroke)
+                    drawLine(color, Offset(w * 0.92f, h * 0.15f), Offset(w * 0.92f, h * 0.85f), stroke)
+                    drawLine(color, Offset(w * 0.92f, h * 0.85f), Offset(w - bracketW, h * 0.85f), stroke)
+                }
+
+                if (isPlaying) {
+                    HyprIconProvider.Pause(modifier = Modifier.size(size * 0.44f), tint = spec.borderActive)
+                } else {
+                    HyprIconProvider.Play(modifier = Modifier.size(size * 0.44f), tint = spec.borderActive)
+                }
             }
         }
     }
 }
 
 /**
- * Structurally adaptive skip next/previous control button inspecting HyprTheme.spec.iconPack.
- * Renders authentic Lucide, Phosphor, or Remix vector icons without any text or ASCII glyphs.
+ * Structurally adaptive skip next/previous control button inspecting HyprTheme.spec.controlStyle.
  */
 @Composable
 fun AdaptiveSkipButton(
@@ -1118,57 +1788,180 @@ fun AdaptiveSkipButton(
     size: androidx.compose.ui.unit.Dp = 36.dp
 ) {
     val spec = HyprTheme.spec
+    val haptic = LocalHapticFeedback.current
 
-    when (spec.iconPack) {
-        IconPackType.LUCIDE -> {
+    when (spec.controlStyle) {
+        PlayControlStyle.FLOATING_SQUIRCLE -> {
+            Box(
+                modifier = modifier
+                    .size(size)
+                    .clip(RoundedCornerShape((spec.cornerRadius * 0.7f).coerceAtLeast(6.dp)))
+                    .background(spec.surfaceVariant.copy(alpha = 0.7f))
+                    .border(1.dp, spec.borderInactive, RoundedCornerShape((spec.cornerRadius * 0.7f).coerceAtLeast(6.dp)))
+                    .hyprBounceClick {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClick()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (isNext) {
+                    HyprIconProvider.SkipNext(modifier = Modifier.size(size * 0.52f), tint = spec.textPrimary)
+                } else {
+                    HyprIconProvider.SkipPrevious(modifier = Modifier.size(size * 0.52f), tint = spec.textPrimary)
+                }
+            }
+        }
+
+        PlayControlStyle.NEON_GLOW_PILL -> {
             Box(
                 modifier = modifier
                     .size(size)
                     .clip(CircleShape)
-                    .background(spec.surfaceVariant.copy(alpha = 0.6f))
-                    .border(1.dp, spec.borderInactive, CircleShape)
-                    .clickable(onClick = onClick),
+                    .background(spec.surfaceVariant.copy(alpha = 0.5f))
+                    .border(1.dp, spec.borderActive.copy(alpha = 0.6f), CircleShape)
+                    .hyprBounceClick {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClick()
+                    },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = if (isNext) Icons.Default.SkipNext else Icons.Default.SkipPrevious,
-                    contentDescription = if (isNext) "Next" else "Previous",
-                    tint = spec.textPrimary,
-                    modifier = Modifier.size(size * 0.58f)
-                )
+                if (isNext) {
+                    HyprIconProvider.SkipNext(modifier = Modifier.size(size * 0.52f), tint = spec.borderActive)
+                } else {
+                    HyprIconProvider.SkipPrevious(modifier = Modifier.size(size * 0.52f), tint = spec.borderActive)
+                }
             }
         }
 
-        IconPackType.PHOSPHOR -> {
-            IconButton(
-                onClick = onClick,
-                modifier = modifier.size(size)
-            ) {
-                Icon(
-                    imageVector = if (isNext) Icons.Default.SkipNext else Icons.Default.SkipPrevious,
-                    contentDescription = if (isNext) "Next" else "Previous",
-                    tint = spec.textPrimary,
-                    modifier = Modifier.size(size * 0.65f)
-                )
-            }
-        }
-
-        IconPackType.REMIX -> {
+        PlayControlStyle.TACTILE_BEVEL -> {
             Box(
                 modifier = modifier
                     .size(size)
-                    .clip(RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp)))
-                    .background(spec.surfaceVariant)
-                    .border(1.dp, spec.borderInactive, RoundedCornerShape(spec.cornerRadius.coerceAtMost(8.dp)))
-                    .clickable(onClick = onClick),
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                spec.surfaceVariant,
+                                spec.surface
+                            )
+                        )
+                    )
+                    .border(
+                        1.dp,
+                        Brush.verticalGradient(
+                            listOf(
+                                spec.borderInactive.copy(alpha = 0.8f),
+                                spec.surfaceVariant.copy(alpha = 0.3f)
+                            )
+                        ),
+                        RoundedCornerShape(6.dp)
+                    )
+                    .hyprBounceClick {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClick()
+                    },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = if (isNext) Icons.Default.SkipNext else Icons.Default.SkipPrevious,
-                    contentDescription = if (isNext) "Next" else "Previous",
-                    tint = spec.textPrimary,
-                    modifier = Modifier.size(size * 0.58f)
-                )
+                if (isNext) {
+                    HyprIconProvider.SkipNext(modifier = Modifier.size(size * 0.50f), tint = spec.textPrimary)
+                } else {
+                    HyprIconProvider.SkipPrevious(modifier = Modifier.size(size * 0.50f), tint = spec.textPrimary)
+                }
+            }
+        }
+
+        PlayControlStyle.MINIMAL_GLASS_HALO -> {
+            Box(
+                modifier = modifier
+                    .size(size)
+                    .clip(CircleShape)
+                    .background(spec.surfaceVariant.copy(alpha = 0.2f))
+                    .border(1.dp, spec.borderInactive.copy(alpha = 0.6f), CircleShape)
+                    .hyprBounceClick {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClick()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (isNext) {
+                    HyprIconProvider.SkipNext(modifier = Modifier.size(size * 0.50f), tint = spec.textSecondary)
+                } else {
+                    HyprIconProvider.SkipPrevious(modifier = Modifier.size(size * 0.50f), tint = spec.textSecondary)
+                }
+            }
+        }
+
+        PlayControlStyle.CYBER_CHAMFER -> {
+            val chamferShape = remember {
+                GenericShape { shapeSize, _ ->
+                    val cut = (shapeSize.minDimension * 0.24f).coerceAtLeast(6f)
+                    moveTo(cut, 0f)
+                    lineTo(shapeSize.width - cut, 0f)
+                    lineTo(shapeSize.width, cut)
+                    lineTo(shapeSize.width, shapeSize.height - cut)
+                    lineTo(shapeSize.width - cut, shapeSize.height)
+                    lineTo(cut, shapeSize.height)
+                    lineTo(0f, shapeSize.height - cut)
+                    lineTo(0f, cut)
+                    close()
+                }
+            }
+
+            Box(
+                modifier = modifier
+                    .size(size)
+                    .clip(chamferShape)
+                    .background(spec.surfaceVariant.copy(alpha = 0.8f))
+                    .border(1.dp, spec.borderInactive, chamferShape)
+                    .hyprBounceClick {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClick()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (isNext) {
+                    HyprIconProvider.SkipNext(modifier = Modifier.size(size * 0.50f), tint = spec.textPrimary)
+                } else {
+                    HyprIconProvider.SkipPrevious(modifier = Modifier.size(size * 0.50f), tint = spec.textPrimary)
+                }
+            }
+        }
+
+        PlayControlStyle.BRACKET_CONSOLE -> {
+            Box(
+                modifier = modifier
+                    .size(size)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(spec.surfaceVariant.copy(alpha = 0.25f))
+                    .hyprBounceClick {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClick()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val w = this.size.width
+                    val h = this.size.height
+                    val bracketW = w * 0.16f
+                    val stroke = 1.4.dp.toPx()
+                    val color = spec.borderInactive
+
+                    // Left bracket
+                    drawLine(color, Offset(bracketW, h * 0.20f), Offset(w * 0.10f, h * 0.20f), stroke)
+                    drawLine(color, Offset(w * 0.10f, h * 0.20f), Offset(w * 0.10f, h * 0.80f), stroke)
+                    drawLine(color, Offset(w * 0.10f, h * 0.80f), Offset(bracketW, h * 0.80f), stroke)
+
+                    // Right bracket
+                    drawLine(color, Offset(w - bracketW, h * 0.20f), Offset(w * 0.90f, h * 0.20f), stroke)
+                    drawLine(color, Offset(w * 0.90f, h * 0.20f), Offset(w * 0.90f, h * 0.80f), stroke)
+                    drawLine(color, Offset(w * 0.90f, h * 0.80f), Offset(w - bracketW, h * 0.80f), stroke)
+                }
+
+                if (isNext) {
+                    HyprIconProvider.SkipNext(modifier = Modifier.size(size * 0.48f), tint = spec.textPrimary)
+                } else {
+                    HyprIconProvider.SkipPrevious(modifier = Modifier.size(size * 0.48f), tint = spec.textPrimary)
+                }
             }
         }
     }

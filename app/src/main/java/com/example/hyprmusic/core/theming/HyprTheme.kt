@@ -49,7 +49,9 @@ enum class ThemePreset(val displayName: String) {
     OLED_CYBERPUNK("OLED Cyberpunk"),
     DRACULA_VOID("Dracula Void"),
     ROSE_PINE("Rosé Pine"),
-    MONOKAI_PRO("Monokai Pro")
+    MONOKAI_PRO("Monokai Pro"),
+    SOLARIZED_AMBER("Solarized Amber"),
+    EMERALD_MATRIX("Emerald Matrix")
 }
 
 @Immutable
@@ -200,6 +202,38 @@ object ThemePresets {
         accentColor = Color(0xFFFFD866)
     )
 
+    val SolarizedAmber = HyprThemeConfig(
+        preset = ThemePreset.SOLARIZED_AMBER,
+        windowGapsDp = 8,
+        borderRadiusDp = 10,
+        borderThicknessDp = 2,
+        blurRadiusDp = 14,
+        activeBorderGradient = listOf(Color(0xFFB58900), Color(0xFFCB4B16)),
+        inactiveBorderColor = Color(0xFF586E75),
+        backgroundColor = Color(0xFF002B36),
+        surfaceColor = Color(0xDD073642),
+        surfaceVariantColor = Color(0xFF001F27),
+        textPrimaryColor = Color(0xFFFDF6E3),
+        textSecondaryColor = Color(0xFF93A1A1),
+        accentColor = Color(0xFFB58900)
+    )
+
+    val EmeraldMatrix = HyprThemeConfig(
+        preset = ThemePreset.EMERALD_MATRIX,
+        windowGapsDp = 8,
+        borderRadiusDp = 8,
+        borderThicknessDp = 2,
+        blurRadiusDp = 16,
+        activeBorderGradient = listOf(Color(0xFF00FF66), Color(0xFF00CC44)),
+        inactiveBorderColor = Color(0xFF1B3322),
+        backgroundColor = Color(0xFF080F0A),
+        surfaceColor = Color(0xDD0D1810),
+        surfaceVariantColor = Color(0xFF050A06),
+        textPrimaryColor = Color(0xFFE0FFE8),
+        textSecondaryColor = Color(0xFF66AA77),
+        accentColor = Color(0xFF00FF66)
+    )
+
     fun getPreset(preset: ThemePreset): HyprThemeConfig = when (preset) {
         ThemePreset.CATPPUCCIN_MOCHA -> CatppuccinMocha
         ThemePreset.TOKYO_NIGHT -> TokyoNight
@@ -209,6 +243,8 @@ object ThemePresets {
         ThemePreset.DRACULA_VOID -> DraculaVoid
         ThemePreset.ROSE_PINE -> RosePine
         ThemePreset.MONOKAI_PRO -> MonokaiPro
+        ThemePreset.SOLARIZED_AMBER -> SolarizedAmber
+        ThemePreset.EMERALD_MATRIX -> EmeraldMatrix
     }
 }
 
@@ -256,16 +292,24 @@ object ThemeManager {
             try { HyprFontType.valueOf(it) } catch (_: Exception) { baseSpec.fontType }
         } ?: baseSpec.fontType
 
+        val savedControlStyle = p.getString("control_style", baseSpec.controlStyle.name)?.let {
+            try { PlayControlStyle.valueOf(it) } catch (_: Exception) { baseSpec.controlStyle }
+        } ?: baseSpec.controlStyle
+
+        val savedGlow = p.getFloat("glow_intensity", baseSpec.glowIntensity)
+
         val resolvedSpec = baseSpec.copy(
             elementGap = gaps.dp,
             cornerRadius = radius.dp,
             borderThickness = thickness.dp,
             blurRadiusDp = blur,
+            glowIntensity = savedGlow,
             isOledMode = isOled,
             bg = if (isOled) Color(0xFF000000) else baseSpec.bg,
             surface = if (isOled) Color(0xEE0A0A0A) else baseSpec.surface,
             iconPack = savedIconPack,
             progressStyle = savedProgressStyle,
+            controlStyle = savedControlStyle,
             gridStyle = savedGridStyle,
             fontType = savedFontType,
             fontFamily = savedFontType.fontFamily
@@ -283,13 +327,24 @@ object ThemeManager {
             cornerRadius = currentSpec.cornerRadius,
             borderThickness = currentSpec.borderThickness,
             blurRadiusDp = currentSpec.blurRadiusDp,
+            glowIntensity = baseSpec.glowIntensity,
             isOledMode = currentSpec.isOledMode,
             bg = if (currentSpec.isOledMode) Color(0xFF000000) else baseSpec.bg,
-            surface = if (currentSpec.isOledMode) Color(0xEE0A0A0A) else baseSpec.surface
+            surface = if (currentSpec.isOledMode) Color(0xEE0A0A0A) else baseSpec.surface,
+            iconPack = baseSpec.iconPack,
+            progressStyle = baseSpec.progressStyle,
+            controlStyle = baseSpec.controlStyle,
+            fontType = baseSpec.fontType,
+            fontFamily = baseSpec.fontFamily
         )
         _designSpec.value = updatedSpec
         _themeConfig.value = updatedSpec.toLegacyConfig()
-        prefs?.edit()?.putString("theme_preset", preset.name)?.apply()
+        prefs?.edit()?.putString("theme_preset", preset.name)
+            ?.putString("icon_pack", baseSpec.iconPack.name)
+            ?.putString("progress_style", baseSpec.progressStyle.name)
+            ?.putString("control_style", baseSpec.controlStyle.name)
+            ?.putString("font_type", baseSpec.fontType.name)
+            ?.apply()
     }
 
     fun updateIconPack(pack: IconPackType) {
@@ -300,6 +355,17 @@ object ThemeManager {
     fun updateProgressStyle(style: ProgressBarStyle) {
         _designSpec.update { it.copy(progressStyle = style) }
         prefs?.edit()?.putString("progress_style", style.name)?.apply()
+    }
+
+    fun updateControlStyle(style: PlayControlStyle) {
+        _designSpec.update { it.copy(controlStyle = style) }
+        prefs?.edit()?.putString("control_style", style.name)?.apply()
+    }
+
+    fun updateGlowIntensity(intensity: Float) {
+        val safeGlow = intensity.coerceIn(0f, 1f)
+        _designSpec.update { it.copy(glowIntensity = safeGlow) }
+        prefs?.edit()?.putFloat("glow_intensity", safeGlow)?.apply()
     }
 
     fun updateGridStyle(gridStyle: GridLayoutStyle) {

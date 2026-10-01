@@ -1,6 +1,7 @@
 package com.example.hyprmusic.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,13 +17,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ColorLens
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -38,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -47,9 +46,11 @@ import com.example.hyprmusic.core.theming.HyprFontType
 import com.example.hyprmusic.core.theming.HyprTheme
 import com.example.hyprmusic.core.theming.HyprThemeConfig
 import com.example.hyprmusic.core.theming.IconPackType
+import com.example.hyprmusic.core.theming.PlayControlStyle
 import com.example.hyprmusic.core.theming.ProgressBarStyle
 import com.example.hyprmusic.core.theming.ThemeManager
 import com.example.hyprmusic.core.theming.ThemePreset
+import com.example.hyprmusic.core.theming.ThemeRegistry
 import com.example.hyprmusic.core.theming.hyprAnimatedGlow
 import com.example.hyprmusic.core.theming.hyprTile
 import com.example.hyprmusic.ui.components.AdaptivePlayButton
@@ -135,9 +136,9 @@ fun ThemerScreen(
                         Spacer(modifier = Modifier.height(6.dp))
 
                         Text(
-                            text = "Gaps: ${theme.windowGapsDp}px • Radius: ${theme.borderRadiusDp}px • Border: ${theme.borderThicknessDp}px • Font: ${spec.fontType.name}",
+                            text = "Gaps: ${theme.windowGapsDp}px • Radius: ${theme.borderRadiusDp}px • Border: ${theme.borderThicknessDp}px • Glow: ${(spec.glowIntensity * 100).toInt()}%",
                             color = theme.textSecondaryColor,
-                            fontSize = 11.5.sp,
+                            fontSize = 11.sp,
                             fontFamily = spec.fontFamily
                         )
 
@@ -151,7 +152,7 @@ fun ThemerScreen(
                             onSeekToPercent = { previewProgress = it }
                         )
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
                         // Interactive Adaptive Controls in Live Preview
                         Row(
@@ -168,7 +169,7 @@ fun ThemerScreen(
                             AdaptivePlayButton(
                                 isPlaying = isPreviewPlaying,
                                 onClick = { isPreviewPlaying = !isPreviewPlaying },
-                                size = 46.dp
+                                size = 48.dp
                             )
                             Spacer(modifier = Modifier.width(16.dp))
                             AdaptiveSkipButton(
@@ -182,7 +183,7 @@ fun ThemerScreen(
             }
         }
 
-        // Section: Theme Presets Selector
+        // Section: 10 Curated Presets Selector
         item {
             Column {
                 Text(
@@ -202,11 +203,120 @@ fun ThemerScreen(
                         key = { it.name }
                     ) { preset ->
                         val isSelected = theme.preset == preset
+                        val presetSpec = ThemeRegistry.getSpec(preset)
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(10).dp))
+                                .background(if (isSelected) theme.accentColor.copy(alpha = 0.22f) else theme.surfaceColor)
+                                .border(
+                                    1.dp,
+                                    if (isSelected) theme.accentColor else theme.surfaceVariantColor,
+                                    RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(10).dp)
+                                )
+                                .clickable { ThemeManager.setPreset(preset) }
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = theme.accentColor,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(5.dp))
+                                    }
+                                    Text(
+                                        text = preset.displayName,
+                                        color = if (isSelected) theme.accentColor else theme.textPrimaryColor,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        fontFamily = spec.fontFamily
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                // Visual palette indicator dots
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(presetSpec.bg)
+                                            .border(0.5.dp, Color.White.copy(alpha = 0.3f), CircleShape)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(presetSpec.borderActive)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(presetSpec.textAccent)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = presetSpec.iconPack.name.lowercase(),
+                                        color = theme.textSecondaryColor,
+                                        fontSize = 9.5.sp,
+                                        fontFamily = spec.fontFamily
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Section: Play Control Button Style
+        item {
+            Column {
+                Text(
+                    text = "PLAY CONTROL BUTTON STYLE",
+                    color = theme.textSecondaryColor,
+                    fontSize = 12.sp,
+                    fontFamily = spec.fontFamily,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)
+                )
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(
+                        items = PlayControlStyle.entries,
+                        key = { it.name }
+                    ) { style ->
+                        val isSelected = spec.controlStyle == style
+                        val label = when (style) {
+                            PlayControlStyle.FLOATING_SQUIRCLE -> "Floating Squircle"
+                            PlayControlStyle.NEON_GLOW_PILL -> "Neon Glow Pill"
+                            PlayControlStyle.TACTILE_BEVEL -> "Tactile Hi-Fi Bevel"
+                            PlayControlStyle.MINIMAL_GLASS_HALO -> "Minimal Glass Halo"
+                            PlayControlStyle.CYBER_CHAMFER -> "Cyber Chamfer"
+                            PlayControlStyle.BRACKET_CONSOLE -> "Bracket Console"
+                        }
+
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(10).dp))
                                 .background(if (isSelected) theme.accentColor.copy(alpha = 0.25f) else theme.surfaceColor)
-                                .clickable { ThemeManager.setPreset(preset) }
+                                .border(
+                                    1.dp,
+                                    if (isSelected) theme.accentColor else theme.surfaceVariantColor,
+                                    RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(10).dp)
+                                )
+                                .clickable { ThemeManager.updateControlStyle(style) }
                                 .padding(horizontal = 14.dp, vertical = 10.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -220,7 +330,71 @@ fun ThemerScreen(
                                     Spacer(modifier = Modifier.width(6.dp))
                                 }
                                 Text(
-                                    text = preset.displayName,
+                                    text = label,
+                                    color = if (isSelected) theme.accentColor else theme.textPrimaryColor,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    fontFamily = spec.fontFamily
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Section: Progress Bar Engine
+        item {
+            Column {
+                Text(
+                    text = "PROGRESS BAR ENGINE",
+                    color = theme.textSecondaryColor,
+                    fontSize = 12.sp,
+                    fontFamily = spec.fontFamily,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)
+                )
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(
+                        items = ProgressBarStyle.entries,
+                        key = { it.name }
+                    ) { style ->
+                        val isSelected = spec.progressStyle == style
+                        val label = when (style) {
+                            ProgressBarStyle.CAPSULE_SEEKER -> "Capsule Seeker"
+                            ProgressBarStyle.WAVEFORM_SCRUBBER -> "Waveform Scrubber"
+                            ProgressBarStyle.SEGMENTED_LED_VU -> "Segmented LED VU"
+                            ProgressBarStyle.MINIMAL_WAYBAR -> "Minimal Line"
+                            ProgressBarStyle.DYNAMIC_NEON -> "Dynamic Glow"
+                            ProgressBarStyle.ANALOG_TAPE_GAUGE -> "Analog Tape Gauge"
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(10).dp))
+                                .background(if (isSelected) theme.accentColor.copy(alpha = 0.25f) else theme.surfaceColor)
+                                .border(
+                                    1.dp,
+                                    if (isSelected) theme.accentColor else theme.surfaceVariantColor,
+                                    RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(10).dp)
+                                )
+                                .clickable { ThemeManager.updateProgressStyle(style) }
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = theme.accentColor,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                }
+                                Text(
+                                    text = label,
                                     color = if (isSelected) theme.accentColor else theme.textPrimaryColor,
                                     fontSize = 13.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
@@ -257,123 +431,19 @@ fun ThemerScreen(
                             IconPackType.LUCIDE -> "Lucide (Line)"
                             IconPackType.PHOSPHOR -> "Phosphor (Outline)"
                             IconPackType.REMIX -> "Remix (Solid)"
+                            IconPackType.TABLER -> "Tabler (Minimal)"
+                            IconPackType.RETRO_CONSOLE -> "Retro Console"
                         }
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(10).dp))
                                 .background(if (isSelected) theme.accentColor.copy(alpha = 0.25f) else theme.surfaceColor)
+                                .border(
+                                    1.dp,
+                                    if (isSelected) theme.accentColor else theme.surfaceVariantColor,
+                                    RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(10).dp)
+                                )
                                 .clickable { ThemeManager.updateIconPack(pack) }
-                                .padding(horizontal = 14.dp, vertical = 10.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (isSelected) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = theme.accentColor,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                }
-                                Text(
-                                    text = label,
-                                    color = if (isSelected) theme.accentColor else theme.textPrimaryColor,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    fontFamily = spec.fontFamily
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Section: Progress Bar Visual Engine
-        item {
-            Column {
-                Text(
-                    text = "PROGRESS BAR ENGINE",
-                    color = theme.textSecondaryColor,
-                    fontSize = 12.sp,
-                    fontFamily = spec.fontFamily,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)
-                )
-
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(
-                        items = ProgressBarStyle.entries,
-                        key = { it.name }
-                    ) { style ->
-                        val isSelected = spec.progressStyle == style
-                        val label = when (style) {
-                            ProgressBarStyle.CAPSULE_SEEKER -> "Capsule Seeker"
-                            ProgressBarStyle.MINIMAL_WAYBAR -> "Minimal Line"
-                            ProgressBarStyle.DYNAMIC_NEON -> "Dynamic Glow"
-                        }
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(10).dp))
-                                .background(if (isSelected) theme.accentColor.copy(alpha = 0.25f) else theme.surfaceColor)
-                                .clickable { ThemeManager.updateProgressStyle(style) }
-                                .padding(horizontal = 14.dp, vertical = 10.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (isSelected) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = theme.accentColor,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                }
-                                Text(
-                                    text = label,
-                                    color = if (isSelected) theme.accentColor else theme.textPrimaryColor,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    fontFamily = spec.fontFamily
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Section: Home Grid Layout Architecture
-        item {
-            Column {
-                Text(
-                    text = "HOME GRID LAYOUT ARCHITECTURE",
-                    color = theme.textSecondaryColor,
-                    fontSize = 12.sp,
-                    fontFamily = spec.fontFamily,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)
-                )
-
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(
-                        items = GridLayoutStyle.entries,
-                        key = { it.name }
-                    ) { layout ->
-                        val isSelected = spec.gridStyle == layout
-                        val label = when (layout) {
-                            GridLayoutStyle.ASYMMETRIC_TILES -> "Asymmetric Bento"
-                            GridLayoutStyle.TIGHT_TERMINAL_ROWS -> "High Density Table"
-                        }
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(10).dp))
-                                .background(if (isSelected) theme.accentColor.copy(alpha = 0.25f) else theme.surfaceColor)
-                                .clickable { ThemeManager.updateGridStyle(layout) }
                                 .padding(horizontal = 14.dp, vertical = 10.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -423,14 +493,80 @@ fun ThemerScreen(
                         val label = when (fontType) {
                             HyprFontType.JETBRAINS_MONO -> "JetBrains Mono"
                             HyprFontType.IBM_PLEX_MONO -> "IBM Plex Mono"
-                            HyprFontType.SYSTEM_MONOSPACE -> "System Mono"
-                            HyprFontType.MINIMAL_SANS -> "Minimal Sans"
+                            HyprFontType.SPACE_GROTESK -> "Space Grotesk (Sans)"
+                            HyprFontType.INTER_CLEAN -> "Inter Clean (Modern)"
+                            HyprFontType.RETRO_TERMINAL -> "Retro Terminal Mono"
                         }
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(10).dp))
                                 .background(if (isSelected) theme.accentColor.copy(alpha = 0.25f) else theme.surfaceColor)
+                                .border(
+                                    1.dp,
+                                    if (isSelected) theme.accentColor else theme.surfaceVariantColor,
+                                    RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(10).dp)
+                                )
                                 .clickable { ThemeManager.updateFontType(fontType) }
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = theme.accentColor,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                }
+                                Text(
+                                    text = label,
+                                    color = if (isSelected) theme.accentColor else theme.textPrimaryColor,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    fontFamily = fontType.fontFamily
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Section: Home Grid Layout Architecture
+        item {
+            Column {
+                Text(
+                    text = "HOME GRID LAYOUT ARCHITECTURE",
+                    color = theme.textSecondaryColor,
+                    fontSize = 12.sp,
+                    fontFamily = spec.fontFamily,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)
+                )
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(
+                        items = GridLayoutStyle.entries,
+                        key = { it.name }
+                    ) { layout ->
+                        val isSelected = spec.gridStyle == layout
+                        val label = when (layout) {
+                            GridLayoutStyle.ASYMMETRIC_TILES -> "Asymmetric Bento"
+                            GridLayoutStyle.TIGHT_TERMINAL_ROWS -> "High Density Table"
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(10).dp))
+                                .background(if (isSelected) theme.accentColor.copy(alpha = 0.25f) else theme.surfaceColor)
+                                .border(
+                                    1.dp,
+                                    if (isSelected) theme.accentColor else theme.surfaceVariantColor,
+                                    RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(10).dp)
+                                )
+                                .clickable { ThemeManager.updateGridStyle(layout) }
                                 .padding(horizontal = 14.dp, vertical = 10.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -471,7 +607,7 @@ fun ThemerScreen(
                         color = theme.textPrimaryColor,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = spec.fontFamily
                     )
 
                     // Window Gaps
@@ -483,13 +619,14 @@ fun ThemerScreen(
                             Text(
                                 text = "Window Gaps",
                                 color = theme.textSecondaryColor,
-                                fontSize = 13.sp
+                                fontSize = 13.sp,
+                                fontFamily = spec.fontFamily
                             )
                             Text(
                                 text = "${theme.windowGapsDp} dp",
                                 color = theme.accentColor,
                                 fontSize = 13.sp,
-                                fontFamily = FontFamily.Monospace,
+                                fontFamily = spec.fontFamily,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -515,13 +652,14 @@ fun ThemerScreen(
                             Text(
                                 text = "Squircle Border Radius",
                                 color = theme.textSecondaryColor,
-                                fontSize = 13.sp
+                                fontSize = 13.sp,
+                                fontFamily = spec.fontFamily
                             )
                             Text(
                                 text = "${theme.borderRadiusDp} dp",
                                 color = theme.accentColor,
                                 fontSize = 13.sp,
-                                fontFamily = FontFamily.Monospace,
+                                fontFamily = spec.fontFamily,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -547,13 +685,14 @@ fun ThemerScreen(
                             Text(
                                 text = "Border Thickness",
                                 color = theme.textSecondaryColor,
-                                fontSize = 13.sp
+                                fontSize = 13.sp,
+                                fontFamily = spec.fontFamily
                             )
                             Text(
                                 text = "${theme.borderThicknessDp} dp",
                                 color = theme.accentColor,
                                 fontSize = 13.sp,
-                                fontFamily = FontFamily.Monospace,
+                                fontFamily = spec.fontFamily,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -579,13 +718,14 @@ fun ThemerScreen(
                             Text(
                                 text = "Frosted Glass Blur (Android 12+)",
                                 color = theme.textSecondaryColor,
-                                fontSize = 13.sp
+                                fontSize = 13.sp,
+                                fontFamily = spec.fontFamily
                             )
                             Text(
                                 text = "${theme.blurRadiusDp} dp",
                                 color = theme.accentColor,
                                 fontSize = 13.sp,
-                                fontFamily = FontFamily.Monospace,
+                                fontFamily = spec.fontFamily,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -601,11 +741,43 @@ fun ThemerScreen(
                             )
                         )
                     }
+
+                    // Glow Aura Intensity
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Outer Glow Aura Intensity",
+                                color = theme.textSecondaryColor,
+                                fontSize = 13.sp,
+                                fontFamily = spec.fontFamily
+                            )
+                            Text(
+                                text = "${(spec.glowIntensity * 100).toInt()}%",
+                                color = theme.accentColor,
+                                fontSize = 13.sp,
+                                fontFamily = spec.fontFamily,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Slider(
+                            value = spec.glowIntensity,
+                            onValueChange = { ThemeManager.updateGlowIntensity(it) },
+                            valueRange = 0f..1f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = theme.accentColor,
+                                activeTrackColor = theme.accentColor,
+                                inactiveTrackColor = theme.surfaceVariantColor
+                            )
+                        )
+                    }
                 }
             }
         }
 
-        // Section: OLED & Reset Actions
+        // Section: OLED Pure Black Mode
         item {
             Box(
                 modifier = Modifier
@@ -623,12 +795,14 @@ fun ThemerScreen(
                             text = "OLED Pure Black Mode",
                             color = theme.textPrimaryColor,
                             fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            fontFamily = spec.fontFamily
                         )
                         Text(
                             text = "Turns background #000000 to save battery",
                             color = theme.textSecondaryColor,
-                            fontSize = 11.sp
+                            fontSize = 11.sp,
+                            fontFamily = spec.fontFamily
                         )
                     }
                     Switch(
