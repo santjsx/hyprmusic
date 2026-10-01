@@ -71,8 +71,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -94,6 +94,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.example.hyprmusic.core.model.Album
 import com.example.hyprmusic.core.model.Artist
 import com.example.hyprmusic.core.model.PlaybackState
@@ -139,6 +141,7 @@ fun LibraryScreen(
     onAlbumCleared: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var currentScope by remember { mutableStateOf(LibraryScope.LOCAL) }
     var viewState by remember { mutableStateOf<LibraryViewState>(LibraryViewState.Main(LibraryFilter.TRACKS)) }
     var searchQuery by remember { mutableStateOf("") }
@@ -150,7 +153,7 @@ fun LibraryScreen(
         }
     }
 
-    val cloudTracks = telegramRepository?.cloudTracks?.collectAsState()?.value ?: emptyList()
+    val cloudTracks = telegramRepository?.cloudTracks?.collectAsStateWithLifecycle()?.value ?: emptyList()
 
     val coroutineScope = rememberCoroutineScope()
     val tracksListState = rememberLazyListState()
@@ -165,7 +168,7 @@ fun LibraryScreen(
                 .padding(horizontal = theme.windowGapsDp.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            LibraryScope.values().forEach { scope ->
+            LibraryScope.entries.forEach { scope ->
                 val isScopeActive = currentScope == scope
                 val count = if (scope == LibraryScope.LOCAL) tracks.size else cloudTracks.size
                 Box(
@@ -326,6 +329,7 @@ private fun MainLibraryView(
     onOpenAlbum: (Album) -> Unit,
     onOpenArtist: (Artist) -> Unit
 ) {
+    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var draggingLetter by remember { mutableStateOf<Char?>(null) }
 
@@ -497,7 +501,7 @@ private fun MainLibraryView(
                     .padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                LibraryFilter.values().forEach { filter ->
+                LibraryFilter.entries.forEach { filter ->
                     val isSelected = filter == activeFilter
                     Box(
                         modifier = Modifier
@@ -645,7 +649,8 @@ private fun MainLibraryView(
                                     ) {
                                         items(
                                             items = filteredArtists.take(10),
-                                            key = { it.id }
+                                            key = { it.id },
+                                            contentType = { "artist_chip" }
                                         ) { artist ->
                                             Box(
                                                 modifier = Modifier
@@ -692,7 +697,8 @@ private fun MainLibraryView(
                                     ) {
                                         items(
                                             items = filteredAlbums.take(10),
-                                            key = { it.id }
+                                            key = { it.id },
+                                            contentType = { "album_card" }
                                         ) { album ->
                                             Box(
                                                 modifier = Modifier
@@ -710,8 +716,18 @@ private fun MainLibraryView(
                                                         contentAlignment = Alignment.Center
                                                     ) {
                                                         if (!album.coverUri.isNullOrBlank()) {
+                                                            val albumReq = remember(album.coverUri) {
+                                                                ImageRequest.Builder(context)
+                                                                    .data(album.coverUri)
+                                                                    .size(240, 240)
+                                                                    .allowHardware(true)
+                                                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                                                    .crossfade(false)
+                                                                    .build()
+                                                            }
                                                             AsyncImage(
-                                                                model = album.coverUri,
+                                                                model = albumReq,
                                                                 contentDescription = null,
                                                                 modifier = Modifier.fillMaxSize(),
                                                                 contentScale = ContentScale.Crop
@@ -820,6 +836,7 @@ fun AlbumDetailView(
     onToggleFavorite: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val albumTracks = remember(allTracks, album) {
         allTracks.filter { it.album.equals(album.title, ignoreCase = true) }
     }
@@ -889,8 +906,18 @@ fun AlbumDetailView(
                     contentAlignment = Alignment.Center
                 ) {
                     if (!album.coverUri.isNullOrBlank()) {
+                        val albumCoverReq = remember(album.coverUri) {
+                            ImageRequest.Builder(context)
+                                .data(album.coverUri)
+                                .size(240, 240)
+                                .allowHardware(true)
+                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                .diskCachePolicy(CachePolicy.ENABLED)
+                                .crossfade(false)
+                                .build()
+                        }
                         AsyncImage(
-                            model = album.coverUri,
+                            model = albumCoverReq,
                             contentDescription = null,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
@@ -1330,6 +1357,7 @@ fun HyprTrackRow(
     onFavoriteClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -1357,8 +1385,18 @@ fun HyprTrackRow(
                         modifier = Modifier.size(24.dp)
                     )
                 } else if (!track.albumArtUri.isNullOrBlank()) {
+                    val trackReq = remember(track.albumArtUri) {
+                        ImageRequest.Builder(context)
+                            .data(track.albumArtUri)
+                            .size(120, 120)
+                            .allowHardware(true)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .crossfade(false)
+                            .build()
+                    }
                     AsyncImage(
-                        model = track.albumArtUri,
+                        model = trackReq,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
@@ -1445,6 +1483,7 @@ fun HyprAlbumCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -1462,8 +1501,18 @@ fun HyprAlbumCard(
                 contentAlignment = Alignment.Center
             ) {
                 if (!album.coverUri.isNullOrBlank()) {
+                    val albumCardReq = remember(album.coverUri) {
+                        ImageRequest.Builder(context)
+                            .data(album.coverUri)
+                            .size(260, 260)
+                            .allowHardware(true)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .crossfade(false)
+                            .build()
+                    }
                     AsyncImage(
-                        model = album.coverUri,
+                        model = albumCardReq,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
@@ -1621,14 +1670,14 @@ private fun CloudLibraryView(
     val coroutineScope = rememberCoroutineScope()
     var cloudSearchQuery by remember { mutableStateOf("") }
 
-    val cloudTracks = telegramRepository?.cloudTracks?.collectAsState()?.value ?: emptyList()
-    val isSyncing = telegramRepository?.isSyncing?.collectAsState()?.value ?: false
-    val isWaking = telegramRepository?.isWakingServer?.collectAsState()?.value ?: false
-    val serverHealth = telegramRepository?.serverHealth?.collectAsState()?.value
-    val syncError = telegramRepository?.syncError?.collectAsState()?.value
-    val downloadedTrackIds = telegramRepository?.downloadedTrackIds?.collectAsState()?.value ?: emptySet()
-    val downloadingProgress = telegramRepository?.downloadingProgress?.collectAsState()?.value ?: emptyMap()
-    val config = telegramRepository?.config?.settings?.collectAsState()?.value
+    val cloudTracks = telegramRepository?.cloudTracks?.collectAsStateWithLifecycle()?.value ?: emptyList()
+    val isSyncing = telegramRepository?.isSyncing?.collectAsStateWithLifecycle()?.value ?: false
+    val isWaking = telegramRepository?.isWakingServer?.collectAsStateWithLifecycle()?.value ?: false
+    val serverHealth = telegramRepository?.serverHealth?.collectAsStateWithLifecycle()?.value
+    val syncError = telegramRepository?.syncError?.collectAsStateWithLifecycle()?.value
+    val downloadedTrackIds = telegramRepository?.downloadedTrackIds?.collectAsStateWithLifecycle()?.value ?: emptySet()
+    val downloadingProgress = telegramRepository?.downloadingProgress?.collectAsStateWithLifecycle()?.value ?: emptyMap()
+    val config = telegramRepository?.config?.settings?.collectAsStateWithLifecycle()?.value
 
     val filteredCloudTracks = remember(cloudTracks, cloudSearchQuery) {
         val q = cloudSearchQuery.trim().lowercase()
@@ -1991,6 +2040,7 @@ private fun HyprCloudTrackRow(
     onDownloadClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -2018,8 +2068,18 @@ private fun HyprCloudTrackRow(
                         modifier = Modifier.size(24.dp)
                     )
                 } else if (!track.albumArtUri.isNullOrBlank()) {
+                    val cloudTrackReq = remember(track.albumArtUri) {
+                        ImageRequest.Builder(context)
+                            .data(track.albumArtUri)
+                            .size(120, 120)
+                            .allowHardware(true)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .crossfade(false)
+                            .build()
+                    }
                     AsyncImage(
-                        model = track.albumArtUri,
+                        model = cloudTrackReq,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop

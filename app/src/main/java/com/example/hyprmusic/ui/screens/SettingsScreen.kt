@@ -50,12 +50,12 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -93,18 +93,18 @@ fun SettingsScreen(
     val coroutineScope = rememberCoroutineScope()
     var showPrivacyPolicy by remember { mutableStateOf(false) }
 
-    val updateInfo by HyprUpdateManager.updateState.collectAsState()
-    val isCheckingUpdate by HyprUpdateManager.isChecking.collectAsState()
-    val downloadProgress by HyprUpdateManager.downloadProgress.collectAsState()
-    val downloadState by HyprUpdateManager.downloadState.collectAsState()
-    val eqEnabled by HyprEqualizer.isEnabled.collectAsState()
-    val eqPreset by HyprEqualizer.currentPreset.collectAsState()
+    val updateInfo by HyprUpdateManager.updateState.collectAsStateWithLifecycle()
+    val isCheckingUpdate by HyprUpdateManager.isChecking.collectAsStateWithLifecycle()
+    val downloadProgress by HyprUpdateManager.downloadProgress.collectAsStateWithLifecycle()
+    val downloadState by HyprUpdateManager.downloadState.collectAsStateWithLifecycle()
+    val eqEnabled by HyprEqualizer.isEnabled.collectAsStateWithLifecycle()
+    val eqPreset by HyprEqualizer.currentPreset.collectAsStateWithLifecycle()
 
-    val cloudSettings = telegramRepository?.config?.settings?.collectAsState()?.value
-    val isSyncingCloud = telegramRepository?.isSyncing?.collectAsState()?.value ?: false
-    val isWakingServer = telegramRepository?.isWakingServer?.collectAsState()?.value ?: false
-    val serverHealth = telegramRepository?.serverHealth?.collectAsState()?.value
-    val syncError = telegramRepository?.syncError?.collectAsState()?.value
+    val cloudSettings = telegramRepository?.config?.settings?.collectAsStateWithLifecycle()?.value
+    val isSyncingCloud = telegramRepository?.isSyncing?.collectAsStateWithLifecycle()?.value ?: false
+    val isWakingServer = telegramRepository?.isWakingServer?.collectAsStateWithLifecycle()?.value ?: false
+    val serverHealth = telegramRepository?.serverHealth?.collectAsStateWithLifecycle()?.value
+    val syncError = telegramRepository?.syncError?.collectAsStateWithLifecycle()?.value
 
     var serverHostInput by remember(cloudSettings?.serverUrl) {
         val currentUrl = cloudSettings?.serverUrl
@@ -266,7 +266,10 @@ fun SettingsScreen(
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(theme.windowGapsDp.dp)
                 ) {
-                    items(ThemePreset.values()) { preset ->
+                    items(
+                        items = ThemePreset.entries,
+                        key = { it.name }
+                    ) { preset ->
                         val isSelected = theme.preset == preset
                         val presetTheme = remember(preset) { ThemePresets.getPreset(preset) }
                         Box(

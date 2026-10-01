@@ -12,9 +12,11 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import androidx.compose.runtime.Immutable
 import java.io.File
 import java.util.UUID
 
+@Immutable
 @Serializable
 data class CustomPlaylist(
     val id: String = UUID.randomUUID().toString(),

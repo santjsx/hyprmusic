@@ -36,9 +36,9 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,11 +67,11 @@ fun EqualizerDialog(
     theme: HyprThemeConfig,
     onDismiss: () -> Unit
 ) {
-    val isEnabled by HyprEqualizer.isEnabled.collectAsState()
-    val bands by HyprEqualizer.bands.collectAsState()
-    val currentPreset by HyprEqualizer.currentPreset.collectAsState()
-    val bassBoost by HyprEqualizer.bassBoostStrength.collectAsState()
-    val virtualizer by HyprEqualizer.virtualizerStrength.collectAsState()
+    val isEnabled by HyprEqualizer.isEnabled.collectAsStateWithLifecycle()
+    val bands by HyprEqualizer.bands.collectAsStateWithLifecycle()
+    val currentPreset by HyprEqualizer.currentPreset.collectAsStateWithLifecycle()
+    val bassBoost by HyprEqualizer.bassBoostStrength.collectAsStateWithLifecycle()
+    val virtualizer by HyprEqualizer.virtualizerStrength.collectAsStateWithLifecycle()
 
     Dialog(
         onDismissRequest = onDismiss,

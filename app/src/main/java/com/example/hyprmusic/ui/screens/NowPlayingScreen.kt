@@ -66,13 +66,13 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -88,10 +88,13 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.example.hyprmusic.core.data.PlaylistRepository
 import com.example.hyprmusic.core.lyrics.LyricsRepository
 import com.example.hyprmusic.core.media.HyprAudioPlayer
@@ -105,9 +108,13 @@ import com.example.hyprmusic.core.theming.hyprAnimatedGlow
 import com.example.hyprmusic.core.theming.hyprBounceClick
 import com.example.hyprmusic.core.theming.hyprTile
 import com.example.hyprmusic.ui.components.AddToPlaylistDialog
+import com.example.hyprmusic.ui.components.AdaptivePlayButton
+import com.example.hyprmusic.ui.components.AdaptiveProgressBar
+import com.example.hyprmusic.ui.components.AdaptiveSkipButton
 import com.example.hyprmusic.ui.components.SleepTimerDialog
 import com.example.hyprmusic.ui.components.SyncedLyricsView
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -142,21 +149,29 @@ fun NowPlayingScreen(
         return
     }
 
+    val context = LocalContext.current
     val view = LocalView.current
     var showLyrics by remember { mutableStateOf(false) }
-    var isDraggingSlider by remember { mutableStateOf(false) }
-    var sliderDragPosition by remember { mutableFloatStateOf(0f) }
+
+    val ambientBlurEffect = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            RenderEffect.createBlurEffect(
+                80f, 80f, Shader.TileMode.CLAMP
+            ).asComposeRenderEffect()
+        } else null
+    }
 
     var lyricsState by remember { mutableStateOf<List<LyricLine>?>(null) }
     var isLyricsLoading by remember { mutableStateOf(false) }
     var lyricsRetryKey by remember { mutableIntStateOf(0) }
 
-    val sleepTimerState by HyprSleepTimer.timerState.collectAsState()
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
 
     // Fetch real lyrics from local storage (.lrc) or LRCLIB multi-search
     LaunchedEffect(track.id, lyricsRetryKey) {
+        // Yield to allow NowPlaying entry animation (slide-in) to complete smoothly without IO contention
+        delay(120)
         isLyricsLoading = true
         lyricsState = withContext(Dispatchers.IO) {
             LyricsRepository.fetchLyrics(track)
@@ -171,21 +186,27 @@ fun NowPlayingScreen(
     ) {
         // Ambient blurred album art backdrop
         if (!track.albumArtUri.isNullOrBlank()) {
+            val ambientReq = remember(track.albumArtUri) {
+                ImageRequest.Builder(context)
+                    .data(track.albumArtUri)
+                    .size(300, 300)
+                    .allowHardware(true)
+                    .memoryCachePolicy(CachePolicy.ENABLED)
+                    .diskCachePolicy(CachePolicy.ENABLED)
+                    .crossfade(false)
+                    .build()
+            }
             AsyncImage(
-                model = track.albumArtUri,
+                model = ambientReq,
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer { alpha = 0.22f }
-                    .then(
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            Modifier.graphicsLayer {
-                                renderEffect = RenderEffect.createBlurEffect(
-                                    80f, 80f, Shader.TileMode.CLAMP
-                                ).asComposeRenderEffect()
-                            }
-                        } else Modifier
-                    ),
+                    .graphicsLayer {
+                        alpha = 0.22f
+                        if (ambientBlurEffect != null) {
+                            renderEffect = ambientBlurEffect
+                        }
+                    },
                 contentScale = ContentScale.Crop
             )
         }
@@ -256,30 +277,13 @@ fun NowPlayingScreen(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (audioPlayer != null) {
-                        IconButton(
+                        SleepTimerButton(
+                            theme = theme,
                             onClick = {
                                 view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                                 showSleepTimerDialog = true
                             }
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Bedtime,
-                                    contentDescription = "Sleep Timer",
-                                    tint = if (sleepTimerState.isActive) theme.accentColor else theme.textSecondaryColor,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                if (sleepTimerState.isActive) {
-                                    Box(
-                                        modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .size(6.dp)
-                                            .clip(CircleShape)
-                                            .background(theme.accentColor)
-                                    )
-                                }
-                            }
-                        }
+                        )
                     }
 
                     if (playlistRepository != null) {
@@ -376,8 +380,18 @@ fun NowPlayingScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             if (!track.albumArtUri.isNullOrBlank()) {
+                                val centerpieceReq = remember(track.albumArtUri) {
+                                    ImageRequest.Builder(context)
+                                        .data(track.albumArtUri)
+                                        .size(800, 800)
+                                        .allowHardware(true)
+                                        .memoryCachePolicy(CachePolicy.ENABLED)
+                                        .diskCachePolicy(CachePolicy.ENABLED)
+                                        .crossfade(false)
+                                        .build()
+                                }
                                 AsyncImage(
-                                    model = track.albumArtUri,
+                                    model = centerpieceReq,
                                     contentDescription = track.title,
                                     modifier = Modifier.fillMaxSize(),
                                     contentScale = ContentScale.Crop
@@ -482,55 +496,14 @@ fun NowPlayingScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Seek Bar & Timers
-            Column(modifier = Modifier.fillMaxWidth()) {
-                val currentSliderValue = if (isDraggingSlider) sliderDragPosition else playbackState.progress
-
-                Slider(
-                    value = currentSliderValue,
-                    onValueChange = {
-                        isDraggingSlider = true
-                        sliderDragPosition = it
-                    },
-                    onValueChangeFinished = {
-                        val duration = playbackState.durationMs
-                        val targetMs = (sliderDragPosition * duration).toLong()
-                        onSeekTo(targetMs)
-                        isDraggingSlider = false
-                    },
-                    colors = SliderDefaults.colors(
-                        thumbColor = theme.accentColor,
-                        activeTrackColor = theme.accentColor,
-                        inactiveTrackColor = theme.surfaceVariantColor
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    val currentDisplaySec = if (isDraggingSlider) {
-                        ((sliderDragPosition * playbackState.durationMs) / 1000).toLong()
-                    } else {
-                        playbackState.currentPositionMs / 1000
-                    }
-                    val totalSec = playbackState.durationMs / 1000
-
-                    Text(
-                        text = "%d:%02d".format(currentDisplaySec / 60, currentDisplaySec % 60),
-                        color = theme.textSecondaryColor,
-                        fontSize = 11.5.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Text(
-                        text = "%d:%02d".format(totalSec / 60, totalSec % 60),
-                        color = theme.textSecondaryColor,
-                        fontSize = 11.5.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
+            // Seek Bar & Timers (Isolated composable prevents parent screen recomposition on playback ticks)
+            PlaybackProgressSection(
+                theme = theme,
+                currentPositionMs = playbackState.currentPositionMs,
+                durationMs = playbackState.durationMs,
+                progress = playbackState.progress,
+                onSeekTo = onSeekTo
+            )
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -556,55 +529,34 @@ fun NowPlayingScreen(
                 }
 
                 // Previous
-                IconButton(
+                AdaptiveSkipButton(
+                    isNext = false,
                     onClick = {
                         view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                         onSkipPrevious()
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipPrevious,
-                        contentDescription = "Previous",
-                        tint = theme.textPrimaryColor,
-                        modifier = Modifier.size(34.dp)
-                    )
-                }
+                    },
+                    size = 44.dp
+                )
 
-                // Play / Pause Hero Button with Spring Bounce Micro-interaction
-                Box(
-                    modifier = Modifier
-                        .size(68.dp)
-                        .clip(CircleShape)
-                        .background(theme.surfaceColor)
-                        .border(2.dp, theme.accentColor, CircleShape)
-                        .hyprBounceClick {
-                            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                            onPlayPause()
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = "Play/Pause",
-                        tint = theme.accentColor,
-                        modifier = Modifier.size(38.dp)
-                    )
-                }
+                // Play / Pause Hero Button with Adaptive Icon Pack
+                AdaptivePlayButton(
+                    isPlaying = playbackState.isPlaying,
+                    onClick = {
+                        view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                        onPlayPause()
+                    },
+                    size = 68.dp
+                )
 
                 // Next
-                IconButton(
+                AdaptiveSkipButton(
+                    isNext = true,
                     onClick = {
                         view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                         onSkipNext()
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipNext,
-                        contentDescription = "Next",
-                        tint = theme.textPrimaryColor,
-                        modifier = Modifier.size(34.dp)
-                    )
-                }
+                    },
+                    size = 44.dp
+                )
 
                 // Repeat Mode
                 IconButton(
@@ -694,38 +646,13 @@ fun NowPlayingScreen(
 
                 // Sleep Timer Action
                 if (audioPlayer != null) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (sleepTimerState.isActive) theme.accentColor.copy(alpha = 0.25f) else theme.surfaceVariantColor)
-                            .border(
-                                1.dp,
-                                if (sleepTimerState.isActive) theme.accentColor else theme.surfaceVariantColor,
-                                RoundedCornerShape(8.dp)
-                            )
-                            .hyprBounceClick {
-                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                                showSleepTimerDialog = true
-                            }
-                            .padding(horizontal = 12.dp, vertical = 7.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Bedtime,
-                                contentDescription = null,
-                                tint = if (sleepTimerState.isActive) theme.accentColor else theme.textSecondaryColor,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (sleepTimerState.isActive) "SLEEP ${sleepTimerState.formattedRemaining}" else "SLEEP TIMER",
-                                color = if (sleepTimerState.isActive) theme.accentColor else theme.textPrimaryColor,
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold
-                            )
+                    SleepTimerActionChip(
+                        theme = theme,
+                        onClick = {
+                            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                            showSleepTimerDialog = true
                         }
-                    }
+                    )
                 }
 
                 // Go to Album Action
@@ -820,7 +747,10 @@ fun AudiophileSpectrumVisualizer(
     isPlaying: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val amplitudes by HyprVisualizerState.amplitudes.collectAsState()
+    val amplitudes by HyprVisualizerState.amplitudes.collectAsStateWithLifecycle()
+    val gradientColors = remember(theme.accentColor) {
+        listOf(theme.accentColor, theme.accentColor.copy(alpha = 0.45f))
+    }
 
     Canvas(modifier = modifier) {
         val barCount = 16
@@ -843,10 +773,7 @@ fun AudiophileSpectrumVisualizer(
 
             drawRoundRect(
                 brush = Brush.verticalGradient(
-                    colors = listOf(
-                        theme.accentColor,
-                        theme.accentColor.copy(alpha = 0.45f)
-                    ),
+                    colors = gradientColors,
                     startY = top,
                     endY = top + barH
                 ),
@@ -1044,6 +971,104 @@ fun NowPlayingEmptyScreen(
             }
 
             Spacer(modifier = Modifier.weight(0.6f))
+        }
+    }
+}
+
+@Composable
+private fun SleepTimerButton(
+    theme: HyprThemeConfig,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val sleepTimerState by HyprSleepTimer.timerState.collectAsStateWithLifecycle()
+    val isActive = sleepTimerState.isActive
+    IconButton(
+        onClick = onClick,
+        modifier = modifier
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = Icons.Default.Bedtime,
+                contentDescription = "Sleep Timer",
+                tint = if (isActive) theme.accentColor else theme.textSecondaryColor,
+                modifier = Modifier.size(20.dp)
+            )
+            if (isActive) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(theme.accentColor)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaybackProgressSection(
+    theme: HyprThemeConfig,
+    currentPositionMs: Long,
+    durationMs: Long,
+    progress: Float,
+    onSeekTo: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val currentDisplaySec = currentPositionMs / 1000
+    val totalSec = durationMs / 1000
+    val elapsed = "%d:%02d".format(currentDisplaySec / 60, currentDisplaySec % 60)
+    val total = "%d:%02d".format(totalSec / 60, totalSec % 60)
+
+    AdaptiveProgressBar(
+        progressPercent = progress,
+        elapsed = elapsed,
+        total = total,
+        onSeekToPercent = { pct ->
+            val targetMs = (pct * durationMs).toLong().coerceIn(0L, durationMs)
+            onSeekTo(targetMs)
+        },
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun SleepTimerActionChip(
+    theme: HyprThemeConfig,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val sleepTimerState by HyprSleepTimer.timerState.collectAsStateWithLifecycle()
+    val isActive = sleepTimerState.isActive
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isActive) theme.accentColor.copy(alpha = 0.25f) else theme.surfaceVariantColor)
+            .border(
+                1.dp,
+                if (isActive) theme.accentColor else theme.surfaceVariantColor,
+                RoundedCornerShape(8.dp)
+            )
+            .hyprBounceClick(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Default.Bedtime,
+                contentDescription = null,
+                tint = if (isActive) theme.accentColor else theme.textSecondaryColor,
+                modifier = Modifier.size(15.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = if (isActive) "SLEEP ${sleepTimerState.formattedRemaining}" else "SLEEP TIMER",
+                color = if (isActive) theme.accentColor else theme.textPrimaryColor,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }

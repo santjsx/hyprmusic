@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -51,6 +52,7 @@ enum class ThemePreset(val displayName: String) {
     MONOKAI_PRO("Monokai Pro")
 }
 
+@Immutable
 data class HyprThemeConfig(
     val preset: ThemePreset = ThemePreset.TOKYO_NIGHT,
     val windowGapsDp: Int = 8,
@@ -214,7 +216,10 @@ val LocalHyprTheme = compositionLocalOf { ThemePresets.TokyoNight }
 
 object ThemeManager {
     private var prefs: SharedPreferences? = null
-    private val _themeConfig = MutableStateFlow(ThemePresets.TokyoNight)
+    private val _designSpec = MutableStateFlow(ThemeRegistry.TokyoNight)
+    val designSpec: StateFlow<HyprDesignSpec> = _designSpec.asStateFlow()
+
+    private val _themeConfig = MutableStateFlow(ThemeRegistry.TokyoNight.toLegacyConfig())
     val themeConfig: StateFlow<HyprThemeConfig> = _themeConfig.asStateFlow()
 
     fun init(context: Context) {
@@ -228,44 +233,88 @@ object ThemeManager {
             ThemePreset.TOKYO_NIGHT
         }
 
-        val base = ThemePresets.getPreset(preset)
-        val gaps = p.getInt("window_gaps", base.windowGapsDp)
-        val radius = p.getInt("border_radius", base.borderRadiusDp)
-        val thickness = p.getInt("border_thickness", base.borderThicknessDp)
-        val blur = p.getInt("blur_radius", base.blurRadiusDp)
-        val isOled = p.getBoolean("is_oled_mode", base.isOledMode)
+        val baseSpec = ThemeRegistry.getSpec(preset)
+        val gaps = p.getInt("window_gaps", baseSpec.elementGap.value.toInt())
+        val radius = p.getInt("border_radius", baseSpec.cornerRadius.value.toInt())
+        val thickness = p.getInt("border_thickness", baseSpec.borderThickness.value.toInt())
+        val blur = p.getInt("blur_radius", baseSpec.blurRadiusDp)
+        val isOled = p.getBoolean("is_oled_mode", baseSpec.isOledMode)
 
-        val resolved = base.copy(
-            windowGapsDp = gaps,
-            borderRadiusDp = radius,
-            borderThicknessDp = thickness,
+        val savedIconPack = p.getString("icon_pack", baseSpec.iconPack.name)?.let {
+            try { IconPackType.valueOf(it) } catch (_: Exception) { baseSpec.iconPack }
+        } ?: baseSpec.iconPack
+
+        val savedProgressStyle = p.getString("progress_style", baseSpec.progressStyle.name)?.let {
+            try { ProgressBarStyle.valueOf(it) } catch (_: Exception) { baseSpec.progressStyle }
+        } ?: baseSpec.progressStyle
+
+        val savedGridStyle = p.getString("grid_style", baseSpec.gridStyle.name)?.let {
+            try { GridLayoutStyle.valueOf(it) } catch (_: Exception) { baseSpec.gridStyle }
+        } ?: baseSpec.gridStyle
+
+        val savedFontType = p.getString("font_type", baseSpec.fontType.name)?.let {
+            try { HyprFontType.valueOf(it) } catch (_: Exception) { baseSpec.fontType }
+        } ?: baseSpec.fontType
+
+        val resolvedSpec = baseSpec.copy(
+            elementGap = gaps.dp,
+            cornerRadius = radius.dp,
+            borderThickness = thickness.dp,
             blurRadiusDp = blur,
             isOledMode = isOled,
-            backgroundColor = if (isOled) Color(0xFF000000) else base.backgroundColor,
-            surfaceColor = if (isOled) Color(0xEE0A0A0A) else base.surfaceColor
+            bg = if (isOled) Color(0xFF000000) else baseSpec.bg,
+            surface = if (isOled) Color(0xEE0A0A0A) else baseSpec.surface,
+            iconPack = savedIconPack,
+            progressStyle = savedProgressStyle,
+            gridStyle = savedGridStyle,
+            fontType = savedFontType,
+            fontFamily = savedFontType.fontFamily
         )
 
-        _themeConfig.value = resolved
+        _designSpec.value = resolvedSpec
+        _themeConfig.value = resolvedSpec.toLegacyConfig()
     }
 
     fun setPreset(preset: ThemePreset) {
-        val base = ThemePresets.getPreset(preset)
-        val current = _themeConfig.value
-        val updated = base.copy(
-            windowGapsDp = current.windowGapsDp,
-            borderRadiusDp = current.borderRadiusDp,
-            borderThicknessDp = current.borderThicknessDp,
-            blurRadiusDp = current.blurRadiusDp,
-            isOledMode = current.isOledMode,
-            backgroundColor = if (current.isOledMode) Color(0xFF000000) else base.backgroundColor,
-            surfaceColor = if (current.isOledMode) Color(0xEE0A0A0A) else base.surfaceColor
+        val baseSpec = ThemeRegistry.getSpec(preset)
+        val currentSpec = _designSpec.value
+        val updatedSpec = baseSpec.copy(
+            elementGap = currentSpec.elementGap,
+            cornerRadius = currentSpec.cornerRadius,
+            borderThickness = currentSpec.borderThickness,
+            blurRadiusDp = currentSpec.blurRadiusDp,
+            isOledMode = currentSpec.isOledMode,
+            bg = if (currentSpec.isOledMode) Color(0xFF000000) else baseSpec.bg,
+            surface = if (currentSpec.isOledMode) Color(0xEE0A0A0A) else baseSpec.surface
         )
-        _themeConfig.value = updated
+        _designSpec.value = updatedSpec
+        _themeConfig.value = updatedSpec.toLegacyConfig()
         prefs?.edit()?.putString("theme_preset", preset.name)?.apply()
+    }
+
+    fun updateIconPack(pack: IconPackType) {
+        _designSpec.update { it.copy(iconPack = pack) }
+        prefs?.edit()?.putString("icon_pack", pack.name)?.apply()
+    }
+
+    fun updateProgressStyle(style: ProgressBarStyle) {
+        _designSpec.update { it.copy(progressStyle = style) }
+        prefs?.edit()?.putString("progress_style", style.name)?.apply()
+    }
+
+    fun updateGridStyle(gridStyle: GridLayoutStyle) {
+        _designSpec.update { it.copy(gridStyle = gridStyle) }
+        prefs?.edit()?.putString("grid_style", gridStyle.name)?.apply()
+    }
+
+    fun updateFontType(fontType: HyprFontType) {
+        _designSpec.update { it.copy(fontType = fontType, fontFamily = fontType.fontFamily) }
+        prefs?.edit()?.putString("font_type", fontType.name)?.apply()
     }
 
     fun updateGaps(gapsDp: Int) {
         val safeGaps = gapsDp.coerceIn(0, 24)
+        _designSpec.update { it.copy(elementGap = safeGaps.dp) }
         _themeConfig.update { it.copy(windowGapsDp = safeGaps) }
         prefs?.edit()?.putInt("window_gaps", safeGaps)?.apply()
     }
@@ -274,6 +323,7 @@ object ThemeManager {
 
     fun updateRadius(radiusDp: Int) {
         val safeRadius = radiusDp.coerceIn(0, 28)
+        _designSpec.update { it.copy(cornerRadius = safeRadius.dp) }
         _themeConfig.update { it.copy(borderRadiusDp = safeRadius) }
         prefs?.edit()?.putInt("border_radius", safeRadius)?.apply()
     }
@@ -282,33 +332,36 @@ object ThemeManager {
 
     fun updateBorderThickness(thicknessDp: Int) {
         val safeThickness = thicknessDp.coerceIn(1, 6)
+        _designSpec.update { it.copy(borderThickness = safeThickness.dp) }
         _themeConfig.update { it.copy(borderThicknessDp = safeThickness) }
         prefs?.edit()?.putInt("border_thickness", safeThickness)?.apply()
     }
 
     fun updateBlur(blurDp: Int) {
         val safeBlur = blurDp.coerceIn(0, 40)
+        _designSpec.update { it.copy(blurRadiusDp = safeBlur) }
         _themeConfig.update { it.copy(blurRadiusDp = safeBlur) }
         prefs?.edit()?.putInt("blur_radius", safeBlur)?.apply()
     }
 
     fun toggleOled(enabled: Boolean) {
-        _themeConfig.update {
-            val base = ThemePresets.getPreset(it.preset)
+        _designSpec.update {
+            val base = ThemeRegistry.getSpec(it.preset)
             if (enabled) {
                 it.copy(
                     isOledMode = true,
-                    backgroundColor = Color(0xFF000000),
-                    surfaceColor = Color(0xEE0A0A0A)
+                    bg = Color(0xFF000000),
+                    surface = Color(0xEE0A0A0A)
                 )
             } else {
                 it.copy(
                     isOledMode = false,
-                    backgroundColor = base.backgroundColor,
-                    surfaceColor = base.surfaceColor
+                    bg = base.bg,
+                    surface = base.surface
                 )
             }
         }
+        _themeConfig.value = _designSpec.value.toLegacyConfig()
         prefs?.edit()?.putBoolean("is_oled_mode", enabled)?.apply()
     }
 }
@@ -407,10 +460,14 @@ fun Modifier.hyprBounceClick(
 
 @Composable
 fun HyprThemeProvider(
+    designSpec: HyprDesignSpec = ThemeManager.designSpec.value,
     themeConfig: HyprThemeConfig = ThemeManager.themeConfig.value,
     content: @Composable () -> Unit
 ) {
-    CompositionLocalProvider(LocalHyprTheme provides themeConfig) {
+    CompositionLocalProvider(
+        LocalHyprDesign provides designSpec,
+        LocalHyprTheme provides themeConfig
+    ) {
         content()
     }
 }

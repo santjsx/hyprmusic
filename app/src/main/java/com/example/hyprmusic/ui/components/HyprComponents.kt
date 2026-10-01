@@ -18,6 +18,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,6 +50,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -56,13 +58,19 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import com.example.hyprmusic.core.theming.GridLayoutStyle
+import com.example.hyprmusic.core.theming.HyprTheme
+import com.example.hyprmusic.core.theming.IconPackType
+import com.example.hyprmusic.core.theming.ProgressBarStyle
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -75,6 +83,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
@@ -83,6 +92,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.example.hyprmusic.core.media.HyprVisualizerState
 import com.example.hyprmusic.core.model.LyricLine
 import com.example.hyprmusic.core.model.PlaybackState
@@ -213,7 +224,7 @@ fun HyprBottomDock(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            HyprWorkspace.values().forEach { ws ->
+            HyprWorkspace.entries.forEach { ws ->
                 val isActive = ws == currentWorkspace
                 val icon = when (ws) {
                     HyprWorkspace.HOME -> Icons.Default.Home
@@ -363,7 +374,7 @@ fun MiniEqualizerBars(
         return
     }
 
-    val amplitudes by HyprVisualizerState.amplitudes.collectAsState()
+    val amplitudes by HyprVisualizerState.amplitudes.collectAsStateWithLifecycle()
 
     Canvas(modifier = modifier.size(width = 13.dp, height = 14.dp)) {
         val barW = 2.5.dp.toPx()
@@ -380,17 +391,25 @@ fun MiniEqualizerBars(
         val h2 = (minH + raw2 * (maxH - minH)).coerceIn(minH, maxH)
         val h3 = (minH + raw3 * (maxH - minH)).coerceIn(minH, maxH)
 
-        val heights = floatArrayOf(h1, h2, h3)
-        for (i in 0..2) {
-            val h = heights[i]
-            val top = maxH - h
-            drawRoundRect(
-                color = theme.accentColor,
-                topLeft = Offset(i * (barW + spacing), top),
-                size = Size(barW, h),
-                cornerRadius = corner
-            )
-        }
+        val accent = theme.accentColor
+        drawRoundRect(
+            color = accent,
+            topLeft = Offset(0f, maxH - h1),
+            size = Size(barW, h1),
+            cornerRadius = corner
+        )
+        drawRoundRect(
+            color = accent,
+            topLeft = Offset(barW + spacing, maxH - h2),
+            size = Size(barW, h2),
+            cornerRadius = corner
+        )
+        drawRoundRect(
+            color = accent,
+            topLeft = Offset(2f * (barW + spacing), maxH - h3),
+            size = Size(barW, h3),
+            cornerRadius = corner
+        )
     }
 }
 
@@ -457,8 +476,19 @@ fun MiniPlayer(
                     contentAlignment = Alignment.Center
                 ) {
                     if (!track.albumArtUri.isNullOrBlank()) {
+                        val context = LocalContext.current
+                        val miniPlayerReq = remember(track.albumArtUri) {
+                            ImageRequest.Builder(context)
+                                .data(track.albumArtUri)
+                                .size(140, 140)
+                                .allowHardware(true)
+                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                .diskCachePolicy(CachePolicy.ENABLED)
+                                .crossfade(false)
+                                .build()
+                        }
                         AsyncImage(
-                            model = track.albumArtUri,
+                            model = miniPlayerReq,
                             contentDescription = track.title,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
@@ -728,7 +758,11 @@ fun SyncedLyricsView(
         return
     }
 
-    val activeIndex = lyrics.indexOfLast { it.timestampMs <= currentPositionMs }.coerceAtLeast(0)
+    val activeIndex = remember(lyrics, currentPositionMs) {
+        val searchIdx = lyrics.binarySearchBy(currentPositionMs) { it.timestampMs }
+        val idx = if (searchIdx >= 0) searchIdx else (-searchIdx - 2).coerceAtLeast(0)
+        idx.coerceIn(0, (lyrics.size - 1).coerceAtLeast(0))
+    }
     val listState = rememberLazyListState()
 
     LaunchedEffect(activeIndex) {
@@ -750,24 +784,337 @@ fun SyncedLyricsView(
             items = lyrics,
             key = { index, item -> "$index-${item.timestampMs}" }
         ) { index, line ->
-            val isActive = index == activeIndex
+            LyricLineItem(
+                theme = theme,
+                line = line,
+                isActive = index == activeIndex,
+                onSeekTo = onSeekTo
+            )
+        }
 
-            Column(
-                modifier = Modifier
+        item { Spacer(modifier = Modifier.height(100.dp)) }
+    }
+}
+
+@Composable
+private fun LyricLineItem(
+    theme: HyprThemeConfig,
+    line: LyricLine,
+    isActive: Boolean,
+    onSeekTo: (Long) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onSeekTo(line.timestampMs) }
+            .padding(vertical = 4.dp)
+    ) {
+        Text(
+            text = line.text,
+            color = if (isActive) theme.accentColor else theme.textSecondaryColor.copy(alpha = 0.45f),
+            fontSize = if (isActive) 19.sp else 15.sp,
+            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+            fontFamily = if (isActive) FontFamily.Default else FontFamily.Monospace
+        )
+    }
+}
+
+/**
+ * Structurally adaptive progress tracker that inspects HyprTheme.spec.progressStyle:
+ * - BLOCKS_SHELL: Terminal command-line ASCII blocks (e.g. ⚡ [████████░░░░░░░] 02:14 / 04:30) with touch scrub seeking
+ * - MINIMAL_WAYBAR: Ultra-clean minimal 4dp floating line track with timestamps
+ * - DYNAMIC_NEON: Audio-reactive neon gradient seek slider with dynamic glow
+ */
+@Composable
+fun AdaptiveProgressBar(
+    progressPercent: Float,
+    elapsed: String,
+    total: String,
+    onSeekToPercent: ((Float) -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    val spec = HyprTheme.spec
+    val safePercent = progressPercent.coerceIn(0f, 1f)
+
+    when (spec.progressStyle) {
+        ProgressBarStyle.BLOCKS_SHELL -> {
+            // Retro CLI ASCII block string with pointerInput touch scrub seeking
+            val totalBlocks = 18
+            val filled = (safePercent * totalBlocks).toInt().coerceIn(0, totalBlocks)
+            val bar = "█".repeat(filled) + "░".repeat(totalBlocks - filled)
+
+            Box(
+                modifier = modifier
                     .fillMaxWidth()
-                    .clickable { onSeekTo(line.timestampMs) }
-                    .padding(vertical = 4.dp)
+                    .clip(RoundedCornerShape(spec.cornerRadius))
+                    .background(spec.surfaceVariant)
+                    .border(1.dp, spec.borderActive.copy(alpha = 0.35f), RoundedCornerShape(spec.cornerRadius))
+                    .then(
+                        if (onSeekToPercent != null) {
+                            Modifier
+                                .pointerInput(Unit) {
+                                    detectHorizontalDragGestures { change, _ ->
+                                        val newPercent = (change.position.x / size.width).coerceIn(0f, 1f)
+                                        onSeekToPercent(newPercent)
+                                    }
+                                }
+                                .pointerInput(Unit) {
+                                    detectTapGestures { offset ->
+                                        val newPercent = (offset.x / size.width).coerceIn(0f, 1f)
+                                        onSeekToPercent(newPercent)
+                                    }
+                                }
+                        } else Modifier
+                    )
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "⚡ [$bar]",
+                        fontFamily = spec.fontFamily,
+                        color = spec.borderActive,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = "$elapsed / $total",
+                        fontFamily = spec.fontFamily,
+                        color = spec.textPrimary,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        ProgressBarStyle.MINIMAL_WAYBAR -> {
+            // Catppuccin / Nordic minimalist waybar linear progress track
+            Column(
+                modifier = modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(spec.cornerRadius))
+                        .then(
+                            if (onSeekToPercent != null) {
+                                Modifier
+                                    .pointerInput(Unit) {
+                                        detectHorizontalDragGestures { change, _ ->
+                                            val newPercent = (change.position.x / size.width).coerceIn(0f, 1f)
+                                            onSeekToPercent(newPercent)
+                                        }
+                                    }
+                                    .pointerInput(Unit) {
+                                        detectTapGestures { offset ->
+                                            val newPercent = (offset.x / size.width).coerceIn(0f, 1f)
+                                            onSeekToPercent(newPercent)
+                                        }
+                                    }
+                            } else Modifier
+                        ),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    LinearProgressIndicator(
+                        progress = { safePercent },
+                        color = spec.borderActive,
+                        trackColor = spec.borderInactive,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(spec.cornerRadius))
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = elapsed,
+                        fontFamily = spec.fontFamily,
+                        color = spec.textSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = total,
+                        fontFamily = spec.fontFamily,
+                        color = spec.textSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        ProgressBarStyle.DYNAMIC_NEON -> {
+            // Glowing neon slider with live scrub feedback
+            Column(
+                modifier = modifier.fillMaxWidth()
+            ) {
+                Slider(
+                    value = safePercent,
+                    onValueChange = { onSeekToPercent?.invoke(it) },
+                    colors = SliderDefaults.colors(
+                        thumbColor = spec.borderActive,
+                        activeTrackColor = spec.borderActive,
+                        inactiveTrackColor = spec.borderInactive
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(24.dp)
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = elapsed,
+                        fontFamily = spec.fontFamily,
+                        color = spec.borderActive,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = total,
+                        fontFamily = spec.fontFamily,
+                        color = spec.textSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Structurally adaptive play/pause control button inspecting HyprTheme.spec.iconPack:
+ * - NERD_FONTS_ASCII: Pure ASCII / terminal text glyphs [ ▶ ] / [ ⏸ ]
+ * - PHOSPHOR_LINE: Smooth thin line vector outlines
+ * - ARCH_OUTLINE: Geometric arch minimalist vectors
+ */
+@Composable
+fun AdaptivePlayButton(
+    isPlaying: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: androidx.compose.ui.unit.Dp = 48.dp
+) {
+    val spec = HyprTheme.spec
+
+    when (spec.iconPack) {
+        IconPackType.NERD_FONTS_ASCII -> {
+            Box(
+                modifier = modifier
+                    .size(size)
+                    .clip(RoundedCornerShape(spec.cornerRadius))
+                    .background(spec.surfaceVariant)
+                    .border(spec.borderThickness, spec.borderActive, RoundedCornerShape(spec.cornerRadius))
+                    .clickable(onClick = onClick),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = line.text,
-                    color = if (isActive) theme.accentColor else theme.textSecondaryColor.copy(alpha = 0.45f),
-                    fontSize = if (isActive) 19.sp else 15.sp,
-                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                    fontFamily = if (isActive) FontFamily.Default else FontFamily.Monospace
+                    text = if (isPlaying) "[ ⏸ ]" else "[ ▶ ]",
+                    fontFamily = spec.fontFamily,
+                    color = spec.borderActive,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
                 )
             }
         }
 
-        item { Spacer(modifier = Modifier.height(100.dp)) }
+        IconPackType.PHOSPHOR_LINE -> {
+            IconButton(
+                onClick = onClick,
+                modifier = modifier
+                    .size(size)
+                    .clip(CircleShape)
+                    .background(spec.surfaceVariant)
+                    .border(spec.borderThickness, spec.borderActive.copy(alpha = 0.5f), CircleShape)
+            ) {
+                Icon(
+                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    tint = spec.borderActive,
+                    modifier = Modifier.size(size * 0.55f)
+                )
+            }
+        }
+
+        IconPackType.ARCH_OUTLINE -> {
+            Box(
+                modifier = modifier
+                    .size(size)
+                    .clip(RoundedCornerShape(spec.cornerRadius))
+                    .background(spec.borderActive)
+                    .clickable(onClick = onClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    tint = spec.bg,
+                    modifier = Modifier.size(size * 0.55f)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Structurally adaptive skip next/previous control button inspecting HyprTheme.spec.iconPack.
+ */
+@Composable
+fun AdaptiveSkipButton(
+    isNext: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: androidx.compose.ui.unit.Dp = 36.dp
+) {
+    val spec = HyprTheme.spec
+
+    when (spec.iconPack) {
+        IconPackType.NERD_FONTS_ASCII -> {
+            Box(
+                modifier = modifier
+                    .size(size)
+                    .clip(RoundedCornerShape(spec.cornerRadius))
+                    .background(spec.surfaceVariant)
+                    .border(1.dp, spec.borderInactive, RoundedCornerShape(spec.cornerRadius))
+                    .clickable(onClick = onClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (isNext) ">>" else "<<",
+                    fontFamily = spec.fontFamily,
+                    color = spec.textPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
+                )
+            }
+        }
+
+        IconPackType.PHOSPHOR_LINE, IconPackType.ARCH_OUTLINE -> {
+            IconButton(
+                onClick = onClick,
+                modifier = modifier.size(size)
+            ) {
+                Icon(
+                    imageVector = if (isNext) Icons.Default.SkipNext else Icons.Default.SkipPrevious,
+                    contentDescription = if (isNext) "Next" else "Previous",
+                    tint = spec.textPrimary,
+                    modifier = Modifier.size(size * 0.7f)
+                )
+            }
+        }
     }
 }

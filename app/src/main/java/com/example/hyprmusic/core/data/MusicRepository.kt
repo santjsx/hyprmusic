@@ -11,11 +11,14 @@ import com.example.hyprmusic.core.model.Track
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -38,24 +41,43 @@ class MusicRepository(private val context: Context) {
     }
 
     private val cacheFile = File(context.filesDir, "tracks_cache.json")
+    private val hasCacheOnDisk = cacheFile.exists() && cacheFile.length() > 0
 
-    // Load disk cache synchronously on initialization to eliminate startup screen flash
-    private val initialCachedTracks: List<Track> = loadCachedTracksFromDisk()
-
-    private val _hasInitialScanCompleted = MutableStateFlow(initialCachedTracks.isNotEmpty())
+    private val _hasInitialScanCompleted = MutableStateFlow(hasCacheOnDisk)
     val hasInitialScanCompleted: StateFlow<Boolean> = _hasInitialScanCompleted.asStateFlow()
 
-    private val _tracks = MutableStateFlow<List<Track>>(initialCachedTracks)
+    private val _tracks = MutableStateFlow<List<Track>>(emptyList())
     val tracks: StateFlow<List<Track>> = _tracks.asStateFlow()
 
-    private val _albums = MutableStateFlow<List<Album>>(aggregateAlbums(initialCachedTracks))
+    private val _albums = MutableStateFlow<List<Album>>(emptyList())
     val albums: StateFlow<List<Album>> = _albums.asStateFlow()
 
-    private val _artists = MutableStateFlow<List<Artist>>(aggregateArtists(initialCachedTracks))
+    private val _artists = MutableStateFlow<List<Artist>>(emptyList())
     val artists: StateFlow<List<Artist>> = _artists.asStateFlow()
 
-    private val _isScanning = MutableStateFlow(false)
+    private val _isScanning = MutableStateFlow(hasCacheOnDisk)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
+
+    init {
+        if (hasCacheOnDisk) {
+            repositoryScope.launch(Dispatchers.IO) {
+                try {
+                    val cached = loadCachedTracksFromDisk()
+                    if (cached.isNotEmpty()) {
+                        val alb = withContext(Dispatchers.Default) { aggregateAlbums(cached) }
+                        val art = withContext(Dispatchers.Default) { aggregateArtists(cached) }
+                        _tracks.value = cached
+                        _albums.value = alb
+                        _artists.value = art
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    _isScanning.value = false
+                }
+            }
+        }
+    }
 
     private fun loadCachedTracksFromDisk(): List<Track> {
         return try {
@@ -108,8 +130,7 @@ class MusicRepository(private val context: Context) {
             }
     }
 
-    suspend fun scanLocalMedia() = withContext(Dispatchers.IO) {
-        _isScanning.value = true
+    fun fetchLocalSongs(): Flow<List<Track>> = flow {
         val localTracks = mutableListOf<Track>()
 
         val projection = mutableListOf(
@@ -236,20 +257,32 @@ class MusicRepository(private val context: Context) {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+        emit(localTracks)
+    }.flowOn(Dispatchers.IO)
 
-        // Real tracks only: no mock data fallback!
-        // Prevent wiping cached library if a scan was empty due to delayed permission grant
-        if (localTracks.isNotEmpty() || initialCachedTracks.isEmpty()) {
-            _tracks.value = localTracks
-            _albums.value = aggregateAlbums(localTracks)
-            _artists.value = aggregateArtists(localTracks)
-            if (localTracks.isNotEmpty()) {
-                saveTracksToDisk(localTracks)
+    suspend fun scanLocalMedia() = withContext(Dispatchers.IO) {
+        _isScanning.value = true
+        try {
+            fetchLocalSongs().collect { localTracks ->
+                // Real tracks only: no mock data fallback!
+                // Prevent wiping cached library if a scan was empty due to delayed permission grant
+                if (localTracks.isNotEmpty() || _tracks.value.isEmpty()) {
+                    val alb = withContext(Dispatchers.Default) { aggregateAlbums(localTracks) }
+                    val art = withContext(Dispatchers.Default) { aggregateArtists(localTracks) }
+                    _tracks.value = localTracks
+                    _albums.value = alb
+                    _artists.value = art
+                    if (localTracks.isNotEmpty()) {
+                        saveTracksToDisk(localTracks)
+                    }
+                }
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            _hasInitialScanCompleted.value = true
+            _isScanning.value = false
         }
-
-        _hasInitialScanCompleted.value = true
-        _isScanning.value = false
     }
 
     fun toggleFavorite(trackId: String): Boolean {

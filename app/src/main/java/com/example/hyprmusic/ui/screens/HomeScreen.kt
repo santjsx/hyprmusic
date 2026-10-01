@@ -40,15 +40,24 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.example.hyprmusic.core.model.PlaybackState
 import com.example.hyprmusic.core.model.Track
 import com.example.hyprmusic.core.theming.HyprThemeConfig
 import com.example.hyprmusic.core.theming.hyprAnimatedGlow
 import com.example.hyprmusic.core.theming.hyprBounceClick
 import com.example.hyprmusic.core.theming.hyprTile
+
+import androidx.compose.foundation.lazy.itemsIndexed
+import com.example.hyprmusic.core.theming.GridLayoutStyle
+import com.example.hyprmusic.core.theming.HyprTheme
+import com.example.hyprmusic.ui.components.AdaptivePlayButton
 
 @Composable
 fun HomeScreen(
@@ -64,6 +73,7 @@ fun HomeScreen(
     onRescan: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     if (tracks.isEmpty()) {
         Box(
             modifier = modifier
@@ -166,6 +176,21 @@ fun HomeScreen(
         return
     }
 
+    val spec = HyprTheme.spec
+    if (spec.gridStyle == GridLayoutStyle.TIGHT_TERMINAL_ROWS) {
+        TerminalRowsHomeScreen(
+            theme = theme,
+            playbackState = playbackState,
+            tracks = tracks,
+            onTrackSelected = onTrackSelected,
+            onTogglePlayPause = onTogglePlayPause,
+            onRandomMix = onRandomMix,
+            onRescan = onRescan,
+            modifier = modifier
+        )
+        return
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -198,8 +223,18 @@ fun HomeScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         if (currentTrack?.albumArtUri != null) {
+                            val heroReq = remember(currentTrack.albumArtUri) {
+                                ImageRequest.Builder(context)
+                                    .data(currentTrack.albumArtUri)
+                                    .size(200, 200)
+                                    .allowHardware(true)
+                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                    .crossfade(false)
+                                    .build()
+                            }
                             AsyncImage(
-                                model = currentTrack.albumArtUri,
+                                model = heroReq,
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
@@ -251,20 +286,11 @@ fun HomeScreen(
                         )
                     }
 
-                    IconButton(
+                    AdaptivePlayButton(
+                        isPlaying = playbackState.isPlaying,
                         onClick = onTogglePlayPause,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(theme.surfaceVariantColor)
-                    ) {
-                        Icon(
-                            imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = "Play/Pause",
-                            tint = theme.accentColor,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
+                        size = 46.dp
+                    )
                 }
             }
         }
@@ -390,8 +416,18 @@ fun HomeScreen(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         if (track.albumArtUri != null) {
+                                            val hrReq = remember(track.albumArtUri) {
+                                                ImageRequest.Builder(context)
+                                                    .data(track.albumArtUri)
+                                                    .size(260, 260)
+                                                    .allowHardware(true)
+                                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                                    .crossfade(false)
+                                                    .build()
+                                            }
                                             AsyncImage(
-                                                model = track.albumArtUri,
+                                                model = hrReq,
                                                 contentDescription = null,
                                                 modifier = Modifier.fillMaxSize(),
                                                 contentScale = ContentScale.Crop
@@ -472,6 +508,7 @@ fun HomeTrackRowItem(
     isCurrent: Boolean,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -491,8 +528,18 @@ fun HomeTrackRowItem(
                 contentAlignment = Alignment.Center
             ) {
                 if (track.albumArtUri != null) {
+                    val rowReq = remember(track.albumArtUri) {
+                        ImageRequest.Builder(context)
+                            .data(track.albumArtUri)
+                            .size(130, 130)
+                            .allowHardware(true)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .crossfade(false)
+                            .build()
+                    }
                     AsyncImage(
-                        model = track.albumArtUri,
+                        model = rowReq,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
@@ -540,3 +587,259 @@ fun HomeTrackRowItem(
         }
     }
 }
+
+@Composable
+private fun TerminalRowsHomeScreen(
+    theme: HyprThemeConfig,
+    playbackState: PlaybackState,
+    tracks: List<Track>,
+    onTrackSelected: (Track, List<Track>) -> Unit,
+    onTogglePlayPause: () -> Unit,
+    onRandomMix: () -> Unit,
+    onRescan: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val spec = HyprTheme.spec
+    val currentTrack = playbackState.currentTrack
+
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = spec.gaps),
+        verticalArrangement = Arrangement.spacedBy(spec.gaps.coerceAtMost(8.dp))
+    ) {
+        // CLI Header Banner
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(spec.cornerRadius))
+                    .background(spec.surface)
+                    .border(spec.borderThickness, spec.borderInactive, RoundedCornerShape(spec.cornerRadius))
+                    .padding(12.dp)
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "$ hyprctl audio get-sink-status",
+                            fontFamily = spec.fontFamily,
+                            color = spec.borderActive,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(if (playbackState.isPlaying) spec.borderActive else spec.surfaceVariant)
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = if (playbackState.isPlaying) "BUFFER: ACTIVE" else "BUFFER: IDLE",
+                                fontFamily = spec.fontFamily,
+                                color = if (playbackState.isPlaying) spec.bg else spec.textSecondary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "[ CLI CONSOLE // TOTAL STREAMS: ${tracks.size} // SINK: PCM_16BIT ]",
+                        fontFamily = spec.fontFamily,
+                        color = spec.textSecondary,
+                        fontSize = 11.sp
+                    )
+
+                    if (currentTrack != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "CUED: ${currentTrack.artist} - ${currentTrack.title}",
+                            fontFamily = spec.fontFamily,
+                            color = spec.textPrimary,
+                            fontSize = 11.5.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Quick terminal actions row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(spec.surfaceVariant)
+                                .border(1.dp, spec.borderActive, RoundedCornerShape(4.dp))
+                                .clickable { onTogglePlayPause() }
+                                .padding(vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (playbackState.isPlaying) "[ $ PAUSE ]" else "[ $ PLAY ]",
+                                fontFamily = spec.fontFamily,
+                                color = spec.borderActive,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(spec.surfaceVariant)
+                                .border(1.dp, spec.borderInactive, RoundedCornerShape(4.dp))
+                                .clickable { onRandomMix() }
+                                .padding(vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "[ $ SHUF ]",
+                                fontFamily = spec.fontFamily,
+                                color = spec.textPrimary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(spec.surfaceVariant)
+                                .border(1.dp, spec.borderInactive, RoundedCornerShape(4.dp))
+                                .clickable { onRescan() }
+                                .padding(vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "[ $ RESCAN ]",
+                                fontFamily = spec.fontFamily,
+                                color = spec.textSecondary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Section label
+        item {
+            Text(
+                text = "INDEXED STREAMS [CLI TABLE FORMAT]",
+                fontFamily = spec.fontFamily,
+                color = spec.textSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+            )
+        }
+
+        // CLI Table Rows
+        itemsIndexed(
+            items = tracks,
+            key = { _, it -> "cli_${it.id}" },
+            contentType = { _, _ -> "cli_track_row" }
+        ) { index, track ->
+            val isCurrent = currentTrack?.id == track.id
+            val isPlaying = isCurrent && playbackState.isPlaying
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(spec.cornerRadius.coerceAtMost(6.dp)))
+                    .background(if (isCurrent) spec.borderActive.copy(alpha = 0.12f) else spec.surface)
+                    .border(
+                        width = if (isCurrent) spec.borderThickness else 1.dp,
+                        color = if (isCurrent) spec.borderActive else spec.borderInactive.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(spec.cornerRadius.coerceAtMost(6.dp))
+                    )
+                    .clickable { onTrackSelected(track, tracks) }
+                    .padding(horizontal = 10.dp, vertical = 8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Line number / Status indicator
+                    Text(
+                        text = if (isPlaying) "▶" else String.format("%02d.", (index + 1) % 100),
+                        fontFamily = spec.fontFamily,
+                        color = if (isCurrent) spec.borderActive else spec.textSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.width(28.dp)
+                    )
+
+                    // Track Title & Artist
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = track.title,
+                            fontFamily = spec.fontFamily,
+                            color = if (isCurrent) spec.borderActive else spec.textPrimary,
+                            fontSize = 12.5.sp,
+                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = track.artist,
+                            fontFamily = spec.fontFamily,
+                            color = spec.textSecondary,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Bitrate badge
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(spec.surfaceVariant)
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "${track.bitrate}k",
+                            fontFamily = spec.fontFamily,
+                            color = if (isCurrent) spec.borderActive else spec.textSecondary,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Duration
+                    val durationSec = track.durationMs / 1000
+                    Text(
+                        text = String.format("%d:%02d", durationSec / 60, durationSec % 60),
+                        fontFamily = spec.fontFamily,
+                        color = spec.textSecondary,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(80.dp))
+        }
+    }
+}
+

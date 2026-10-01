@@ -38,16 +38,22 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import coil.request.CachePolicy
+import coil.request.ImageRequest
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,6 +65,7 @@ import com.example.hyprmusic.core.data.PlaylistRepository
 import com.example.hyprmusic.core.media.HyprAudioPlayer
 import com.example.hyprmusic.core.media.HyprEqualizer
 import com.example.hyprmusic.core.model.Album
+import com.example.hyprmusic.core.model.Track
 import com.example.hyprmusic.core.theming.HyprThemeProvider
 import com.example.hyprmusic.core.theming.ThemeManager
 import com.example.hyprmusic.core.theming.hyprBounceClick
@@ -93,35 +100,39 @@ class MainActivity : ComponentActivity() {
         telegramRepository = TelegramMusicRepository(applicationContext, musicRepository)
         playlistRepository = PlaylistRepository(applicationContext)
 
-        try {
-            HyprEqualizer.init(applicationContext, audioPlayer.audioSessionId)
-        } catch (_: Exception) {}
+        // Defer audio effect binding and Coil cache init to background thread to allow instant first-frame render
+        lifecycleScope.launch(Dispatchers.Default) {
+            try {
+                HyprEqualizer.init(applicationContext, audioPlayer.audioSessionId)
+            } catch (_: Exception) {}
 
-        val imageLoader = coil.ImageLoader.Builder(applicationContext)
-            .memoryCache {
-                coil.memory.MemoryCache.Builder(applicationContext)
-                    .maxSizePercent(0.25)
-                    .build()
-            }
-            .diskCache {
-                coil.disk.DiskCache.Builder()
-                    .directory(applicationContext.cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(100L * 1024 * 1024)
-                    .build()
-            }
-            .bitmapConfig(android.graphics.Bitmap.Config.HARDWARE)
-            .respectCacheHeaders(false)
-            .crossfade(true)
-            .build()
-        coil.Coil.setImageLoader(imageLoader)
+            val imageLoader = coil.ImageLoader.Builder(applicationContext)
+                .memoryCache {
+                    coil.memory.MemoryCache.Builder(applicationContext)
+                        .maxSizePercent(0.25)
+                        .build()
+                }
+                .diskCache {
+                    coil.disk.DiskCache.Builder()
+                        .directory(applicationContext.cacheDir.resolve("image_cache"))
+                        .maxSizeBytes(100L * 1024 * 1024)
+                        .build()
+                }
+                .bitmapConfig(android.graphics.Bitmap.Config.HARDWARE)
+                .respectCacheHeaders(false)
+                .crossfade(true)
+                .build()
+            coil.Coil.setImageLoader(imageLoader)
+        }
 
         setContent {
-            val themeConfig by ThemeManager.themeConfig.collectAsState()
+            val designSpec by ThemeManager.designSpec.collectAsStateWithLifecycle()
+            val themeConfig by ThemeManager.themeConfig.collectAsStateWithLifecycle()
 
-            HyprThemeProvider(themeConfig = themeConfig) {
+            HyprThemeProvider(designSpec = designSpec, themeConfig = themeConfig) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = themeConfig.backgroundColor
+                    color = designSpec.bg
                 ) {
                     HyprMusicApp(
                         audioPlayer = audioPlayer,
@@ -147,13 +158,13 @@ fun HyprMusicApp(
     telegramRepository: TelegramMusicRepository,
     playlistRepository: PlaylistRepository
 ) {
-    val themeConfig by ThemeManager.themeConfig.collectAsState()
-    val playbackState by audioPlayer.playbackState.collectAsState()
-    val tracks by musicRepository.tracks.collectAsState()
-    val albums by musicRepository.albums.collectAsState()
-    val artists by musicRepository.artists.collectAsState()
-    val isScanning by musicRepository.isScanning.collectAsState()
-    val hasInitialScanCompleted by musicRepository.hasInitialScanCompleted.collectAsState()
+    val themeConfig by ThemeManager.themeConfig.collectAsStateWithLifecycle()
+    val playbackState by audioPlayer.playbackState.collectAsStateWithLifecycle()
+    val tracks by musicRepository.tracks.collectAsStateWithLifecycle()
+    val albums by musicRepository.albums.collectAsStateWithLifecycle()
+    val artists by musicRepository.artists.collectAsStateWithLifecycle()
+    val isScanning by musicRepository.isScanning.collectAsStateWithLifecycle()
+    val hasInitialScanCompleted by musicRepository.hasInitialScanCompleted.collectAsStateWithLifecycle()
 
     var currentWorkspace by remember { mutableStateOf(HyprWorkspace.HOME) }
     var isNowPlayingExpanded by remember { mutableStateOf(false) }
@@ -228,16 +239,20 @@ fun HyprMusicApp(
             // Dynamic Workspace Content or Live Search Results
             Box(modifier = Modifier.weight(1f)) {
                 if (isSearchActive && searchQuery.isNotBlank()) {
-                    val cloudTracks by telegramRepository.cloudTracks.collectAsState()
-                    val searchResults = remember(searchQuery, tracks, cloudTracks) {
-                        val localMatches = musicRepository.search(searchQuery)
-                        val q = searchQuery.trim().lowercase()
-                        val cloudMatches = cloudTracks.filter {
-                            it.title.lowercase().contains(q) ||
-                            it.artist.lowercase().contains(q) ||
-                            it.album.lowercase().contains(q)
+                    val cloudTracks by telegramRepository.cloudTracks.collectAsStateWithLifecycle()
+                    var searchResults by remember { mutableStateOf<List<Track>>(emptyList()) }
+
+                    LaunchedEffect(searchQuery, tracks, cloudTracks) {
+                        searchResults = withContext(Dispatchers.Default) {
+                            val localMatches = musicRepository.search(searchQuery)
+                            val q = searchQuery.trim().lowercase()
+                            val cloudMatches = cloudTracks.filter {
+                                it.title.lowercase().contains(q) ||
+                                it.artist.lowercase().contains(q) ||
+                                it.album.lowercase().contains(q)
+                            }
+                            localMatches + cloudMatches
                         }
-                        localMatches + cloudMatches
                     }
 
                     LazyColumn(
@@ -259,7 +274,8 @@ fun HyprMusicApp(
 
                         items(
                             items = searchResults,
-                            key = { "search_${it.id}" }
+                            key = { "search_${it.id}" },
+                            contentType = { "search_track_item" }
                         ) { track ->
                             val isPlaying = playbackState.currentTrack?.id == track.id && playbackState.isPlaying
                             val isCurrent = playbackState.currentTrack?.id == track.id
@@ -285,8 +301,19 @@ fun HyprMusicApp(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         if (track.albumArtUri != null) {
+                                            val context = LocalContext.current
+                                            val searchThumbReq = remember(track.albumArtUri) {
+                                                ImageRequest.Builder(context)
+                                                    .data(track.albumArtUri)
+                                                    .size(120, 120)
+                                                    .allowHardware(true)
+                                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                                    .crossfade(false)
+                                                    .build()
+                                            }
                                             AsyncImage(
-                                                model = track.albumArtUri,
+                                                model = searchThumbReq,
                                                 contentDescription = null,
                                                 modifier = Modifier.fillMaxSize(),
                                                 contentScale = ContentScale.Crop

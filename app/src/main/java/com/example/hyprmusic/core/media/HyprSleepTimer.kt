@@ -7,10 +7,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import androidx.compose.runtime.Immutable
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+@Immutable
 data class SleepTimerState(
     val isActive: Boolean = false,
     val remainingMillis: Long = 0L,

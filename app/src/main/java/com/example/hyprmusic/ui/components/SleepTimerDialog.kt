@@ -30,11 +30,11 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,8 +61,9 @@ fun SleepTimerDialog(
     onDismiss: () -> Unit
 ) {
     val view = LocalView.current
-    val timerState by HyprSleepTimer.timerState.collectAsState()
-    val currentTrack = audioPlayer.playbackState.collectAsState().value.currentTrack
+    val timerState by HyprSleepTimer.timerState.collectAsStateWithLifecycle()
+    val playbackState by audioPlayer.playbackState.collectAsStateWithLifecycle()
+    val currentTrack = playbackState.currentTrack
     var customMinutes by remember { mutableFloatStateOf(20f) }
 
     Dialog(

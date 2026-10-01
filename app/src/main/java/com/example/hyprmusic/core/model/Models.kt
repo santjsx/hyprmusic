@@ -1,7 +1,9 @@
 package com.example.hyprmusic.core.model
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 
+@Immutable
 @Serializable
 data class Track(
     val id: String,
@@ -86,6 +88,7 @@ data class Track(
         }
 }
 
+@Immutable
 @Serializable
 data class Album(
     val id: String,
@@ -96,6 +99,7 @@ data class Album(
     val releaseYear: Int? = null
 )
 
+@Immutable
 @Serializable
 data class Artist(
     val id: String,
@@ -104,6 +108,7 @@ data class Artist(
     val albumCount: Int = 0
 )
 
+@Immutable
 @Serializable
 data class Playlist(
     val id: String,
@@ -112,6 +117,7 @@ data class Playlist(
     val createdAt: Long = System.currentTimeMillis()
 )
 
+@Immutable
 @Serializable
 data class LyricLine(
     val timestampMs: Long,
@@ -122,6 +128,7 @@ enum class RepeatMode {
     OFF, ALL, ONE
 }
 
+@Immutable
 data class PlaybackState(
     val currentTrack: Track? = null,
     val isPlaying: Boolean = false,

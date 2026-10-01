@@ -1,0 +1,43 @@
+# Baseline Profile for HyprMusic
+# Accelerates startup, navigation, and audio playback AOT compilation
+
+# Core Activity & Lifecycle
+Lcom/example/hyprmusic/MainActivity;
+HSPLcom/example/hyprmusic/MainActivity;->onCreate(Landroid/os/Bundle;)V
+HSPLcom/example/hyprmusic/MainActivityKt;->HyprMusicApp(Lcom/example/hyprmusic/core/media/HyprAudioPlayer;Lcom/example/hyprmusic/core/data/MusicRepository;Lcom/example/hyprmusic/core/cloud/telegram/TelegramMusicRepository;Lcom/example/hyprmusic/core/data/PlaylistRepository;Landroidx/compose/runtime/Composer;I)V
+
+# Theming System
+Lcom/example/hyprmusic/core/theming/ThemeManager;
+HSPLcom/example/hyprmusic/core/theming/ThemeManager;->init(Landroid/content/Context;)V
+HSPLcom/example/hyprmusic/core/theming/ThemeManager;->getThemeConfig()Lkotlinx/coroutines/flow/StateFlow;
+Lcom/example/hyprmusic/core/theming/HyprThemeConfig;
+Lcom/example/hyprmusic/core/theming/ThemePresets;
+HSPLcom/example/hyprmusic/core/theming/HyprThemeKt;->HyprThemeProvider(Lcom/example/hyprmusic/core/theming/HyprThemeConfig;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+HSPLcom/example/hyprmusic/core/theming/HyprThemeKt;->hyprTile(Landroidx/compose/ui/Modifier;Lcom/example/hyprmusic/core/theming/HyprThemeConfig;Z)Landroidx/compose/ui/Modifier;
+
+# Audio Player Engine & Media3
+Lcom/example/hyprmusic/core/media/HyprAudioPlayer;
+HSPLcom/example/hyprmusic/core/media/HyprAudioPlayer;->getInstance(Landroid/content/Context;)Lcom/example/hyprmusic/core/media/HyprAudioPlayer;
+HSPLcom/example/hyprmusic/core/media/HyprAudioPlayer;->playTrack(Lcom/example/hyprmusic/core/model/Track;Ljava/util/List;)V
+HSPLcom/example/hyprmusic/core/media/HyprAudioPlayer;->togglePlayPause()V
+HSPLcom/example/hyprmusic/core/media/HyprAudioPlayer;->seekTo(J)V
+Lcom/example/hyprmusic/core/media/HyprVisualizerProcessor;
+HSPLcom/example/hyprmusic/core/media/HyprVisualizerProcessor;->processPcmData(Ljava/nio/ByteBuffer;)V
+Lcom/example/hyprmusic/core/media/HyprEqualizer;
+
+# Repositories & Data Models
+Lcom/example/hyprmusic/core/data/MusicRepository;
+HSPLcom/example/hyprmusic/core/data/MusicRepository;->scanLocalMedia()V
+HSPLcom/example/hyprmusic/core/data/MusicRepository;->search(Ljava/lang/String;)Ljava/util/List;
+Lcom/example/hyprmusic/core/data/PlaylistRepository;
+Lcom/example/hyprmusic/core/model/Track;
+Lcom/example/hyprmusic/core/model/Album;
+Lcom/example/hyprmusic/core/model/Artist;
+Lcom/example/hyprmusic/core/model/PlaybackState;
+
+# UI Screens & Composable Layouts
+HSPLcom/example/hyprmusic/ui/screens/HomeScreenKt;->HomeScreen(Lcom/example/hyprmusic/core/theming/HyprThemeConfig;Lcom/example/hyprmusic/core/model/PlaybackState;Ljava/util/List;Ljava/util/List;ZZLkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;III)V
+HSPLcom/example/hyprmusic/ui/screens/LibraryScreenKt;->LibraryScreen(Lcom/example/hyprmusic/core/theming/HyprThemeConfig;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/example/hyprmusic/core/model/Track;Lcom/example/hyprmusic/core/model/Album;Lcom/example/hyprmusic/core/cloud/telegram/TelegramMusicRepository;Lcom/example/hyprmusic/core/data/PlaylistRepository;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;IIII)V
+HSPLcom/example/hyprmusic/ui/screens/NowPlayingScreenKt;->NowPlayingScreen(Lcom/example/hyprmusic/core/theming/HyprThemeConfig;Lcom/example/hyprmusic/core/model/PlaybackState;Lcom/example/hyprmusic/core/media/HyprAudioPlayer;Lcom/example/hyprmusic/core/data/PlaylistRepository;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;IIII)V
+HSPLcom/example/hyprmusic/ui/components/HyprComponentsKt;->MiniPlayer(Lcom/example/hyprmusic/core/theming/HyprThemeConfig;Lcom/example/hyprmusic/core/model/PlaybackState;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+HSPLcom/example/hyprmusic/ui/components/HyprComponentsKt;->HyprBottomDock(Lcom/example/hyprmusic/core/theming/HyprThemeConfig;Lcom/example/hyprmusic/ui/components/HyprWorkspace;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;ZZLandroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
