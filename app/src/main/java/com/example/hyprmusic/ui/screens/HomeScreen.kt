@@ -54,6 +54,8 @@ import com.example.hyprmusic.core.theming.hyprAnimatedGlow
 import com.example.hyprmusic.core.theming.hyprBounceClick
 import com.example.hyprmusic.core.theming.hyprTile
 
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.lazy.itemsIndexed
 import com.example.hyprmusic.core.theming.GridLayoutStyle
 import com.example.hyprmusic.core.theming.HyprTheme
@@ -67,6 +69,7 @@ fun HomeScreen(
     heavyRotationTracks: List<Track> = emptyList(),
     isScanning: Boolean = false,
     hasInitialScanCompleted: Boolean = true,
+    listState: LazyListState = rememberSaveable(saver = LazyListState.Saver) { LazyListState() },
     onTrackSelected: (Track, List<Track>) -> Unit,
     onTogglePlayPause: () -> Unit,
     onRandomMix: () -> Unit,
@@ -182,6 +185,7 @@ fun HomeScreen(
             theme = theme,
             playbackState = playbackState,
             tracks = tracks,
+            listState = listState,
             onTrackSelected = onTrackSelected,
             onTogglePlayPause = onTogglePlayPause,
             onRandomMix = onRandomMix,
@@ -191,7 +195,17 @@ fun HomeScreen(
         return
     }
 
+    val displayedRecentlyIndexed = remember(tracks, heavyRotationTracks) {
+        if (heavyRotationTracks.isNotEmpty()) {
+            val hrIds = heavyRotationTracks.map { it.id }.toSet()
+            tracks.filterNot { it.id in hrIds }
+        } else {
+            tracks
+        }
+    }
+
     LazyColumn(
+        state = listState,
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = theme.windowGapsDp.dp),
@@ -364,9 +378,8 @@ fun HomeScreen(
             }
         }
 
-        // Heavy Rotation Carousel
-        val rotationList = if (heavyRotationTracks.isNotEmpty()) heavyRotationTracks else tracks.take(10)
-        if (rotationList.isNotEmpty()) {
+        // Heavy Rotation Carousel - only displayed when genuine play history exists
+        if (heavyRotationTracks.isNotEmpty()) {
             item {
                 Column {
                     Row(
@@ -395,7 +408,7 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.spacedBy(theme.windowGapsDp.dp)
                     ) {
                         items(
-                            items = rotationList,
+                            items = heavyRotationTracks,
                             key = { "hr_${it.id}" },
                             contentType = { "heavy_rotation_track" }
                         ) { track ->
@@ -468,7 +481,7 @@ fun HomeScreen(
             }
         }
 
-        // Library Tracks Section
+        // Library Tracks Section - deduplicate items already present in Heavy Rotation
         item {
             Text(
                 text = "RECENTLY INDEXED",
@@ -481,7 +494,7 @@ fun HomeScreen(
         }
 
         items(
-            items = tracks.take(30),
+            items = displayedRecentlyIndexed,
             key = { "rec_${it.id}" },
             contentType = { "recent_track" }
         ) { track ->
@@ -593,6 +606,7 @@ private fun TerminalRowsHomeScreen(
     theme: HyprThemeConfig,
     playbackState: PlaybackState,
     tracks: List<Track>,
+    listState: LazyListState,
     onTrackSelected: (Track, List<Track>) -> Unit,
     onTogglePlayPause: () -> Unit,
     onRandomMix: () -> Unit,
@@ -603,6 +617,7 @@ private fun TerminalRowsHomeScreen(
     val currentTrack = playbackState.currentTrack
 
     LazyColumn(
+        state = listState,
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = spec.gaps),
@@ -813,13 +828,19 @@ private fun TerminalRowsHomeScreen(
                                 .size(16.dp)
                         )
                     } else {
+                        val indexWidth = if (tracks.size >= 100) 34.dp else 28.dp
+                        val indexText = if (tracks.size >= 100) {
+                            String.format("%03d", index + 1)
+                        } else {
+                            String.format("%02d", index + 1)
+                        }
                         Text(
-                            text = String.format("%02d", (index + 1) % 100),
+                            text = indexText,
                             fontFamily = spec.fontFamily,
                             color = if (isCurrent) spec.borderActive else spec.textSecondary,
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Medium,
-                            modifier = Modifier.width(28.dp)
+                            modifier = Modifier.width(indexWidth)
                         )
                     }
 

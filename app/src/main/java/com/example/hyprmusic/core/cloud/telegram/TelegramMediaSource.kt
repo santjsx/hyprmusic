@@ -28,7 +28,7 @@ object TelegramMediaSource {
 
     fun buildDataSourceFactory(context: Context): DataSource.Factory {
         val httpFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent("HyprMusic/1.2.0 (Android)")
+            .setUserAgent("HyprMusic/1.6.1 (Android)")
             .setConnectTimeoutMs(15000)
             .setReadTimeoutMs(30000)
             .setAllowCrossProtocolRedirects(true)

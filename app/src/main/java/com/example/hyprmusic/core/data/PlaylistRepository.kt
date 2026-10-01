@@ -41,8 +41,13 @@ class PlaylistRepository(private val context: Context) {
 
     private fun loadFromDisk(): List<CustomPlaylist> {
         return try {
-            if (!file.exists()) return emptyList()
-            val text = file.readText()
+            val targetFile = if (file.exists() && file.length() > 0) {
+                file
+            } else {
+                File(context.filesDir, "playlists.json.tmp")
+            }
+            if (!targetFile.exists()) return emptyList()
+            val text = targetFile.readText()
             if (text.isBlank()) return emptyList()
             json.decodeFromString<List<CustomPlaylist>>(text)
         } catch (e: Exception) {
@@ -55,7 +60,12 @@ class PlaylistRepository(private val context: Context) {
         scope.launch {
             try {
                 val text = json.encodeToString(playlists)
-                file.writeText(text)
+                val tempFile = File(context.filesDir, "playlists.json.tmp")
+                tempFile.writeText(text)
+                if (tempFile.exists() && tempFile.length() > 0) {
+                    if (file.exists()) file.delete()
+                    tempFile.renameTo(file)
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }

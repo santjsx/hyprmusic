@@ -1,5 +1,6 @@
 package com.example.hyprmusic.core.media
 
+import androidx.media3.common.C
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.BaseAudioProcessor
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -64,12 +65,13 @@ object HyprVisualizerState {
 
 class HyprVisualizerProcessor : BaseAudioProcessor() {
 
+    private var is16BitPcm = false
+    private var lastProcessTime = 0L
+
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
-        // We only process standard 16-bit PCM; pass through format
+        is16BitPcm = (inputAudioFormat.encoding == C.ENCODING_PCM_16BIT)
         return inputAudioFormat
     }
-
-    private var lastProcessTime = 0L
 
     override fun queueInput(inputBuffer: ByteBuffer) {
         val remaining = inputBuffer.remaining()
@@ -77,48 +79,54 @@ class HyprVisualizerProcessor : BaseAudioProcessor() {
 
         val buffer = replaceOutputBuffer(remaining)
 
-        val now = System.currentTimeMillis()
-        if (now - lastProcessTime >= 33L) {
-            lastProcessTime = now
-            // Read samples for visualization without disrupting playback
-            val duplicate = inputBuffer.asReadOnlyBuffer().order(ByteOrder.LITTLE_ENDIAN)
-            val shortBuffer = duplicate.asShortBuffer()
-            val totalSamples = shortBuffer.remaining()
+        if (is16BitPcm) {
+            val now = System.currentTimeMillis()
+            if (now - lastProcessTime >= 33L) {
+                lastProcessTime = now
+                try {
+                    // Read samples for visualization without disrupting playback
+                    val duplicate = inputBuffer.asReadOnlyBuffer().order(ByteOrder.LITTLE_ENDIAN)
+                    val shortBuffer = duplicate.asShortBuffer()
+                    val totalSamples = shortBuffer.remaining()
 
-            if (totalSamples > 0) {
-                var sumSquare = 0.0
-                val bandSize = max(1, totalSamples / HyprVisualizerState.BAR_COUNT)
-                val currentAmps = FloatArray(HyprVisualizerState.BAR_COUNT)
+                    if (totalSamples > 0) {
+                        var sumSquare = 0.0
+                        val bandSize = max(1, totalSamples / HyprVisualizerState.BAR_COUNT)
+                        val currentAmps = FloatArray(HyprVisualizerState.BAR_COUNT)
 
-                var bandIndex = 0
-                var bandPeak = 0f
-                var samplesInBand = 0
+                        var bandIndex = 0
+                        var bandPeak = 0f
+                        var samplesInBand = 0
 
-                for (i in 0 until totalSamples) {
-                    val sample = shortBuffer.get()
-                    val normalized = abs(sample.toFloat()) / 32768.0f
-                    sumSquare += (normalized * normalized)
+                        for (i in 0 until totalSamples) {
+                            val sample = shortBuffer.get()
+                            val normalized = abs(sample.toFloat()) / 32768.0f
+                            sumSquare += (normalized * normalized)
 
-                    if (normalized > bandPeak) {
-                        bandPeak = normalized
+                            if (normalized > bandPeak) {
+                                bandPeak = normalized
+                            }
+                            samplesInBand++
+
+                            if (samplesInBand >= bandSize && bandIndex < HyprVisualizerState.BAR_COUNT) {
+                                currentAmps[bandIndex] = min(1f, bandPeak * 1.5f) // Boost visibility
+                                bandIndex++
+                                bandPeak = 0f
+                                samplesInBand = 0
+                            }
+                        }
+
+                        while (bandIndex < HyprVisualizerState.BAR_COUNT) {
+                            currentAmps[bandIndex] = currentAmps[max(0, bandIndex - 1)] * 0.8f
+                            bandIndex++
+                        }
+
+                        val rms = min(1f, (sqrt(sumSquare / totalSamples) * 2.0).toFloat())
+                        HyprVisualizerState.updateRaw(currentAmps, rms)
                     }
-                    samplesInBand++
-
-                    if (samplesInBand >= bandSize && bandIndex < HyprVisualizerState.BAR_COUNT) {
-                        currentAmps[bandIndex] = min(1f, bandPeak * 1.5f) // Boost visibility
-                        bandIndex++
-                        bandPeak = 0f
-                        samplesInBand = 0
-                    }
+                } catch (e: Exception) {
+                    // Never disrupt audio playback pipeline on visualization failure
                 }
-
-                while (bandIndex < HyprVisualizerState.BAR_COUNT) {
-                    currentAmps[bandIndex] = currentAmps[max(0, bandIndex - 1)] * 0.8f
-                    bandIndex++
-                }
-
-                val rms = min(1f, (sqrt(sumSquare / totalSamples) * 2.0).toFloat())
-                HyprVisualizerState.updateRaw(currentAmps, rms)
             }
         }
 

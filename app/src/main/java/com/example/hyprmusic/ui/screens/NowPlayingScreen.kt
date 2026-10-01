@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -183,6 +184,11 @@ fun NowPlayingScreen(
         modifier = modifier
             .fillMaxSize()
             .background(theme.backgroundColor)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {}
+            )
     ) {
         // Ambient blurred album art backdrop
         if (!track.albumArtUri.isNullOrBlank()) {
@@ -800,6 +806,11 @@ fun NowPlayingEmptyScreen(
         modifier = modifier
             .fillMaxSize()
             .background(theme.backgroundColor)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {}
+            )
             .safeDrawingPadding()
             .padding(horizontal = theme.windowGapsDp.dp, vertical = 8.dp)
     ) {
@@ -1016,8 +1027,8 @@ private fun PlaybackProgressSection(
     onSeekTo: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val currentDisplaySec = currentPositionMs / 1000
-    val totalSec = durationMs / 1000
+    val currentDisplaySec = (currentPositionMs / 1000).coerceAtLeast(0)
+    val totalSec = (durationMs / 1000).coerceAtLeast(0)
     val elapsed = "%d:%02d".format(currentDisplaySec / 60, currentDisplaySec % 60)
     val total = "%d:%02d".format(totalSec / 60, totalSec % 60)
 
@@ -1026,8 +1037,12 @@ private fun PlaybackProgressSection(
         elapsed = elapsed,
         total = total,
         onSeekToPercent = { pct ->
-            val targetMs = (pct * durationMs).toLong().coerceIn(0L, durationMs)
-            onSeekTo(targetMs)
+            if (durationMs > 0L) {
+                // Safeguard against seeking directly onto the end frame which triggers auto-skipNext()
+                val safePct = pct.coerceIn(0f, 0.995f)
+                val targetMs = (safePct * durationMs).toLong().coerceIn(0L, (durationMs - 500L).coerceAtLeast(0L))
+                onSeekTo(targetMs)
+            }
         },
         modifier = modifier
     )

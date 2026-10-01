@@ -81,8 +81,13 @@ class MusicRepository(private val context: Context) {
 
     private fun loadCachedTracksFromDisk(): List<Track> {
         return try {
-            if (cacheFile.exists()) {
-                val content = cacheFile.readText()
+            val target = if (cacheFile.exists() && cacheFile.length() > 0) {
+                cacheFile
+            } else {
+                File(context.filesDir, "tracks_cache.json.tmp")
+            }
+            if (target.exists()) {
+                val content = target.readText()
                 if (content.isNotBlank()) {
                     jsonSerializer.decodeFromString<List<Track>>(content)
                 } else emptyList()
@@ -96,7 +101,12 @@ class MusicRepository(private val context: Context) {
         repositoryScope.launch {
             try {
                 val content = jsonSerializer.encodeToString(tracks)
-                cacheFile.writeText(content)
+                val tempFile = File(context.filesDir, "tracks_cache.json.tmp")
+                tempFile.writeText(content)
+                if (tempFile.exists() && tempFile.length() > 0) {
+                    if (cacheFile.exists()) cacheFile.delete()
+                    tempFile.renameTo(cacheFile)
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -165,12 +175,12 @@ class MusicRepository(private val context: Context) {
             cursor?.use { c ->
                 val idCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
                 val titleCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
-                val artistCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
-                val albumCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
+                val artistCol = c.getColumnIndex(MediaStore.Audio.Media.ARTIST)
+                val albumCol = c.getColumnIndex(MediaStore.Audio.Media.ALBUM)
                 val durationCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
-                val dataCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
-                val albumIdCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
-                val dateAddedCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
+                val dataCol = c.getColumnIndex(MediaStore.Audio.Media.DATA)
+                val albumIdCol = c.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID)
+                val dateAddedCol = c.getColumnIndex(MediaStore.Audio.Media.DATE_ADDED)
                 val mimeTypeCol = c.getColumnIndex(MediaStore.Audio.Media.MIME_TYPE)
                 val sizeCol = c.getColumnIndex(MediaStore.Audio.Media.SIZE)
                 val bitrateCol = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -180,12 +190,12 @@ class MusicRepository(private val context: Context) {
                 while (c.moveToNext()) {
                     val id = c.getLong(idCol)
                     val title = c.getString(titleCol) ?: "Unknown Title"
-                    val artist = c.getString(artistCol) ?: "Unknown Artist"
-                    val album = c.getString(albumCol) ?: "Unknown Album"
+                    val artist = if (artistCol >= 0) c.getString(artistCol) ?: "Unknown Artist" else "Unknown Artist"
+                    val album = if (albumCol >= 0) c.getString(albumCol) ?: "Unknown Album" else "Unknown Album"
                     val durationMs = c.getLong(durationCol)
-                    val filePath = c.getString(dataCol) ?: ""
-                    val albumId = c.getLong(albumIdCol)
-                    val dateAdded = c.getLong(dateAddedCol)
+                    val filePath = if (dataCol >= 0) c.getString(dataCol) ?: "" else ""
+                    val albumId = if (albumIdCol >= 0) c.getLong(albumIdCol) else -1L
+                    val dateAdded = if (dateAddedCol >= 0) c.getLong(dateAddedCol) else 0L
                     val rawMime = if (mimeTypeCol >= 0) c.getString(mimeTypeCol) else null
                     val sizeBytes = if (sizeCol >= 0) c.getLong(sizeCol) else 0L
                     val rawBitrate = if (bitrateCol >= 0) c.getInt(bitrateCol) else 0
@@ -227,10 +237,12 @@ class MusicRepository(private val context: Context) {
                         id
                     ).toString()
 
-                    val albumArtUri = ContentUris.withAppendedId(
-                        Uri.parse("content://media/external/audio/albumart"),
-                        albumId
-                    ).toString()
+                    val albumArtUri = if (albumId > 0L) {
+                        ContentUris.withAppendedId(
+                            Uri.parse("content://media/external/audio/albumart"),
+                            albumId
+                        ).toString()
+                    } else null
 
                     val trackIdStr = id.toString()
                     val isFav = favoritesRepository.isFavorite(trackIdStr)
@@ -297,20 +309,15 @@ class MusicRepository(private val context: Context) {
         val all = _tracks.value
         if (all.isEmpty()) return emptyList()
 
-        // Check if there are played tracks
-        val withPlays = all.map { track ->
-            Pair(track, playbackStatsRepository.getPlayCount(track.id))
+        val withPlays = all.mapNotNull { track ->
+            val count = playbackStatsRepository.getPlayCount(track.id)
+            if (count > 0) Pair(track, count) else null
         }
 
-        val hasAnyPlays = withPlays.any { it.second > 0 }
-        return if (hasAnyPlays) {
-            withPlays.sortedByDescending { it.second }
-                .take(limit)
-                .map { it.first }
-        } else {
-            // Graceful fallback to recently added or high-bitrate tracks
-            all.take(limit)
-        }
+        return withPlays
+            .sortedByDescending { it.second }
+            .take(limit)
+            .map { it.first }
     }
 
     fun search(query: String): List<Track> {

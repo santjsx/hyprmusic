@@ -40,6 +40,7 @@ object HyprSleepTimer {
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var timerJob: Job? = null
     private var boundAudioPlayer: HyprAudioPlayer? = null
+    private var initialVolume: Float = 1.0f
 
     private val _timerState = MutableStateFlow(SleepTimerState())
     val timerState: StateFlow<SleepTimerState> = _timerState.asStateFlow()
@@ -47,6 +48,7 @@ object HyprSleepTimer {
     fun startTimer(minutes: Int, audioPlayer: HyprAudioPlayer) {
         cancelTimer()
         boundAudioPlayer = audioPlayer
+        initialVolume = audioPlayer.getVolume().coerceIn(0.01f, 1.0f)
         val durationMs = minutes * 60 * 1000L
 
         _timerState.value = SleepTimerState(
@@ -72,9 +74,9 @@ object HyprSleepTimer {
                 // Smooth 15-second audiophile volume fade-out
                 if (remaining <= 15_000L) {
                     val fadeFraction = (remaining / 15_000f).coerceIn(0f, 1f)
-                    audioPlayer.setVolume(fadeFraction)
+                    audioPlayer.setVolume(fadeFraction * initialVolume)
                 } else {
-                    audioPlayer.setVolume(1.0f)
+                    audioPlayer.setVolume(initialVolume)
                 }
 
                 _timerState.value = _timerState.value.copy(
@@ -89,6 +91,7 @@ object HyprSleepTimer {
     fun startEndOfTrackTimer(currentTrackId: String, audioPlayer: HyprAudioPlayer) {
         cancelTimer()
         boundAudioPlayer = audioPlayer
+        initialVolume = audioPlayer.getVolume().coerceIn(0.01f, 1.0f)
 
         _timerState.value = SleepTimerState(
             isActive = true,
@@ -113,7 +116,7 @@ object HyprSleepTimer {
                 val trackRemainingMs = (state.durationMs - state.currentPositionMs).coerceAtLeast(0L)
                 if (state.durationMs > 0L && trackRemainingMs in 1L..8_000L) {
                     val fadeFraction = (trackRemainingMs / 8_000f).coerceIn(0f, 1f)
-                    audioPlayer.setVolume(fadeFraction)
+                    audioPlayer.setVolume(fadeFraction * initialVolume)
                 }
 
                 if (state.durationMs > 0L && trackRemainingMs <= 500L) {
@@ -132,10 +135,9 @@ object HyprSleepTimer {
 
         val addedMs = minutes * 60 * 1000L
         val newRemaining = current.remainingMillis + addedMs
-        val newTotal = current.totalDurationMillis + addedMs
 
         boundAudioPlayer?.let { player ->
-            player.setVolume(1.0f) // Restore volume in case it was in fade-out window
+            player.setVolume(initialVolume) // Restore volume in case it was in fade-out window
             cancelTimer()
             startTimer((newRemaining / 60000L).toInt().coerceAtLeast(1), player)
         }
@@ -144,13 +146,13 @@ object HyprSleepTimer {
     fun cancelTimer() {
         timerJob?.cancel()
         timerJob = null
-        boundAudioPlayer?.setVolume(1.0f)
+        boundAudioPlayer?.setVolume(initialVolume)
         _timerState.value = SleepTimerState()
     }
 
     private fun executeShutdown() {
         boundAudioPlayer?.pause()
-        boundAudioPlayer?.setVolume(1.0f) // Restore volume for next session
+        boundAudioPlayer?.setVolume(initialVolume) // Restore volume for next session
         _timerState.value = SleepTimerState()
         timerJob = null
     }

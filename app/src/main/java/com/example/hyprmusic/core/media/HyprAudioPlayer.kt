@@ -241,7 +241,8 @@ class HyprAudioPlayer private constructor(private val context: Context) {
 
     fun seekTo(positionMs: Long) {
         val duration = _playbackState.value.durationMs
-        val target = positionMs.coerceIn(0L, if (duration > 0) duration else Long.MAX_VALUE)
+        val maxSafe = if (duration > 300L) duration - 300L else if (duration > 0L) duration else Long.MAX_VALUE
+        val target = positionMs.coerceIn(0L, maxSafe)
         exoPlayer.seekTo(target)
         _playbackState.update { it.copy(currentPositionMs = target) }
     }
@@ -274,8 +275,9 @@ class HyprAudioPlayer private constructor(private val context: Context) {
         val state = _playbackState.value
         if (state.queue.isEmpty()) return
 
-        val nextIndex = if (state.isShuffle) {
-            state.queue.indices.random()
+        val nextIndex = if (state.isShuffle && state.queue.size > 1) {
+            val otherIndices = state.queue.indices.filter { it != state.currentIndex }
+            if (otherIndices.isNotEmpty()) otherIndices.random() else (state.currentIndex + 1) % state.queue.size
         } else {
             (state.currentIndex + 1) % state.queue.size
         }
@@ -386,18 +388,39 @@ class HyprAudioPlayer private constructor(private val context: Context) {
             }
         }
 
+        private var lastErrorTrackId: String? = null
+        private var errorRetryCount = 0
+
         override fun onPlayerError(error: PlaybackException) {
             error.printStackTrace()
             // Seamless auto-recovery from audio sink underruns or transient decoder hiccups
             val currentPos = exoPlayer.currentPosition
             val currentTrack = _playbackState.value.currentTrack
             if (currentTrack != null) {
-                try {
-                    exoPlayer.seekTo(currentPos)
-                    exoPlayer.prepare()
-                    exoPlayer.play()
-                } catch (e: Exception) {
-                    e.printStackTrace()
+                if (lastErrorTrackId == currentTrack.id) {
+                    errorRetryCount++
+                } else {
+                    lastErrorTrackId = currentTrack.id
+                    errorRetryCount = 1
+                }
+
+                if (errorRetryCount <= 2) {
+                    try {
+                        exoPlayer.seekTo(currentPos)
+                        exoPlayer.prepare()
+                        exoPlayer.play()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        skipNext()
+                    }
+                } else {
+                    // Prevent infinite retry loop on unplayable media
+                    errorRetryCount = 0
+                    if (_playbackState.value.queue.size > 1) {
+                        skipNext()
+                    } else {
+                        pause()
+                    }
                 }
             }
         }

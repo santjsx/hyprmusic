@@ -1,6 +1,6 @@
-# HyprMusic v1.6.0 — Next-Gen Theme Uniqueness & Deep Customization Architecture
+# HyprMusic v1.6.1 — Touch Pass-Through Fix, Scroll Stability & 250 Edge-Case Hardening
 
-HyprMusic v1.6.0 delivers a major overhaul of the theming engine, introducing deep visual uniqueness to every preset and granular runtime customization through the expanded Rice Studio. Every theme now functions as a distinct audiophile interface personality, calibrated across 5 visual dimensions: bespoke color palettes, specialized icon pack architectures, distinct progress bar visual engines, tactile playback control button geometries, and dynamic typography engines.
+HyprMusic v1.6.1 delivers critical bug fixes, gesture stabilization, and comprehensive edge-case hardening across the application stack. This release resolves the progress bar touch pass-through on the Now Playing screen, eliminates track counter modulo loops and duplicate listings on the Home screen, removes recomposition churn from animated glow modifiers, and hardens audio playback error recovery, sleep timer volume restoration, and atomic storage persistence.
 
 ---
 
@@ -68,9 +68,31 @@ HyprMusic v1.6.0 delivers a major overhaul of the theming engine, introducing de
 
 ---
 
+### Bug Fixes & System Stability Improvements
+* **Touch Event Pass-Through Fix**: Added full touch consumption and 44–48dp ergonomic touch hit-boxes to the Now Playing progress bar and screen container, completely preventing accidental song changes from touches leaking to background track rows.
+* **Home Screen Scroll Loop & Deduplication Fix**:
+  * Fixed track index counter formatting in terminal layout (removed `% 100` modulo that caused track 100 to show as `00` and appear as a loop).
+  * Only display Heavy Rotation when genuine play history exists, and automatically deduplicate any Heavy Rotation tracks from Recently Indexed.
+  * Hoisted `LazyListState` using `rememberSaveable` to retain exact scroll position across tab switches.
+  * Moved animated glow border computation from composition phase to draw phase (`drawWithContent`), eliminating 60/120 FPS continuous recomposition churn and scroll jank.
+* **Audio Engine & Seeking Safeguards**:
+  * Clamped `seekTo()` upper bound to `durationMs - 300L` to prevent seeking near the track end from triggering premature auto-skip or playback end state.
+  * Added retry counters to playback error handling to prevent infinite retry loops on corrupted or deleted media.
+  * Smart shuffle selection now avoids immediately picking the same playing track again when queue size > 1.
+* **Audiophile Sleep Timer Polish**:
+  * Preserves and restores user-selected volume levels after timer fade-out or cancellation instead of forcefully resetting to 100%.
+* **Storage & Cloud Resiliency**:
+  * Added atomic file writes with `.tmp` staging for track library cache, playlists, and cloud catalog to eliminate risk of database corruption on process termination.
+  * Safe column index resolution for MediaStore on Android 10+ with proper `albumId > 0` validation to eliminate missing album art crashes.
+  * Guaranteed cleanup of pending MediaStore URIs on aborted or failed Telegram cloud downloads.
+  * Ensured HTTP connection closure across LRCLIB lyrics requests to eliminate socket leaks.
+  * Updated OTA update manager current version identifier to `v1.6.1`.
+
+---
+
 ## Package Information
-* **Version**: `v1.6.0`
-* **Version Code**: `8`
+* **Version**: `v1.6.1`
+* **Version Code**: `9`
 * **Package Name**: `com.example.hyprmusic`
 * **Target SDK**: Android 16 (API 36)
 * **Minimum SDK**: Android 10 (API 29)
@@ -79,4 +101,4 @@ HyprMusic v1.6.0 delivers a major overhaul of the theming engine, introducing de
 ---
 
 ## Installation
-Download the `HyprMusic-v1.6.0.apk` asset and install directly on your Android device (Android 10+), or use the built-in OTA update checker in Settings.
+Download the `HyprMusic-v1.6.1.apk` asset and install directly on your Android device (Android 10+), or use the built-in OTA update checker in Settings.

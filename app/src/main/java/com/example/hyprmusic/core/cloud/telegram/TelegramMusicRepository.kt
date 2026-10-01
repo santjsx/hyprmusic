@@ -90,9 +90,14 @@ class TelegramMusicRepository(
     }
 
     private fun loadCachedCatalog() {
-        if (!cacheFile.exists() || cacheFile.length() == 0L) return
+        val target = if (cacheFile.exists() && cacheFile.length() > 0L) {
+            cacheFile
+        } else {
+            File(context.filesDir, "tpmc_cached_catalog.json.tmp")
+        }
+        if (!target.exists() || target.length() == 0L) return
         try {
-            val content = cacheFile.readText()
+            val content = target.readText()
             val dto = json.decodeFromString<TelegramLibraryResponseDto>(content)
             val settings = config.settings.value
             val mappedTracks = dto.tracks.map { it.toTrack(settings.serverUrl, settings.userId, settings.apiSecretKey) }
@@ -193,7 +198,13 @@ class TelegramMusicRepository(
 
                 // Persist to disk cache
                 try {
-                    cacheFile.writeText(json.encodeToString(dto))
+                    val content = json.encodeToString(dto)
+                    val tempFile = File(context.filesDir, "tpmc_cached_catalog.json.tmp")
+                    tempFile.writeText(content)
+                    if (tempFile.exists() && tempFile.length() > 0) {
+                        if (cacheFile.exists()) cacheFile.delete()
+                        tempFile.renameTo(cacheFile)
+                    }
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
@@ -231,7 +242,7 @@ class TelegramMusicRepository(
             val request = Request.Builder()
                 .url(downloadUrl)
                 .get()
-                .header("User-Agent", "HyprMusic/1.2.0 (Android)")
+                .header("User-Agent", "HyprMusic/1.6.1 (Android)")
                 .build()
 
             downloadClient.newCall(request).execute().use { response ->
@@ -296,12 +307,13 @@ class TelegramMusicRepository(
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            targetUri?.let { uri ->
+        } finally {
+            val uriToClean = targetUri
+            if (!success && uriToClean != null) {
                 try {
-                    context.contentResolver.delete(uri, null, null)
+                    context.contentResolver.delete(uriToClean, null, null)
                 } catch (ignored: Exception) {}
             }
-        } finally {
             _downloadingProgress.update { it - track.id }
         }
 

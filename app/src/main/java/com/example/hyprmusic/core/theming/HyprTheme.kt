@@ -30,11 +30,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -471,7 +476,7 @@ fun Modifier.hyprAnimatedGlow(
     if (!enabled) return this
 
     val infiniteTransition = rememberInfiniteTransition(label = "hypr_glow")
-    val offsetProgress by infiniteTransition.animateFloat(
+    val offsetProgress = infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1000f,
         animationSpec = infiniteRepeatable(
@@ -481,18 +486,34 @@ fun Modifier.hyprAnimatedGlow(
         label = "glow_offset"
     )
 
-    val shape = RoundedCornerShape(theme.borderRadiusDp.dp)
-    val animatedBrush = Brush.linearGradient(
-        colors = theme.activeBorderGradient + theme.activeBorderGradient.first(),
-        start = Offset(offsetProgress, offsetProgress),
-        end = Offset(offsetProgress + 500f, offsetProgress + 500f)
-    )
+    val density = LocalDensity.current
+    val strokeWidthPx = remember(density, theme.borderThicknessDp) {
+        with(density) { (theme.borderThicknessDp + 1).dp.toPx() }
+    }
+    val cornerRadiusPx = remember(density, theme.borderRadiusDp) {
+        with(density) { theme.borderRadiusDp.dp.toPx() }
+    }
+    val gradientColors = remember(theme.activeBorderGradient) {
+        theme.activeBorderGradient + theme.activeBorderGradient.first()
+    }
 
-    return this.border(
-        width = (theme.borderThicknessDp + 1).dp,
-        brush = animatedBrush,
-        shape = shape
-    )
+    return this.drawWithContent {
+        drawContent()
+        val currentOffset = offsetProgress.value
+        val animatedBrush = Brush.linearGradient(
+            colors = gradientColors,
+            start = Offset(currentOffset, currentOffset),
+            end = Offset(currentOffset + 500f, currentOffset + 500f)
+        )
+        val halfStroke = strokeWidthPx / 2f
+        drawRoundRect(
+            brush = animatedBrush,
+            topLeft = Offset(halfStroke, halfStroke),
+            size = Size(size.width - strokeWidthPx, size.height - strokeWidthPx),
+            cornerRadius = CornerRadius(cornerRadiusPx, cornerRadiusPx),
+            style = Stroke(width = strokeWidthPx)
+        )
+    }
 }
 
 /**

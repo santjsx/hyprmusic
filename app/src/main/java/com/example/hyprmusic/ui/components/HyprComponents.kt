@@ -17,8 +17,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -1134,6 +1137,50 @@ object HyprIconProvider {
  * - DYNAMIC_NEON: Audio-reactive neon gradient seek slider with dynamic glow
  * - ANALOG_TAPE_GAUGE: Vintage dual-rail tape counter with precision tick marks & sliding head
  */
+/**
+ * Unified pointer gesture listener for progress bars that immediately handles down-seeking,
+ * continuous dragging, and consumes all events to prevent touch pass-through.
+ */
+private fun Modifier.adaptiveSeekGesture(
+    onSeekToPercent: ((Float) -> Unit)?
+): Modifier {
+    if (onSeekToPercent == null) return this
+    return this.pointerInput(onSeekToPercent) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            down.consume()
+            val totalWidth = size.width.toFloat()
+            if (totalWidth > 0f) {
+                val newPercent = (down.position.x / totalWidth).coerceIn(0f, 1f)
+                onSeekToPercent(newPercent)
+            }
+
+            while (true) {
+                val event = awaitPointerEvent()
+                val change = event.changes.firstOrNull() ?: break
+                if (!change.pressed) {
+                    change.consume()
+                    break
+                }
+                change.consume()
+                if (totalWidth > 0f) {
+                    val newPercent = (change.position.x / totalWidth).coerceIn(0f, 1f)
+                    onSeekToPercent(newPercent)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Structurally adaptive progress tracker inspecting HyprTheme.spec.progressStyle:
+ * - CAPSULE_SEEKER: Modern capsule pill scrubber with smooth interactive thumb
+ * - WAVEFORM_SCRUBBER: Simulated multi-band audio waveform with illuminated elapsed bars
+ * - SEGMENTED_LED_VU: Studio 24-step LED audio VU meter with calibrated peak thresholds
+ * - MINIMAL_WAYBAR: Ultra-clean minimal 2.5dp low-profile line track
+ * - DYNAMIC_NEON: Audio-reactive neon gradient seek slider with dynamic glow
+ * - ANALOG_TAPE_GAUGE: Vintage dual-rail tape counter with precision tick marks & sliding head
+ */
 @Composable
 fun AdaptiveProgressBar(
     progressPercent: Float,
@@ -1149,29 +1196,13 @@ fun AdaptiveProgressBar(
         ProgressBarStyle.CAPSULE_SEEKER -> {
             Column(
                 modifier = modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(20.dp)
-                        .then(
-                            if (onSeekToPercent != null) {
-                                Modifier
-                                    .pointerInput(Unit) {
-                                        detectHorizontalDragGestures { change, _ ->
-                                            val newPercent = (change.position.x / size.width).coerceIn(0f, 1f)
-                                            onSeekToPercent(newPercent)
-                                        }
-                                    }
-                                    .pointerInput(Unit) {
-                                        detectTapGestures { offset ->
-                                            val newPercent = (offset.x / size.width).coerceIn(0f, 1f)
-                                            onSeekToPercent(newPercent)
-                                        }
-                                    }
-                            } else Modifier
-                        ),
+                        .height(44.dp)
+                        .adaptiveSeekGesture(onSeekToPercent),
                     contentAlignment = Alignment.CenterStart
                 ) {
                     val totalWidthPx = constraints.maxWidth.toFloat()
@@ -1197,9 +1228,9 @@ fun AdaptiveProgressBar(
                     Box(
                         modifier = Modifier
                             .graphicsLayer {
-                                translationX = (totalWidthPx * safePercent - 6.dp.toPx()).coerceAtLeast(0f)
+                                translationX = (totalWidthPx * safePercent - 7.dp.toPx()).coerceAtLeast(0f)
                             }
-                            .size(12.dp)
+                            .size(14.dp)
                             .clip(CircleShape)
                             .background(spec.textPrimary)
                             .border(1.5.dp, spec.borderActive, CircleShape)
@@ -1231,53 +1262,43 @@ fun AdaptiveProgressBar(
         ProgressBarStyle.WAVEFORM_SCRUBBER -> {
             Column(
                 modifier = modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Canvas(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(28.dp)
-                        .then(
-                            if (onSeekToPercent != null) {
-                                Modifier
-                                    .pointerInput(Unit) {
-                                        detectHorizontalDragGestures { change, _ ->
-                                            val newPercent = (change.position.x / size.width).coerceIn(0f, 1f)
-                                            onSeekToPercent(newPercent)
-                                        }
-                                    }
-                                    .pointerInput(Unit) {
-                                        detectTapGestures { offset ->
-                                            val newPercent = (offset.x / size.width).coerceIn(0f, 1f)
-                                            onSeekToPercent(newPercent)
-                                        }
-                                    }
-                            } else Modifier
-                        )
+                        .height(44.dp)
+                        .adaptiveSeekGesture(onSeekToPercent),
+                    contentAlignment = Alignment.Center
                 ) {
-                    val totalW = size.width
-                    val maxH = size.height
-                    val barCount = 32
-                    val spacingPx = 2.5.dp.toPx()
-                    val barW = ((totalW - (barCount - 1) * spacingPx) / barCount).coerceAtLeast(2f)
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(28.dp)
+                    ) {
+                        val totalW = size.width
+                        val maxH = size.height
+                        val barCount = 32
+                        val spacingPx = 2.5.dp.toPx()
+                        val barW = ((totalW - (barCount - 1) * spacingPx) / barCount).coerceAtLeast(2f)
 
-                    for (i in 0 until barCount) {
-                        val barFraction = (i + 0.5f) / barCount
-                        val isPassed = barFraction <= safePercent
-                        // Organically calibrated soundwave curve
-                        val norm = 0.22f + 0.72f * kotlin.math.abs(
-                            kotlin.math.sin(i * 0.45f + 0.25f) * kotlin.math.cos(i * 0.22f + 0.1f)
-                        )
-                        val barH = (maxH * norm).coerceIn(4.dp.toPx(), maxH)
-                        val x = i * (barW + spacingPx)
-                        val y = (maxH - barH) / 2f
+                        for (i in 0 until barCount) {
+                            val barFraction = (i + 0.5f) / barCount
+                            val isPassed = barFraction <= safePercent
+                            val norm = 0.22f + 0.72f * kotlin.math.abs(
+                                kotlin.math.sin(i * 0.45f + 0.25f) * kotlin.math.cos(i * 0.22f + 0.1f)
+                            )
+                            val barH = (maxH * norm).coerceIn(4.dp.toPx(), maxH)
+                            val x = i * (barW + spacingPx)
+                            val y = (maxH - barH) / 2f
 
-                        drawRoundRect(
-                            color = if (isPassed) spec.borderActive else spec.surfaceVariant.copy(alpha = 0.5f),
-                            topLeft = Offset(x, y),
-                            size = Size(barW, barH),
-                            cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
-                        )
+                            drawRoundRect(
+                                color = if (isPassed) spec.borderActive else spec.surfaceVariant.copy(alpha = 0.5f),
+                                topLeft = Offset(x, y),
+                                size = Size(barW, barH),
+                                cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
+                            )
+                        }
                     }
                 }
 
@@ -1314,53 +1335,44 @@ fun AdaptiveProgressBar(
         ProgressBarStyle.SEGMENTED_LED_VU -> {
             Column(
                 modifier = modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Canvas(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(14.dp)
-                        .then(
-                            if (onSeekToPercent != null) {
-                                Modifier
-                                    .pointerInput(Unit) {
-                                        detectHorizontalDragGestures { change, _ ->
-                                            val newPercent = (change.position.x / size.width).coerceIn(0f, 1f)
-                                            onSeekToPercent(newPercent)
-                                        }
-                                    }
-                                    .pointerInput(Unit) {
-                                        detectTapGestures { offset ->
-                                            val newPercent = (offset.x / size.width).coerceIn(0f, 1f)
-                                            onSeekToPercent(newPercent)
-                                        }
-                                    }
-                            } else Modifier
-                        )
+                        .height(44.dp)
+                        .adaptiveSeekGesture(onSeekToPercent),
+                    contentAlignment = Alignment.Center
                 ) {
-                    val totalW = size.width
-                    val h = size.height
-                    val segmentCount = 24
-                    val spacingPx = 2.dp.toPx()
-                    val segW = ((totalW - (segmentCount - 1) * spacingPx) / segmentCount).coerceAtLeast(2f)
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(16.dp)
+                    ) {
+                        val totalW = size.width
+                        val h = size.height
+                        val segmentCount = 24
+                        val spacingPx = 2.dp.toPx()
+                        val segW = ((totalW - (segmentCount - 1) * spacingPx) / segmentCount).coerceAtLeast(2f)
 
-                    for (i in 0 until segmentCount) {
-                        val isLit = (i / segmentCount.toFloat()) <= safePercent
-                        val x = i * (segW + spacingPx)
+                        for (i in 0 until segmentCount) {
+                            val isLit = (i / segmentCount.toFloat()) <= safePercent
+                            val x = i * (segW + spacingPx)
 
-                        val litColor = when {
-                            i >= 21 -> Color(0xFFFF3366) // Studio Peak Red
-                            i >= 16 -> Color(0xFFFFB300) // Studio Warning Amber
-                            else -> spec.borderActive // Standard Studio Accent
+                            val litColor = when {
+                                i >= 21 -> Color(0xFFFF3366) // Studio Peak Red
+                                i >= 16 -> Color(0xFFFFB300) // Studio Warning Amber
+                                else -> spec.borderActive // Standard Studio Accent
+                            }
+                            val color = if (isLit) litColor else spec.surfaceVariant.copy(alpha = 0.35f)
+
+                            drawRoundRect(
+                                color = color,
+                                topLeft = Offset(x, 0f),
+                                size = Size(segW, h),
+                                cornerRadius = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx())
+                            )
                         }
-                        val color = if (isLit) litColor else spec.surfaceVariant.copy(alpha = 0.35f)
-
-                        drawRoundRect(
-                            color = color,
-                            topLeft = Offset(x, 0f),
-                            size = Size(segW, h),
-                            cornerRadius = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx())
-                        )
                     }
                 }
 
@@ -1397,31 +1409,14 @@ fun AdaptiveProgressBar(
         ProgressBarStyle.MINIMAL_WAYBAR -> {
             Column(
                 modifier = modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(5.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(10.dp)
-                        .clip(RoundedCornerShape(spec.cornerRadius))
-                        .then(
-                            if (onSeekToPercent != null) {
-                                Modifier
-                                    .pointerInput(Unit) {
-                                        detectHorizontalDragGestures { change, _ ->
-                                            val newPercent = (change.position.x / size.width).coerceIn(0f, 1f)
-                                            onSeekToPercent(newPercent)
-                                        }
-                                    }
-                                    .pointerInput(Unit) {
-                                        detectTapGestures { offset ->
-                                            val newPercent = (offset.x / size.width).coerceIn(0f, 1f)
-                                            onSeekToPercent(newPercent)
-                                        }
-                                    }
-                            } else Modifier
-                        ),
-                    contentAlignment = Alignment.CenterStart
+                        .height(44.dp)
+                        .adaptiveSeekGesture(onSeekToPercent),
+                    contentAlignment = Alignment.Center
                 ) {
                     LinearProgressIndicator(
                         progress = { safePercent },
@@ -1429,8 +1424,8 @@ fun AdaptiveProgressBar(
                         trackColor = spec.surfaceVariant,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(3.dp)
-                            .clip(RoundedCornerShape(1.5.dp))
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
                     )
                 }
 
@@ -1458,20 +1453,54 @@ fun AdaptiveProgressBar(
 
         ProgressBarStyle.DYNAMIC_NEON -> {
             Column(
-                modifier = modifier.fillMaxWidth()
+                modifier = modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Slider(
-                    value = safePercent,
-                    onValueChange = { onSeekToPercent?.invoke(it) },
-                    colors = SliderDefaults.colors(
-                        thumbColor = spec.borderActive,
-                        activeTrackColor = spec.borderActive,
-                        inactiveTrackColor = spec.surfaceVariant
-                    ),
+                BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(24.dp)
-                )
+                        .height(44.dp)
+                        .adaptiveSeekGesture(onSeekToPercent),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    val totalW = constraints.maxWidth.toFloat()
+                    val trackH = 6.dp
+
+                    // Background track
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(trackH)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(spec.surfaceVariant)
+                    )
+
+                    // Neon glowing active track
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(safePercent)
+                            .height(trackH)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(spec.borderActive.copy(alpha = 0.7f), spec.borderActive)
+                                )
+                            )
+                    )
+
+                    // Glowing Neon Thumb
+                    Box(
+                        modifier = Modifier
+                            .graphicsLayer {
+                                translationX = (totalW * safePercent - 8.dp.toPx()).coerceAtLeast(0f)
+                            }
+                            .size(16.dp)
+                            .clip(CircleShape)
+                            .background(spec.borderActive)
+                            .border(2.dp, spec.surface, CircleShape)
+                    )
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -1480,14 +1509,14 @@ fun AdaptiveProgressBar(
                         text = elapsed,
                         fontFamily = spec.fontFamily,
                         color = spec.borderActive,
-                        fontSize = 11.sp,
+                        fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = total,
                         fontFamily = spec.fontFamily,
                         color = spec.textSecondary,
-                        fontSize = 11.sp,
+                        fontSize = 11.5.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -1497,63 +1526,54 @@ fun AdaptiveProgressBar(
         ProgressBarStyle.ANALOG_TAPE_GAUGE -> {
             Column(
                 modifier = modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Canvas(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(22.dp)
-                        .then(
-                            if (onSeekToPercent != null) {
-                                Modifier
-                                    .pointerInput(Unit) {
-                                        detectHorizontalDragGestures { change, _ ->
-                                            val newPercent = (change.position.x / size.width).coerceIn(0f, 1f)
-                                            onSeekToPercent(newPercent)
-                                        }
-                                    }
-                                    .pointerInput(Unit) {
-                                        detectTapGestures { offset ->
-                                            val newPercent = (offset.x / size.width).coerceIn(0f, 1f)
-                                            onSeekToPercent(newPercent)
-                                        }
-                                    }
-                            } else Modifier
-                        )
+                        .height(44.dp)
+                        .adaptiveSeekGesture(onSeekToPercent),
+                    contentAlignment = Alignment.Center
                 ) {
-                    val totalW = size.width
-                    val topRailY = 3.dp.toPx()
-                    val bottomRailY = 19.dp.toPx()
-                    val strokeW = 1.2.dp.toPx()
-                    val railColor = spec.borderInactive.copy(alpha = 0.8f)
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(24.dp)
+                    ) {
+                        val totalW = size.width
+                        val topRailY = 3.dp.toPx()
+                        val bottomRailY = 21.dp.toPx()
+                        val strokeW = 1.2.dp.toPx()
+                        val railColor = spec.borderInactive.copy(alpha = 0.8f)
 
-                    // Dual tracking rails
-                    drawLine(railColor, Offset(0f, topRailY), Offset(totalW, topRailY), strokeWidth = strokeW)
-                    drawLine(railColor, Offset(0f, bottomRailY), Offset(totalW, bottomRailY), strokeWidth = strokeW)
+                        // Dual tracking rails
+                        drawLine(railColor, Offset(0f, topRailY), Offset(totalW, topRailY), strokeWidth = strokeW)
+                        drawLine(railColor, Offset(0f, bottomRailY), Offset(totalW, bottomRailY), strokeWidth = strokeW)
 
-                    // Precision tape tick marks
-                    for (step in 0..20) {
-                        val tickX = totalW * (step / 20f)
-                        val isMajor = step % 5 == 0
-                        val tickLen = if (isMajor) 5.dp.toPx() else 2.5.dp.toPx()
-                        drawLine(railColor, Offset(tickX, topRailY), Offset(tickX, topRailY + tickLen), strokeWidth = 1.dp.toPx())
-                        drawLine(railColor, Offset(tickX, bottomRailY), Offset(tickX, bottomRailY - tickLen), strokeWidth = 1.dp.toPx())
+                        // Precision tape tick marks
+                        for (step in 0..20) {
+                            val tickX = totalW * (step / 20f)
+                            val isMajor = step % 5 == 0
+                            val tickLen = if (isMajor) 5.dp.toPx() else 2.5.dp.toPx()
+                            drawLine(railColor, Offset(tickX, topRailY), Offset(tickX, topRailY + tickLen), strokeWidth = 1.dp.toPx())
+                            drawLine(railColor, Offset(tickX, bottomRailY), Offset(tickX, bottomRailY - tickLen), strokeWidth = 1.dp.toPx())
+                        }
+
+                        // Active progress needle
+                        val needleX = (totalW * safePercent).coerceIn(0f, totalW)
+                        drawLine(
+                            spec.borderActive,
+                            Offset(needleX, 1.dp.toPx()),
+                            Offset(needleX, 23.dp.toPx()),
+                            strokeWidth = 2.5.dp.toPx(),
+                            cap = StrokeCap.Round
+                        )
+                        drawCircle(
+                            spec.borderActive,
+                            radius = 3.5.dp.toPx(),
+                            center = Offset(needleX, 12.dp.toPx())
+                        )
                     }
-
-                    // Active progress needle
-                    val needleX = (totalW * safePercent).coerceIn(0f, totalW)
-                    drawLine(
-                        spec.borderActive,
-                        Offset(needleX, 1.dp.toPx()),
-                        Offset(needleX, 21.dp.toPx()),
-                        strokeWidth = 2.5.dp.toPx(),
-                        cap = StrokeCap.Round
-                    )
-                    drawCircle(
-                        spec.borderActive,
-                        radius = 3.5.dp.toPx(),
-                        center = Offset(needleX, 11.dp.toPx())
-                    )
                 }
 
                 Row(

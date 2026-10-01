@@ -251,12 +251,18 @@ object LyricsRepository {
             connectTimeout = 4000
             readTimeout = 4000
             requestMethod = "GET"
-            setRequestProperty("User-Agent", "HyprMusic/2.0 (contact@hyprmusic.dev)")
+            setRequestProperty("User-Agent", "HyprMusic/1.6.1 (contact@hyprmusic.dev)")
         }
-        return if (conn.responseCode == 200) {
-            val raw = conn.inputStream.bufferedReader().use { it.readText() }
-            JSONArray(raw)
-        } else null
+        return try {
+            if (conn.responseCode == 200) {
+                val raw = conn.inputStream.bufferedReader().use { it.readText() }
+                JSONArray(raw)
+            } else null
+        } catch (_: Exception) {
+            null
+        } finally {
+            conn.disconnect()
+        }
     }
 
     private fun fetchJsonObject(urlStr: String): JSONObject? {
@@ -264,11 +270,17 @@ object LyricsRepository {
             connectTimeout = 4000
             readTimeout = 4000
             requestMethod = "GET"
-            setRequestProperty("User-Agent", "HyprMusic/2.0 (contact@hyprmusic.dev)")
+            setRequestProperty("User-Agent", "HyprMusic/1.6.1 (contact@hyprmusic.dev)")
         }
-        return if (conn.responseCode == 200) {
-            val raw = conn.inputStream.bufferedReader().use { it.readText() }
-            JSONObject(raw)
-        } else null
+        return try {
+            if (conn.responseCode == 200) {
+                val raw = conn.inputStream.bufferedReader().use { it.readText() }
+                JSONObject(raw)
+            } else null
+        } catch (_: Exception) {
+            null
+        } finally {
+            conn.disconnect()
+        }
     }
 }
