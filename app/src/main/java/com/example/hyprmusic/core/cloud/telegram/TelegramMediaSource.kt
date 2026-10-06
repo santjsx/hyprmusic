@@ -45,7 +45,7 @@ object TelegramMediaSource {
 
     fun buildCacheDataSource(context: Context): CacheDataSource {
         val okHttpFactory = OkHttpDataSource.Factory(sharedOkHttpClient)
-            .setUserAgent("HyprMusic/1.9.8 (Android)")
+            .setUserAgent("HyprMusic/1.9.9 (Android)")
 
         val baseFactory = DefaultDataSource.Factory(context, okHttpFactory)
         val cache = getCache(context)
@@ -59,7 +59,7 @@ object TelegramMediaSource {
 
     fun buildDataSourceFactory(context: Context): DataSource.Factory {
         val okHttpFactory = OkHttpDataSource.Factory(sharedOkHttpClient)
-            .setUserAgent("HyprMusic/1.9.8 (Android)")
+            .setUserAgent("HyprMusic/1.9.9 (Android)")
 
         val baseFactory = DefaultDataSource.Factory(context, okHttpFactory)
         val cache = getCache(context)

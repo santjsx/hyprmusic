@@ -12,12 +12,17 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -861,25 +866,30 @@ fun SyncedLyricsView(
     onSeekTo: (Long) -> Unit,
     onRetry: () -> Unit,
     onShowCoverArt: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    trackTitle: String = "",
+    artist: String = ""
 ) {
     if (isLoading) {
         Box(
             modifier = modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(28.dp),
+                    modifier = Modifier.size(26.dp),
                     strokeWidth = 2.dp,
                     color = theme.accentColor
                 )
-                Spacer(modifier = Modifier.height(14.dp))
                 Text(
-                    text = "grep -i lyrics in local storage...",
-                    color = theme.textSecondaryColor,
+                    text = "[ ⟳ FETCHING SYNCED LRCLIB STREAM... ]",
+                    color = theme.accentColor.copy(alpha = 0.85f),
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
@@ -894,17 +904,17 @@ fun SyncedLyricsView(
             Column(
                 modifier = Modifier
                     .fillMaxWidth(0.85f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(theme.surfaceVariantColor.copy(alpha = 0.6f))
-                    .border(1.dp, theme.accentColor.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                    .padding(20.dp),
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(theme.surfaceVariantColor.copy(alpha = 0.55f))
+                    .border(1.dp, theme.inactiveBorderColor.copy(alpha = 0.40f), RoundedCornerShape(10.dp))
+                    .padding(22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Icon(
                     imageVector = Icons.Default.GraphicEq,
                     contentDescription = null,
                     tint = theme.accentColor,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(28.dp)
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -913,34 +923,35 @@ fun SyncedLyricsView(
                     text = "[!] NO SYNCED LYRICS FOUND",
                     color = theme.textPrimaryColor,
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 12.5.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "Instrumental track or unindexed .lrc file",
+                    text = "Instrumental track or unindexed in LRCLIB",
                     color = theme.textSecondaryColor,
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
+                    fontSize = 10.5.sp,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
                             .background(theme.surfaceColor)
+                            .border(1.dp, theme.accentColor.copy(alpha = 0.50f), RoundedCornerShape(6.dp))
                             .clickable(onClick = onRetry)
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Text(
-                            text = "[ RETRY ]",
+                            text = "RETRY",
                             color = theme.accentColor,
-                            fontSize = 10.5.sp,
+                            fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold
                         )
@@ -950,13 +961,14 @@ fun SyncedLyricsView(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
                             .background(theme.surfaceColor)
+                            .border(1.dp, theme.inactiveBorderColor.copy(alpha = 0.40f), RoundedCornerShape(6.dp))
                             .clickable(onClick = onShowCoverArt)
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Text(
-                            text = "[ SHOW ART ]",
+                            text = "COVER",
                             color = theme.textSecondaryColor,
-                            fontSize = 10.5.sp,
+                            fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold
                         )
@@ -973,37 +985,189 @@ fun SyncedLyricsView(
         idx.coerceIn(0, (lyrics.size - 1).coerceAtLeast(0))
     }
     val listState = rememberLazyListState()
+    var userScrolledAway by remember { mutableStateOf(false) }
 
-    LaunchedEffect(activeIndex) {
-        if (activeIndex in lyrics.indices) {
-            listState.animateScrollToItem((activeIndex - 2).coerceAtLeast(0))
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) {
+            userScrolledAway = true
         }
     }
 
-    LazyColumn(
-        state = listState,
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        item { Spacer(modifier = Modifier.height(40.dp)) }
+    // Auto-resync: return to auto-scrolling if user hasn't touched the screen for 4 seconds
+    LaunchedEffect(userScrolledAway) {
+        if (userScrolledAway) {
+            delay(4000)
+            userScrolledAway = false
+        }
+    }
 
-        itemsIndexed(
-            items = lyrics,
-            key = { index, item -> "$index-${item.timestampMs}" }
-        ) { index, line ->
-            val distance = (index - activeIndex).let { if (it < 0) -it else it }
-            LyricLineItem(
-                theme = theme,
-                line = line,
-                isActive = index == activeIndex,
-                distance = distance,
-                onSeekTo = onSeekTo
+    // Centered auto-scroll to keep active lyric in the optical sweet spot
+    LaunchedEffect(activeIndex, userScrolledAway) {
+        if (!userScrolledAway && activeIndex in lyrics.indices) {
+            val viewportHeight = listState.layoutInfo.viewportSize.height
+            val targetOffset = if (viewportHeight > 0) -(viewportHeight / 3) else 0
+            listState.animateScrollToItem(
+                index = activeIndex,
+                scrollOffset = targetOffset
             )
         }
+    }
 
-        item { Spacer(modifier = Modifier.height(120.dp)) }
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Terminal Header Module
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Back to Cover pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(theme.surfaceVariantColor.copy(alpha = 0.70f))
+                        .border(1.dp, theme.inactiveBorderColor.copy(alpha = 0.40f), RoundedCornerShape(6.dp))
+                        .clickable(onClick = onShowCoverArt)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "‹ COVER",
+                        color = theme.accentColor,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Title & Monospace Path Telemetry
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp)
+                ) {
+                    Text(
+                        text = trackTitle.ifEmpty { "SYNCED LYRICS" },
+                        color = theme.textPrimaryColor,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "~/lyrics/synced.lrc",
+                        color = theme.textSecondaryColor,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 8.5.sp
+                    )
+                }
+
+                // Live Sync Status Beacon
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xFF00E676).copy(alpha = 0.12f))
+                        .border(1.dp, Color(0xFF00E676).copy(alpha = 0.40f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 7.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "● LIVE",
+                        color = Color(0xFF00E676),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Lyrics Viewport with Top & Bottom Gradient Fade Masks
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                0f to Color.Transparent,
+                                0.08f to Color.Black,
+                                0.92f to Color.Black,
+                                1f to Color.Transparent
+                            ),
+                            blendMode = BlendMode.DstIn
+                        )
+                    }
+            ) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    item { Spacer(modifier = Modifier.height(28.dp)) }
+
+                    itemsIndexed(
+                        items = lyrics,
+                        key = { index, item -> "$index-${item.timestampMs}" }
+                    ) { index, line ->
+                        val distance = (index - activeIndex).let { if (it < 0) -it else it }
+                        LyricLineItem(
+                            theme = theme,
+                            line = line,
+                            isActive = index == activeIndex,
+                            distance = distance,
+                            onSeekTo = onSeekTo
+                        )
+                    }
+
+                    item { Spacer(modifier = Modifier.height(64.dp)) }
+                }
+            }
+        }
+
+        // Floating Resync Pill when user scrolls away
+        AnimatedVisibility(
+            visible = userScrolledAway,
+            enter = fadeIn() + scaleIn(),
+            exit = fadeOut() + scaleOut(),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = 12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(theme.surfaceColor.copy(alpha = 0.94f))
+                    .border(1.dp, theme.accentColor, RoundedCornerShape(8.dp))
+                    .clickable {
+                        userScrolledAway = false
+                    }
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF00E676))
+                    )
+                    Text(
+                        text = "RESYNC",
+                        color = theme.accentColor,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -1018,9 +1182,9 @@ private fun LyricLineItem(
     val haptic = LocalHapticFeedback.current
     val alpha = when {
         isActive -> 1f
-        distance == 1 -> 0.65f
-        distance == 2 -> 0.40f
-        else -> 0.22f
+        distance == 1 -> 0.55f
+        distance == 2 -> 0.35f
+        else -> 0.18f
     }
 
     val minSec = remember(line.timestampMs) {
@@ -1030,55 +1194,54 @@ private fun LyricLineItem(
         String.format("%02d:%02d", m, s)
     }
 
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(
-                if (isActive) theme.accentColor.copy(alpha = 0.14f)
-                else Color.Transparent
-            )
-            .border(
-                width = if (isActive) 1.dp else 0.dp,
-                color = if (isActive) theme.accentColor.copy(alpha = 0.5f) else Color.Transparent,
-                shape = RoundedCornerShape(8.dp)
-            )
+            .clip(RoundedCornerShape(6.dp))
             .clickable {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onSeekTo(line.timestampMs)
             }
-            .padding(horizontal = 12.dp, vertical = if (isActive) 10.dp else 6.dp)
+            .padding(vertical = if (isActive) 6.dp else 3.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+        // Left Terminal Cursor / Prompt Indicator
+        Box(
+            modifier = Modifier.width(20.dp),
+            contentAlignment = Alignment.CenterStart
         ) {
-            Text(
-                text = line.text,
-                color = if (isActive) theme.accentColor else theme.textPrimaryColor.copy(alpha = alpha),
-                fontSize = if (isActive) 18.5.sp else 15.sp,
-                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                fontFamily = if (isActive) FontFamily.Default else FontFamily.Monospace,
-                modifier = Modifier.weight(1f)
-            )
-
             if (isActive) {
-                Spacer(modifier = Modifier.width(8.dp))
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(theme.accentColor.copy(alpha = 0.25f))
-                        .padding(horizontal = 5.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "[$minSec]",
-                        color = theme.accentColor,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                Text(
+                    text = "❯",
+                    color = theme.accentColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
+        }
+
+        // Lyric text: clean typographic hierarchy without heavy boxes
+        Text(
+            text = line.text,
+            color = if (isActive) theme.accentColor else theme.textPrimaryColor.copy(alpha = alpha),
+            fontSize = if (isActive) 18.5.sp else 15.sp,
+            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+            fontFamily = if (isActive) FontFamily.Default else FontFamily.Default,
+            lineHeight = if (isActive) 25.sp else 21.sp,
+            modifier = Modifier.weight(1f)
+        )
+
+        // Subtle Monospace Gutter Timestamp
+        if (isActive) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "[$minSec]",
+                color = theme.accentColor.copy(alpha = 0.80f),
+                fontFamily = FontFamily.Monospace,
+                fontSize = 9.5.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }

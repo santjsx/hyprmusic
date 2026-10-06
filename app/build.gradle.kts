@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.hyprmusic"
         minSdk = 29
         targetSdk = 36
-        versionCode = 20
-        versionName = "1.9.8"
+        versionCode = 21
+        versionName = "1.9.9"
     }
 
     buildTypes {

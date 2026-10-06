@@ -5,6 +5,9 @@ import android.graphics.Shader
 import android.os.Build
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode as AnimRepeatMode
@@ -129,17 +132,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
-/**
- * Centerpiece display mode for Now Playing visual module:
- * - FLOATING: Circular vinyl disc floating freely over blurred album backdrop without outer frame
- * - TILED: Flat tiled Hyprland window module with 1px active colored border and vector tonearm
- * - SLEEVE: Tangible gatefold Digipak jacket with sliding peeking vinyl disc
- */
-enum class NowPlayingCenterpieceMode(val tag: String, val label: String) {
-    FLOATING("FLOAT", "◈ FLOAT"),
-    TILED("TILED", "◈ TILED"),
-    SLEEVE("SLEEVE", "◈ SLEEVE")
-}
 
 @Composable
 fun NowPlayingScreen(
@@ -191,7 +183,6 @@ fun NowPlayingScreen(
 
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
-    var centerpieceMode by rememberSaveable { mutableStateOf(NowPlayingCenterpieceMode.FLOATING) }
 
     // Unified Hyprland Rice Window Tokens
     val uniformRadius = theme.borderRadiusDp.coerceIn(8, 12).dp
@@ -324,76 +315,39 @@ fun NowPlayingScreen(
                     )
                 }
 
-                // Right Utility Cluster (Display Mode Switcher + Favorite)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                // Right Utility: Favorite Toggle
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(riceShape)
+                        .background(
+                            if (track.isFavorite) theme.accentColor.copy(alpha = 0.18f)
+                            else theme.surfaceVariantColor
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = if (track.isFavorite) theme.accentColor.copy(alpha = 0.65f)
+                                   else theme.inactiveBorderColor.copy(alpha = 0.45f),
+                            shape = riceShape
+                        )
+                        .clickable {
+                            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                            onToggleFavorite(track.id)
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
-                    // Display Mode Switcher Module Pill
-                    Box(
-                        modifier = Modifier
-                            .height(34.dp)
-                            .clip(riceShape)
-                            .background(theme.surfaceVariantColor)
-                            .border(
-                                width = 1.dp,
-                                color = theme.accentColor.copy(alpha = 0.40f),
-                                shape = riceShape
-                            )
-                            .clickable {
-                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                                centerpieceMode = when (centerpieceMode) {
-                                    NowPlayingCenterpieceMode.FLOATING -> NowPlayingCenterpieceMode.TILED
-                                    NowPlayingCenterpieceMode.TILED -> NowPlayingCenterpieceMode.SLEEVE
-                                    NowPlayingCenterpieceMode.SLEEVE -> NowPlayingCenterpieceMode.FLOATING
-                                }
-                            }
-                            .padding(horizontal = 10.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = centerpieceMode.label,
-                            color = theme.accentColor,
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    // Favorite Button Module
-                    Box(
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(riceShape)
-                            .background(
-                                if (track.isFavorite) theme.accentColor.copy(alpha = 0.18f)
-                                else theme.surfaceVariantColor
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = if (track.isFavorite) theme.accentColor.copy(alpha = 0.65f)
-                                       else theme.inactiveBorderColor.copy(alpha = 0.45f),
-                                shape = riceShape
-                            )
-                            .clickable {
-                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                                onToggleFavorite(track.id)
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = "Favorite",
-                            tint = if (track.isFavorite) theme.accentColor else theme.textSecondaryColor,
-                            modifier = Modifier.size(17.dp)
-                        )
-                    }
+                    Icon(
+                        imageVector = if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = "Favorite",
+                        tint = if (track.isFavorite) theme.accentColor else theme.textSecondaryColor,
+                        modifier = Modifier.size(17.dp)
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Main Visual Centerpiece: Album Artwork / Vinyl vs Synced Lyrics
+            // Main Visual Centerpiece: Floating Vinyl vs Synced Lyrics
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -402,7 +356,7 @@ fun NowPlayingScreen(
             ) {
                 AnimatedContent(
                     targetState = showLyrics,
-                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(220)) },
                     label = "centerpiece_switch"
                 ) { lyricsActive ->
                     if (lyricsActive) {
@@ -421,134 +375,96 @@ fun NowPlayingScreen(
                                 onSeekTo = onSeekTo,
                                 onRetry = { lyricsRetryKey++ },
                                 onShowCoverArt = { showLyrics = false },
+                                trackTitle = track.title,
+                                artist = track.artist,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
                     } else {
-                        // Multi-Mode Centerpiece: Floating Disc vs Flat Tiled Deck vs Digipak Sleeve
-                        Box(
+                        // Singular Floating Vinyl Centerpiece
+                        FloatingVinylCenterpiece(
+                            theme = theme,
+                            albumArtUri = track.albumArtUri,
+                            trackTitle = track.title,
+                            artist = track.artist,
+                            isPlaying = playbackState.isPlaying,
                             modifier = Modifier
                                 .fillMaxWidth(0.92f)
                                 .aspectRatio(1f)
-                                .hyprBounceClick {
-                                    view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                                    centerpieceMode = when (centerpieceMode) {
-                                        NowPlayingCenterpieceMode.FLOATING -> NowPlayingCenterpieceMode.TILED
-                                        NowPlayingCenterpieceMode.TILED -> NowPlayingCenterpieceMode.SLEEVE
-                                        NowPlayingCenterpieceMode.SLEEVE -> NowPlayingCenterpieceMode.FLOATING
-                                    }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            AnimatedContent(
-                                targetState = centerpieceMode,
-                                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                                label = "centerpiece_mode_transition"
-                            ) { currentMode ->
-                                when (currentMode) {
-                                    NowPlayingCenterpieceMode.FLOATING -> {
-                                        FloatingVinylCenterpiece(
-                                            theme = theme,
-                                            albumArtUri = track.albumArtUri,
-                                            trackTitle = track.title,
-                                            artist = track.artist,
-                                            isPlaying = playbackState.isPlaying
-                                        )
-                                    }
-                                    NowPlayingCenterpieceMode.TILED -> {
-                                        FlatTiledVinylDeck(
-                                            theme = theme,
-                                            albumArtUri = track.albumArtUri,
-                                            trackTitle = track.title,
-                                            artist = track.artist,
-                                            isPlaying = playbackState.isPlaying,
-                                            progress = playbackState.progress,
-                                            riceShape = riceShape,
-                                            activeBorderColor = activeWindowBorder
-                                        )
-                                    }
-                                    NowPlayingCenterpieceMode.SLEEVE -> {
-                                        DigipakSleeve(
-                                            theme = theme,
-                                            albumArtUri = track.albumArtUri,
-                                            trackTitle = track.title,
-                                            artist = track.artist,
-                                            isPlaying = playbackState.isPlaying,
-                                            riceShape = riceShape,
-                                            activeBorderColor = activeWindowBorder
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Track Title, Artist & Audiophile Badges
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+            AnimatedVisibility(
+                visible = !showLyrics,
+                enter = expandVertically(tween(200)) + fadeIn(tween(200)),
+                exit = shrinkVertically(tween(200)) + fadeOut(tween(200))
             ) {
-                Text(
-                    text = track.title,
-                    color = theme.textPrimaryColor,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(3.dp))
-                Text(
-                    text = track.artist,
-                    color = theme.textSecondaryColor,
-                    fontSize = 14.sp,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // High-Res Audio Badge & Studio Headroom Indicator (Uniform Rice Pill Badges)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .clip(riceShape)
-                            .background(theme.surfaceVariantColor)
-                            .border(1.dp, theme.inactiveBorderColor.copy(alpha = 0.40f), riceShape)
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "${track.audioFormat} ${track.bitrate}kbps",
-                            color = theme.accentColor,
-                            fontSize = 10.5.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    Box(
-                        modifier = Modifier
-                            .clip(riceShape)
-                            .background(theme.surfaceVariantColor)
-                            .border(1.dp, theme.inactiveBorderColor.copy(alpha = 0.40f), riceShape)
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    Text(
+                        text = track.title,
+                        color = theme.textPrimaryColor,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        text = track.artist,
+                        color = theme.textSecondaryColor,
+                        fontSize = 14.sp,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // High-Res Audio Badge & Studio Headroom Indicator (Uniform Rice Pill Badges)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "16-BIT PCM",
-                            color = theme.textSecondaryColor,
-                            fontSize = 10.5.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(riceShape)
+                                .background(theme.surfaceVariantColor)
+                                .border(1.dp, theme.inactiveBorderColor.copy(alpha = 0.40f), riceShape)
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "${track.audioFormat} ${track.bitrate}kbps",
+                                color = theme.accentColor,
+                                fontSize = 10.5.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(riceShape)
+                                .background(theme.surfaceVariantColor)
+                                .border(1.dp, theme.inactiveBorderColor.copy(alpha = 0.40f), riceShape)
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "16-BIT PCM",
+                                color = theme.textSecondaryColor,
+                                fontSize = 10.5.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
@@ -566,7 +482,7 @@ fun NowPlayingScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Main Playback Controls Deck (Machined Audiophile Enclosure with Distinct Waybar Pill Modules)
+            // Main Playback Controls Deck (Clean, Minimal & Professional)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -577,169 +493,71 @@ fun NowPlayingScreen(
                         color = activeWindowBorder,
                         shape = riceShape
                     )
-                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
-                Column {
-                    // Status Telemetry LED bar - Distinct Waybar-Style Pill Modules with clear spacing
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 2.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Shuffle
+                    IconButton(
+                        onClick = {
+                            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                            onToggleShuffle()
+                        }
                     ) {
-                        // Module 1: ENGAGED / PAUSED Status Pill
-                        Box(
-                            modifier = Modifier
-                                .clip(riceShape)
-                                .background(
-                                    if (playbackState.isPlaying) Color(0xFF00E676).copy(alpha = 0.12f)
-                                    else Color(0xFFFFB300).copy(alpha = 0.12f)
-                                )
-                                .border(
-                                    width = 1.dp,
-                                    color = if (playbackState.isPlaying) Color(0xFF00E676).copy(alpha = 0.40f)
-                                           else Color(0xFFFFB300).copy(alpha = 0.40f),
-                                    shape = riceShape
-                                )
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(5.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(if (playbackState.isPlaying) Color(0xFF00E676) else Color(0xFFFFB300))
-                                )
-                                Text(
-                                    text = if (playbackState.isPlaying) "ENGAGED" else "PAUSED",
-                                    color = if (playbackState.isPlaying) Color(0xFF00E676) else Color(0xFFFFB300),
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-
-                        // Module 2: Bit-Perfect Engine Module
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(riceShape)
-                                .background(theme.surfaceVariantColor.copy(alpha = 0.70f))
-                                .border(
-                                    width = 1.dp,
-                                    color = theme.inactiveBorderColor.copy(alpha = 0.45f),
-                                    shape = riceShape
-                                )
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "BIT-PERFECT DIRECT",
-                                color = theme.textSecondaryColor,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-
-                        // Module 3: Format & Bitrate Module
-                        Box(
-                            modifier = Modifier
-                                .clip(riceShape)
-                                .background(theme.surfaceVariantColor.copy(alpha = 0.85f))
-                                .border(
-                                    width = 1.dp,
-                                    color = theme.accentColor.copy(alpha = 0.40f),
-                                    shape = riceShape
-                                )
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "${track.audioFormat} ${track.bitrate}k",
-                                color = theme.accentColor,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Shuffle,
+                            contentDescription = "Shuffle",
+                            tint = if (playbackState.isShuffle) theme.accentColor else theme.textSecondaryColor,
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    // Previous
+                    AdaptiveSkipButton(
+                        isNext = false,
+                        onClick = {
+                            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                            onSkipPrevious()
+                        },
+                        size = 44.dp
+                    )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
+                    // Play / Pause Hero Button with Adaptive Icon Pack
+                    AdaptivePlayButton(
+                        isPlaying = playbackState.isPlaying,
+                        onClick = {
+                            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                            onPlayPause()
+                        },
+                        size = 68.dp
+                    )
+
+                    // Next
+                    AdaptiveSkipButton(
+                        isNext = true,
+                        onClick = {
+                            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                            onSkipNext()
+                        },
+                        size = 44.dp
+                    )
+
+                    // Repeat Mode
+                    IconButton(
+                        onClick = {
+                            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                            onToggleRepeat()
+                        }
                     ) {
-                        // Shuffle
-                        IconButton(
-                            onClick = {
-                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                                onToggleShuffle()
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Shuffle,
-                                contentDescription = "Shuffle",
-                                tint = if (playbackState.isShuffle) theme.accentColor else theme.textSecondaryColor,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-
-                        // Previous
-                        AdaptiveSkipButton(
-                            isNext = false,
-                            onClick = {
-                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                                onSkipPrevious()
-                            },
-                            size = 44.dp
+                        Icon(
+                            imageVector = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
+                            contentDescription = "Repeat",
+                            tint = if (playbackState.repeatMode != RepeatMode.OFF) theme.accentColor else theme.textSecondaryColor,
+                            modifier = Modifier.size(24.dp)
                         )
-
-                        // Play / Pause Hero Button with Adaptive Icon Pack
-                        AdaptivePlayButton(
-                            isPlaying = playbackState.isPlaying,
-                            onClick = {
-                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                                onPlayPause()
-                            },
-                            size = 68.dp
-                        )
-
-                        // Next
-                        AdaptiveSkipButton(
-                            isNext = true,
-                            onClick = {
-                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                                onSkipNext()
-                            },
-                            size = 44.dp
-                        )
-
-                        // Repeat Mode
-                        IconButton(
-                            onClick = {
-                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                                onToggleRepeat()
-                            }
-                        ) {
-                            Icon(
-                                imageVector = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
-                                contentDescription = "Repeat",
-                                tint = if (playbackState.repeatMode != RepeatMode.OFF) theme.accentColor else theme.textSecondaryColor,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
                     }
                 }
             }
@@ -1449,207 +1267,7 @@ fun FloatingVinylCenterpiece(
 }
 
 /**
- * Flat Tiled Vinyl Deck (Hyprland Rice Architecture):
- * A true flat, tiled desktop window module with uniform corner radius, flat dark surface,
- * razor-thin 1px active colored border, flat recessed platter well with minimal calibration dots,
- * spinning vinyl disc, and a flat precision vector tonearm.
- */
-@Composable
-fun FlatTiledVinylDeck(
-    theme: HyprThemeConfig,
-    albumArtUri: String?,
-    trackTitle: String,
-    artist: String,
-    isPlaying: Boolean,
-    progress: Float,
-    riceShape: RoundedCornerShape = RoundedCornerShape(theme.borderRadiusDp.coerceIn(8, 12).dp),
-    activeBorderColor: Color = if (isPlaying) Color(0xFF00E676).copy(alpha = 0.40f) else theme.inactiveBorderColor.copy(alpha = 0.45f),
-    modifier: Modifier = Modifier
-) {
-    val rotationAnimatable = remember { Animatable(0f) }
-
-    LaunchedEffect(isPlaying) {
-        if (isPlaying) {
-            while (isActive) {
-                rotationAnimatable.animateTo(
-                    targetValue = rotationAnimatable.value + 360f,
-                    animationSpec = tween(durationMillis = 1800, easing = LinearEasing)
-                )
-            }
-        }
-    }
-    val currentRotation = rotationAnimatable.value % 360f
-
-    val targetTonearmAngle = if (isPlaying) {
-        18f + (progress.coerceIn(0f, 1f) * 18f)
-    } else {
-        0f
-    }
-
-    val tonearmAngle by animateFloatAsState(
-        targetValue = targetTonearmAngle,
-        animationSpec = spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessLow),
-        label = "tiled_tonearm_angle"
-    )
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth(0.92f)
-            .aspectRatio(1f)
-            .clip(riceShape)
-            .background(theme.surfaceColor.copy(alpha = 0.90f))
-            .border(
-                width = 1.dp,
-                color = activeBorderColor,
-                shape = riceShape
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        // Flat Platter Well & Tonearm Gimbal Canvas
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val plinthW = size.width
-            val plinthH = size.height
-            val platterCenter = Offset(plinthW * 0.44f, plinthH * 0.50f)
-            val platterRadius = plinthW * 0.40f
-
-            // Flat recessed circular platter well
-            drawCircle(
-                color = Color(0xFF070709),
-                radius = platterRadius * 1.04f,
-                center = platterCenter
-            )
-            drawCircle(
-                color = Color(0xFF1E1E26),
-                radius = platterRadius * 1.04f,
-                center = platterCenter,
-                style = Stroke(width = 1.dp.toPx())
-            )
-
-            // Minimalist hairline strobe calibration dots
-            val dotCount = 36
-            val strobeRadius = platterRadius * 0.98f
-            for (i in 0 until dotCount) {
-                val angle = Math.toRadians((i * (360f / dotCount)).toDouble())
-                val x = platterCenter.x + (strobeRadius * Math.cos(angle)).toFloat()
-                val y = platterCenter.y + (strobeRadius * Math.sin(angle)).toFloat()
-                drawCircle(
-                    color = if (isPlaying && i % 2 == 0) Color(0xFF00E676).copy(alpha = 0.75f) else Color(0xFF4A4A58),
-                    radius = 1.1.dp.toPx(),
-                    center = Offset(x, y)
-                )
-            }
-
-            // Pivot bearing mount (Top-Right)
-            val pivotCenter = Offset(plinthW * 0.83f, plinthH * 0.18f)
-            drawCircle(
-                color = Color(0xFF22222A),
-                radius = 14.dp.toPx(),
-                center = pivotCenter
-            )
-            drawCircle(
-                color = Color(0xFF3E3E4C),
-                radius = 14.dp.toPx(),
-                center = pivotCenter,
-                style = Stroke(width = 1.dp.toPx())
-            )
-            drawCircle(
-                color = if (isPlaying) Color(0xFF00E676) else theme.accentColor,
-                radius = 3.dp.toPx(),
-                center = pivotCenter
-            )
-
-            // Cue rest cradle
-            val armRestPos = Offset(plinthW * 0.83f, plinthH * 0.44f)
-            drawCircle(
-                color = if (!isPlaying) Color(0xFF00E676) else Color(0xFF3E3E4C),
-                radius = 3.5.dp.toPx(),
-                center = armRestPos
-            )
-        }
-
-        // Spinning Vinyl Disc
-        PureVinylDisc(
-            theme = theme,
-            albumArtUri = albumArtUri,
-            trackTitle = trackTitle,
-            artist = artist,
-            currentRotation = currentRotation,
-            modifier = Modifier
-                .fillMaxSize(0.77f)
-                .graphicsLayer { translationX = -size.width * 0.06f }
-        )
-
-        // Flat Precision Tonearm Canvas
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val plinthW = size.width
-            val plinthH = size.height
-            val pivotCenter = Offset(plinthW * 0.83f, plinthH * 0.18f)
-
-            rotate(degrees = tonearmAngle, pivot = pivotCenter) {
-                val armLength = plinthW * 0.37f
-                val p0 = pivotCenter
-                val c1 = Offset(pivotCenter.x + armLength * 0.08f, pivotCenter.y + armLength * 0.30f)
-                val c2 = Offset(pivotCenter.x - armLength * 0.06f, pivotCenter.y + armLength * 0.65f)
-                val tubeEnd = Offset(pivotCenter.x - armLength * 0.03f, pivotCenter.y + armLength * 0.88f)
-
-                val sPath = Path().apply {
-                    moveTo(p0.x, p0.y)
-                    cubicTo(c1.x, c1.y, c2.x, c2.y, tubeEnd.x, tubeEnd.y)
-                }
-
-                val hsLength = 14.dp.toPx()
-                val hsAngleRad = Math.toRadians(24.0)
-                val hsEndX = tubeEnd.x + (hsLength * Math.sin(hsAngleRad)).toFloat()
-                val hsEndY = tubeEnd.y + (hsLength * Math.cos(hsAngleRad)).toFloat()
-                val hsEnd = Offset(hsEndX, hsEndY)
-
-                // Drop shadow
-                translate(left = 3.dp.toPx(), top = 4.dp.toPx()) {
-                    drawPath(
-                        path = sPath,
-                        color = Color.Black.copy(alpha = 0.35f),
-                        style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round)
-                    )
-                }
-
-                // Clean Tonearm Tube
-                drawPath(
-                    path = sPath,
-                    brush = Brush.linearGradient(
-                        colors = listOf(Color(0xFFE0E0E8), Color(0xFF90909A)),
-                        start = p0,
-                        end = tubeEnd
-                    ),
-                    style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round)
-                )
-
-                // Headshell & Stylus
-                drawLine(
-                    color = Color(0xFF1E1E26),
-                    start = tubeEnd,
-                    end = hsEnd,
-                    strokeWidth = 5.dp.toPx(),
-                    cap = StrokeCap.Square
-                )
-                drawLine(
-                    color = if (isPlaying) Color(0xFF00E676) else theme.accentColor,
-                    start = Offset(tubeEnd.x + (hsEnd.x - tubeEnd.x) * 0.5f, tubeEnd.y + (hsEnd.y - tubeEnd.y) * 0.5f),
-                    end = hsEnd,
-                    strokeWidth = 3.dp.toPx(),
-                    cap = StrokeCap.Round
-                )
-                drawCircle(
-                    color = Color.White,
-                    radius = 1.4.dp.toPx(),
-                    center = hsEnd
-                )
-            }
-        }
-    }
-}
-
-/**
- * Backwards-compatible alias for MasterVinylTurntable delegating to FlatTiledVinylDeck.
+ * Backwards-compatible alias for MasterVinylTurntable delegating to FloatingVinylCenterpiece.
  */
 @Composable
 fun MasterVinylTurntable(
@@ -1661,144 +1279,14 @@ fun MasterVinylTurntable(
     modifier: Modifier = Modifier,
     artist: String = ""
 ) {
-    FlatTiledVinylDeck(
+    FloatingVinylCenterpiece(
         theme = theme,
         albumArtUri = albumArtUri,
         trackTitle = trackTitle,
         artist = artist,
         isPlaying = isPlaying,
-        progress = progress,
         modifier = modifier
     )
 }
 
-/**
- * Digipak Sleeve Centerpiece:
- * Tangible physical gatefold/digipak record jacket with realistic book spine fold,
- * open right pocket slot with inner depth shadow, and sliding 12-inch vinyl record
- * styled with the uniform rice corner radius and active window border.
- */
-@Composable
-fun DigipakSleeve(
-    theme: HyprThemeConfig,
-    albumArtUri: String?,
-    trackTitle: String,
-    isPlaying: Boolean,
-    modifier: Modifier = Modifier,
-    riceShape: RoundedCornerShape = RoundedCornerShape(theme.borderRadiusDp.coerceIn(8, 12).dp),
-    activeBorderColor: Color = if (isPlaying) Color(0xFF00E676).copy(alpha = 0.40f) else theme.inactiveBorderColor.copy(alpha = 0.45f),
-    artist: String = ""
-) {
-    val rms = if (isPlaying) 0.04f else 0f
-
-    val rotationAnimatable = remember { Animatable(0f) }
-    LaunchedEffect(isPlaying) {
-        if (isPlaying) {
-            while (isActive) {
-                rotationAnimatable.animateTo(
-                    targetValue = rotationAnimatable.value + 360f,
-                    animationSpec = tween(durationMillis = 3600, easing = LinearEasing)
-                )
-            }
-        }
-    }
-    val currentRotation = rotationAnimatable.value % 360f
-
-    val slideTarget = if (isPlaying) (58f + rms * 6f) else 36f
-    val slideOffset by animateDpAsState(
-        targetValue = slideTarget.dp,
-        animationSpec = spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow),
-        label = "vinyl_slide_peek"
-    )
-
-    val scale = if (isPlaying) (0.98f + rms * 0.03f).coerceIn(0.98f, 1.02f) else 0.96f
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth(0.90f)
-            .aspectRatio(1f)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        // Soft Ambient Drop Shadow / Underglow Behind Jacket
-        Box(
-            modifier = Modifier
-                .fillMaxSize(0.92f)
-                .clip(riceShape)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            (if (isPlaying) Color(0xFF00E676) else theme.accentColor).copy(alpha = if (isPlaying) 0.20f else 0.08f),
-                            Color.Transparent
-                        )
-                    )
-                )
-        )
-
-        // Sliding 12-inch Vinyl LP peeking out of the right opening
-        Box(
-            modifier = Modifier
-                .fillMaxSize(0.86f)
-                .graphicsLayer { translationX = slideOffset.toPx() },
-            contentAlignment = Alignment.Center
-        ) {
-            PureVinylDisc(
-                theme = theme,
-                albumArtUri = albumArtUri,
-                trackTitle = trackTitle,
-                artist = artist,
-                currentRotation = currentRotation,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .border(0.8.dp, Color(0xFF222228), CircleShape)
-            )
-        }
-
-        // Tangible Physical Gatefold Digipak Sleeve with uniform riceShape and active border
-        Box(
-            modifier = Modifier
-                .fillMaxSize(0.92f)
-                .clip(riceShape)
-                .background(Color(0xFF141418))
-                .border(1.dp, activeBorderColor, riceShape)
-        ) {
-            HyprArtworkImage(
-                artworkUri = albumArtUri,
-                title = trackTitle,
-                artist = artist,
-                shape = riceShape,
-                modifier = Modifier.fillMaxSize()
-            )
-
-            // Left Book Spine Fold Crease Highlight
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                Color.Black.copy(alpha = 0.45f),
-                                Color.White.copy(alpha = 0.16f),
-                                Color.Transparent,
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.50f)
-                            ),
-                            startX = 0f,
-                            endX = Float.POSITIVE_INFINITY
-                        )
-                    )
-            )
-
-            // Right Open Pocket Shadow & Notch
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .border(0.8.dp, Color.White.copy(alpha = 0.12f), riceShape)
-            )
-        }
-    }
-}
 
