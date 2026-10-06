@@ -132,7 +132,7 @@ object TelegramMusicApi {
             val req = Request.Builder()
                 .url(url)
                 .post(reqBody)
-                .header("User-Agent", "HyprMusic/1.9.9 (Android)")
+                .header("User-Agent", "HyprMusic/2.0.0 (Android)")
                 .build()
 
             client.newCall(req).execute().use { response ->
