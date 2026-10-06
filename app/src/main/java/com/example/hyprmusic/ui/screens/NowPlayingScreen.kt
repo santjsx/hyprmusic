@@ -415,7 +415,7 @@ fun NowPlayingScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(11.dp))
 
             // Song-Synchronized Audiophile Spectrum Visualizer (PCM Direct, Hardware-Accelerated Canvas)
             AudiophileSpectrumVisualizer(
@@ -423,11 +423,11 @@ fun NowPlayingScreen(
                 isPlaying = playbackState.isPlaying,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(34.dp)
+                    .height(40.dp)
                     .padding(horizontal = 20.dp)
             )
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(11.dp))
 
             // Track Title, Artist & Audiophile Badges
             Column(
@@ -838,8 +838,10 @@ fun NowPlayingScreen(
 }
 
 /**
- * Ultra-smooth, hardware-accelerated spectrum visualizer.
+ * Ultra-smooth, Arch/Hyprland rice-themed 20-band Cava spectrum visualizer.
  * Renders on a single Canvas DrawScope with zero recompositions of the parent screen.
+ * Hardware-synced to PCM audio FFT with falling peak gravity caps, beat transient pulse,
+ * and logarithmic frequency scaling.
  */
 @Composable
 fun AudiophileSpectrumVisualizer(
@@ -848,39 +850,226 @@ fun AudiophileSpectrumVisualizer(
     modifier: Modifier = Modifier
 ) {
     val amplitudes by HyprVisualizerState.amplitudes.collectAsStateWithLifecycle()
-    val gradientColors = remember(theme.accentColor) {
-        listOf(theme.accentColor, theme.accentColor.copy(alpha = 0.45f))
+    val peakCaps by HyprVisualizerState.peakCaps.collectAsStateWithLifecycle()
+    val beatPulse by HyprVisualizerState.beatPulse.collectAsStateWithLifecycle()
+    val beatPulseScale by HyprVisualizerState.beatPulseScale.collectAsStateWithLifecycle()
+
+    var isWaveMode by rememberSaveable { mutableStateOf(false) }
+
+    val surfaceBg = remember(theme.surfaceColor) { theme.surfaceColor.copy(alpha = 0.40f) }
+    val accent = theme.accentColor
+    val borderColor = remember(accent) { accent.copy(alpha = 0.25f) }
+
+    LaunchedEffect(isPlaying) {
+        if (!isPlaying) {
+            for (step in 0 until 18) {
+                HyprVisualizerState.decay()
+                delay(16)
+            }
+            HyprVisualizerState.reset()
+        }
     }
 
-    Canvas(modifier = modifier) {
-        val barCount = 16
-        val totalWidth = size.width
-        val barWidth = 5.dp.toPx()
-        val totalBarsWidth = barWidth * barCount
-        val spacing = if (barCount > 1) {
-            ((totalWidth - totalBarsWidth) / (barCount - 1)).coerceAtLeast(2.dp.toPx())
-        } else 0f
-        val startX = (totalWidth - (totalBarsWidth + spacing * (barCount - 1))) / 2f
-        val maxHeight = size.height
-        val minHeight = 4.dp.toPx()
-        val cornerRadius = CornerRadius(2.5.dp.toPx(), 2.5.dp.toPx())
-
-        for (i in 0 until barCount) {
-            val rawAmp = if (isPlaying) amplitudes.getOrElse(i) { 0f } else 0f
-            val barH = (minHeight + rawAmp * (maxHeight - minHeight)).coerceIn(minHeight, maxHeight)
-            val left = startX + i * (barWidth + spacing)
-            val top = (maxHeight - barH) / 2f
-
-            drawRoundRect(
-                brush = Brush.verticalGradient(
-                    colors = gradientColors,
-                    startY = top,
-                    endY = top + barH
-                ),
-                topLeft = Offset(left, top),
-                size = Size(barWidth, barH),
-                cornerRadius = cornerRadius
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                val scale = if (isPlaying) beatPulseScale else 1.0f
+                scaleX = scale
+                scaleY = scale
+            }
+            .background(surfaceBg, RoundedCornerShape(8.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = { isWaveMode = !isWaveMode }
             )
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Arch / Hyprland Rice Monospace Telemetry Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // Beat Transient Indicator Dot
+                    Box(
+                        modifier = Modifier
+                            .size(5.dp)
+                            .background(
+                                color = if (isPlaying && beatPulse > 0.25f) accent else accent.copy(alpha = 0.35f),
+                                shape = CircleShape
+                            )
+                    )
+                    Text(
+                        text = if (isWaveMode) "~ / wave" else "~ / cava",
+                        color = accent,
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+
+                Text(
+                    text = if (isPlaying) {
+                        if (isWaveMode) "[ LIQUID BEZIER • 60FPS ]" else "[ 20-BAND • BASS-SYNC ]"
+                    } else "[ PAUSED // 0 Hz ]",
+                    color = theme.textSecondaryColor.copy(alpha = 0.65f),
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 0.5.sp
+                )
+            }
+
+            // Spectrum Canvas with Dual-Mode (Cava Bars vs Cubic Bezier Wave)
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(20.dp)
+            ) {
+                val barCount = HyprVisualizerState.BAR_COUNT
+                val totalWidth = size.width
+                val maxHeight = size.height
+                val baselineY = maxHeight - 1.dp.toPx()
+                val barWidth = 3.5.dp.toPx()
+                val minBarHeight = 1.8.dp.toPx()
+                val cornerRadius = CornerRadius(1.2.dp.toPx(), 1.2.dp.toPx())
+
+                val totalBarsWidth = barWidth * barCount
+                val spacing = if (barCount > 1) {
+                    ((totalWidth - totalBarsWidth) / (barCount - 1)).coerceAtLeast(1.5.dp.toPx())
+                } else 0f
+                val startX = (totalWidth - (totalBarsWidth + spacing * (barCount - 1))) / 2f
+                val endX = startX + (barWidth + spacing) * (barCount - 1) + barWidth
+
+                // 1. Cyber Baseline
+                drawLine(
+                    color = accent.copy(alpha = 0.25f),
+                    start = Offset(startX - 2.dp.toPx(), baselineY),
+                    end = Offset(endX + 2.dp.toPx(), baselineY),
+                    strokeWidth = 1.dp.toPx()
+                )
+
+                if (isWaveMode) {
+                    // Mode 2: Ultra-smooth Cubic Bezier Liquid Wave
+                    val usableHeight = maxHeight - 3.dp.toPx()
+                    val pts = ArrayList<Offset>(barCount)
+                    for (i in 0 until barCount) {
+                        val x = startX + i * (barWidth + spacing) + barWidth * 0.5f
+                        val amp = amplitudes.getOrElse(i) { 0f }
+                        val y = baselineY - (minBarHeight + amp * usableHeight).coerceIn(minBarHeight, usableHeight)
+                        pts.add(Offset(x, y))
+                    }
+
+                    if (pts.isNotEmpty()) {
+                        val wavePath = Path()
+                        val fillPath = Path()
+
+                        wavePath.moveTo(pts[0].x, pts[0].y)
+                        fillPath.moveTo(pts[0].x, baselineY)
+                        fillPath.lineTo(pts[0].x, pts[0].y)
+
+                        for (i in 0 until pts.size - 1) {
+                            val p0 = pts[i]
+                            val p1 = pts[i + 1]
+                            val midX = (p0.x + p1.x) / 2f
+                            wavePath.cubicTo(midX, p0.y, midX, p1.y, p1.x, p1.y)
+                            fillPath.cubicTo(midX, p0.y, midX, p1.y, p1.x, p1.y)
+                        }
+
+                        fillPath.lineTo(pts.last().x, baselineY)
+                        fillPath.close()
+
+                        // Gradient liquid fill under wave
+                        drawPath(
+                            path = fillPath,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    accent.copy(alpha = 0.45f),
+                                    accent.copy(alpha = 0.05f)
+                                ),
+                                startY = 0f,
+                                endY = baselineY
+                            )
+                        )
+
+                        // Smooth neon crest stroke
+                        drawPath(
+                            path = wavePath,
+                            color = accent,
+                            style = Stroke(
+                                width = 1.8.dp.toPx(),
+                                cap = StrokeCap.Round,
+                                join = StrokeJoin.Round
+                            )
+                        )
+                    }
+                } else {
+                    // Mode 1: 20-Band Cava Bars with Falling Peak Gravity Caps
+                    // Sub-Bass Reactive Glow (soft radial pulse behind bass bands on kick)
+                    if (isPlaying && beatPulse > 0.2f) {
+                        val bassGlowWidth = (barWidth + spacing) * 4.5f
+                        drawRect(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    accent.copy(alpha = 0.28f * beatPulse),
+                                    Color.Transparent
+                                ),
+                                center = Offset(startX + bassGlowWidth * 0.5f, baselineY),
+                                radius = bassGlowWidth * 0.9f
+                            ),
+                            topLeft = Offset(startX - 4.dp.toPx(), baselineY - 14.dp.toPx()),
+                            size = Size(bassGlowWidth + 8.dp.toPx(), 14.dp.toPx())
+                        )
+                    }
+
+                    for (i in 0 until barCount) {
+                        val left = startX + i * (barWidth + spacing)
+                        val rawAmp = amplitudes.getOrElse(i) { 0f }
+                        val rawPeak = peakCaps.getOrElse(i) { 0f }
+
+                        val usableHeight = maxHeight - 3.5.dp.toPx()
+                        val barH = (minBarHeight + rawAmp * usableHeight).coerceIn(minBarHeight, usableHeight)
+                        val barTop = baselineY - barH
+
+                        // Bottom-anchored gradient bar
+                        drawRoundRect(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    accent,
+                                    accent.copy(alpha = 0.45f)
+                                ),
+                                startY = barTop,
+                                endY = baselineY
+                            ),
+                            topLeft = Offset(left, barTop),
+                            size = Size(barWidth, barH),
+                            cornerRadius = cornerRadius
+                        )
+
+                        // Floating Cava Peak Cap (Gravity Dash)
+                        val peakH = (minBarHeight + rawPeak * usableHeight).coerceIn(minBarHeight, usableHeight)
+                        val capTop = (baselineY - peakH - 1.8.dp.toPx()).coerceAtLeast(0f)
+                        val capAlpha = if (isPlaying && rawPeak > 0.05f) 0.90f else 0.30f
+
+                        drawRoundRect(
+                            color = Color.White.copy(alpha = capAlpha),
+                            topLeft = Offset(left, capTop),
+                            size = Size(barWidth, 1.2.dp.toPx()),
+                            cornerRadius = CornerRadius(0.6.dp.toPx(), 0.6.dp.toPx())
+                        )
+                    }
+                }
+            }
         }
     }
 }
