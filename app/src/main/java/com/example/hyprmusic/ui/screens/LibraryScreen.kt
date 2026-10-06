@@ -1,20 +1,34 @@
 package com.example.hyprmusic.ui.screens
 
+import android.view.HapticFeedbackConstants
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import com.example.hyprmusic.core.cloud.telegram.TelegramMusicRepository
 import com.example.hyprmusic.core.data.PlaylistRepository
 import com.example.hyprmusic.core.data.CustomPlaylist
+import com.example.hyprmusic.core.model.AlbumSortOption
+import com.example.hyprmusic.core.model.ArtistSortOption
+import com.example.hyprmusic.core.model.LibrarySortPreferences
+import com.example.hyprmusic.core.model.PlaylistSortOption
+import com.example.hyprmusic.core.model.TrackSortOption
+import com.example.hyprmusic.core.model.sortAlbums
+import com.example.hyprmusic.core.model.sortArtists
+import com.example.hyprmusic.core.model.sortPlaylists
+import com.example.hyprmusic.core.model.sortTracks
 import com.example.hyprmusic.ui.components.AddToPlaylistDialog
 import com.example.hyprmusic.ui.components.MiniEqualizerBars
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -385,8 +399,15 @@ private fun MainLibraryView(
     val coroutineScope = rememberCoroutineScope()
     var draggingLetter by remember { mutableStateOf<Char?>(null) }
 
-    // Fast memoized filtering
-    val filteredTracks = remember(tracks, searchQuery, activeFilter) {
+    // Persistent sorting states per tab
+    var trackSort by remember { mutableStateOf(LibrarySortPreferences.getTrackSort(context)) }
+    var albumSort by remember { mutableStateOf(LibrarySortPreferences.getAlbumSort(context)) }
+    var artistSort by remember { mutableStateOf(LibrarySortPreferences.getArtistSort(context)) }
+    var playlistSort by remember { mutableStateOf(LibrarySortPreferences.getPlaylistSort(context)) }
+    var isSortModalOpen by remember { mutableStateOf(false) }
+
+    // Fast memoized filtering & stable sorting
+    val filteredTracks = remember(tracks, searchQuery, activeFilter, trackSort) {
         val query = searchQuery.trim().lowercase()
         val baseList = when (activeFilter) {
             LibraryFilter.FAVORITES -> tracks.filter { it.isFavorite }
@@ -398,46 +419,55 @@ private fun MainLibraryView(
             }
             else -> tracks
         }
-        if (query.isBlank()) baseList
+        val searched = if (query.isBlank()) baseList
         else baseList.filter {
             it.title.lowercase().contains(query) ||
             it.artist.lowercase().contains(query) ||
             it.album.lowercase().contains(query)
         }
+        searched.sortTracks(trackSort)
     }
 
-    val filteredAlbums = remember(albums, searchQuery) {
+    val filteredAlbums = remember(albums, searchQuery, albumSort) {
         val query = searchQuery.trim().lowercase()
-        if (query.isBlank()) albums
+        val searched = if (query.isBlank()) albums
         else albums.filter {
             it.title.lowercase().contains(query) ||
             it.artist.lowercase().contains(query)
         }
+        searched.sortAlbums(albumSort)
     }
 
-    val filteredArtists = remember(artists, searchQuery) {
+    val filteredArtists = remember(artists, searchQuery, artistSort) {
         val query = searchQuery.trim().lowercase()
-        if (query.isBlank()) artists
+        val searched = if (query.isBlank()) artists
         else artists.filter { it.name.lowercase().contains(query) }
+        searched.sortArtists(artistSort)
     }
 
-    val filteredPlaylists = remember(playlists, searchQuery) {
+    val filteredPlaylists = remember(playlists, searchQuery, playlistSort) {
         val query = searchQuery.trim().lowercase()
-        if (query.isBlank()) playlists
+        val searched = if (query.isBlank()) playlists
         else playlists.filter { it.name.lowercase().contains(query) }
+        searched.sortPlaylists(playlistSort)
     }
 
-    // Precomputed alphabet jump map for instant 1M track fast scrolling
-    val trackAlphabetMap = remember(filteredTracks) {
-        val map = mutableMapOf<Char, Int>()
-        filteredTracks.forEachIndexed { index, track ->
-            val firstChar = track.title.firstOrNull()?.uppercaseChar() ?: '#'
-            val key = if (firstChar in 'A'..'Z') firstChar else '#'
-            if (!map.containsKey(key)) {
-                map[key] = index
+    // Precomputed alphabet jump map for instant fast scrolling (only active for alphabetical sort modes)
+    val trackAlphabetMap = remember(filteredTracks, trackSort) {
+        if (trackSort != TrackSortOption.TITLE_A_Z && trackSort != TrackSortOption.ARTIST_A_Z) {
+            emptyMap()
+        } else {
+            val map = mutableMapOf<Char, Int>()
+            filteredTracks.forEachIndexed { index, track ->
+                val str = if (trackSort == TrackSortOption.ARTIST_A_Z) track.artist else track.title
+                val firstChar = str.firstOrNull()?.uppercaseChar() ?: '#'
+                val key = if (firstChar in 'A'..'Z') firstChar else '#'
+                if (!map.containsKey(key)) {
+                    map[key] = index
+                }
             }
+            map
         }
-        map
     }
 
     Box(
@@ -523,6 +553,55 @@ private fun MainLibraryView(
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // Waybar Sort Capsule
+                val currentSortLabel = when (activeFilter) {
+                    LibraryFilter.TRACKS, LibraryFilter.HI_RES, LibraryFilter.FAVORITES -> trackSort.shortLabel
+                    LibraryFilter.ALBUMS -> albumSort.shortLabel
+                    LibraryFilter.ARTISTS -> artistSort.shortLabel
+                    LibraryFilter.PLAYLISTS -> playlistSort.shortLabel
+                    LibraryFilter.ALL -> trackSort.shortLabel
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(theme.surfaceVariantColor)
+                        .border(
+                            width = 1.dp,
+                            color = theme.accentColor.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(6.dp)
+                        )
+                        .clickable { isSortModalOpen = true }
+                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Sort,
+                            contentDescription = "Sort",
+                            tint = theme.accentColor,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Text(
+                            text = currentSortLabel,
+                            color = theme.accentColor,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "▼",
+                            color = theme.accentColor.copy(alpha = 0.7f),
+                            fontSize = 7.sp
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(4.dp))
@@ -623,19 +702,21 @@ private fun MainLibraryView(
                                 item { Spacer(modifier = Modifier.height(90.dp)) }
                             }
 
-                            // Alphabet fast scroll sidebar for 1M / 10 Lakh items
-                            HyprAlphabetScroller(
-                                theme = theme,
-                                onLetterSelected = { letter ->
-                                    draggingLetter = letter
-                                    trackAlphabetMap[letter]?.let { targetIndex ->
-                                        coroutineScope.launch {
-                                            tracksListState.scrollToItem(targetIndex)
+                            // Alphabet fast scroll sidebar for 1M / 10 Lakh items (only active for alphabetical sort)
+                            if (trackAlphabetMap.isNotEmpty()) {
+                                HyprAlphabetScroller(
+                                    theme = theme,
+                                    onLetterSelected = { letter ->
+                                        draggingLetter = letter
+                                        trackAlphabetMap[letter]?.let { targetIndex ->
+                                            coroutineScope.launch {
+                                                tracksListState.scrollToItem(targetIndex)
+                                            }
                                         }
-                                    }
-                                },
-                                onDragEnd = { draggingLetter = null }
-                            )
+                                    },
+                                    onDragEnd = { draggingLetter = null }
+                                )
+                            }
                         }
                     }
 
@@ -886,6 +967,68 @@ private fun MainLibraryView(
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold
                 )
+            }
+        }
+
+        // Arch Hyprland Rice Sort Modal Dialog
+        if (isSortModalOpen) {
+            when (activeFilter) {
+                LibraryFilter.TRACKS, LibraryFilter.HI_RES, LibraryFilter.FAVORITES, LibraryFilter.ALL -> {
+                    val options = TrackSortOption.entries.map { it.label to (it == trackSort) }
+                    HyprSortModalDialog(
+                        theme = theme,
+                        title = "[ SORT // ${activeFilter.label} ]",
+                        options = options,
+                        onSelectIndex = { index ->
+                            val selected = TrackSortOption.entries[index]
+                            trackSort = selected
+                            LibrarySortPreferences.setTrackSort(context, selected)
+                        },
+                        onDismiss = { isSortModalOpen = false }
+                    )
+                }
+                LibraryFilter.ALBUMS -> {
+                    val options = AlbumSortOption.entries.map { it.label to (it == albumSort) }
+                    HyprSortModalDialog(
+                        theme = theme,
+                        title = "[ SORT // ALBUMS ]",
+                        options = options,
+                        onSelectIndex = { index ->
+                            val selected = AlbumSortOption.entries[index]
+                            albumSort = selected
+                            LibrarySortPreferences.setAlbumSort(context, selected)
+                        },
+                        onDismiss = { isSortModalOpen = false }
+                    )
+                }
+                LibraryFilter.ARTISTS -> {
+                    val options = ArtistSortOption.entries.map { it.label to (it == artistSort) }
+                    HyprSortModalDialog(
+                        theme = theme,
+                        title = "[ SORT // ARTISTS ]",
+                        options = options,
+                        onSelectIndex = { index ->
+                            val selected = ArtistSortOption.entries[index]
+                            artistSort = selected
+                            LibrarySortPreferences.setArtistSort(context, selected)
+                        },
+                        onDismiss = { isSortModalOpen = false }
+                    )
+                }
+                LibraryFilter.PLAYLISTS -> {
+                    val options = PlaylistSortOption.entries.map { it.label to (it == playlistSort) }
+                    HyprSortModalDialog(
+                        theme = theme,
+                        title = "[ SORT // PLAYLISTS ]",
+                        options = options,
+                        onSelectIndex = { index ->
+                            val selected = PlaylistSortOption.entries[index]
+                            playlistSort = selected
+                            LibrarySortPreferences.setPlaylistSort(context, selected)
+                        },
+                        onDismiss = { isSortModalOpen = false }
+                    )
+                }
             }
         }
     }
@@ -3090,4 +3233,185 @@ private fun HyprCloudTrackRow(
         }
     }
 }
+
+/**
+ * Arch Hyprland Rice Sort Modal Dialog
+ */
+@Composable
+private fun HyprSortModalDialog(
+    theme: HyprThemeConfig,
+    title: String,
+    options: List<Pair<String, Boolean>>,
+    onSelectIndex: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val view = LocalView.current
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.65f))
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismiss
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.90f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(theme.surfaceColor)
+                    .border(
+                        width = 1.dp,
+                        color = theme.accentColor.copy(alpha = 0.55f),
+                        shape = RoundedCornerShape(14.dp)
+                    )
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null,
+                        onClick = {}
+                    )
+                    .padding(16.dp)
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Modal Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(theme.accentColor)
+                            )
+                            Text(
+                                text = title,
+                                color = theme.accentColor,
+                                fontSize = 13.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = theme.textSecondaryColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(theme.surfaceVariantColor)
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Options list
+                    val scrollState = rememberScrollState()
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 380.dp)
+                            .verticalScroll(scrollState),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        options.forEachIndexed { index, (label, isSelected) ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isSelected) theme.accentColor.copy(alpha = 0.18f)
+                                        else theme.surfaceVariantColor.copy(alpha = 0.45f)
+                                    )
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isSelected) theme.accentColor.copy(alpha = 0.85f) else Color.Transparent,
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable {
+                                        try {
+                                            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                                        } catch (_: Exception) {}
+                                        onSelectIndex(index)
+                                        onDismiss()
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text(
+                                            text = if (isSelected) "▶" else " ",
+                                            color = theme.accentColor,
+                                            fontSize = 11.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = label,
+                                            color = if (isSelected) theme.accentColor else theme.textPrimaryColor,
+                                            fontSize = 12.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+
+                                    if (isSelected) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(theme.accentColor.copy(alpha = 0.2f))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = "ACTIVE",
+                                                color = theme.accentColor,
+                                                fontSize = 9.sp,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 
