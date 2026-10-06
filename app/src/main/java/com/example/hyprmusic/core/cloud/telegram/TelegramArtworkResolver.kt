@@ -105,7 +105,7 @@ object TelegramArtworkResolver {
                 val headReq = Request.Builder()
                     .url(currentArtUri)
                     .head()
-                    .header("User-Agent", "HyprMusic/1.9.7 (Android)")
+                    .header("User-Agent", "HyprMusic/1.9.8 (Android)")
                     .build()
 
                 httpClient.newCall(headReq).execute().use { resp ->
@@ -196,7 +196,7 @@ object TelegramArtworkResolver {
             val req = Request.Builder()
                 .url(url)
                 .get()
-                .header("User-Agent", "HyprMusic/1.9.7 (Android)")
+                .header("User-Agent", "HyprMusic/1.9.8 (Android)")
                 .build()
 
             httpClient.newCall(req).execute().use { resp ->

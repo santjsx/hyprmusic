@@ -1508,14 +1508,14 @@ fun AdaptiveProgressBar(
                 ) {
                     Text(
                         text = elapsed,
-                        fontFamily = spec.fontFamily,
+                        fontFamily = FontFamily.Monospace,
                         color = spec.borderActive,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
                         text = total,
-                        fontFamily = spec.fontFamily,
+                        fontFamily = FontFamily.Monospace,
                         color = spec.textSecondary,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Medium
@@ -1574,21 +1574,21 @@ fun AdaptiveProgressBar(
                 ) {
                     Text(
                         text = elapsed,
-                        fontFamily = spec.fontFamily,
+                        fontFamily = FontFamily.Monospace,
                         color = spec.borderActive,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "[WAVEFORM]",
-                        fontFamily = spec.fontFamily,
+                        fontFamily = FontFamily.Monospace,
                         color = spec.borderActive.copy(alpha = 0.7f),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = total,
-                        fontFamily = spec.fontFamily,
+                        fontFamily = FontFamily.Monospace,
                         color = spec.textSecondary,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Medium
@@ -1648,21 +1648,21 @@ fun AdaptiveProgressBar(
                 ) {
                     Text(
                         text = elapsed,
-                        fontFamily = spec.fontFamily,
+                        fontFamily = FontFamily.Monospace,
                         color = spec.borderActive,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "[VU: -3dB]",
-                        fontFamily = spec.fontFamily,
+                        fontFamily = FontFamily.Monospace,
                         color = spec.borderActive.copy(alpha = 0.7f),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = total,
-                        fontFamily = spec.fontFamily,
+                        fontFamily = FontFamily.Monospace,
                         color = spec.textSecondary,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Medium
@@ -1700,14 +1700,14 @@ fun AdaptiveProgressBar(
                 ) {
                     Text(
                         text = elapsed,
-                        fontFamily = spec.fontFamily,
+                        fontFamily = FontFamily.Monospace,
                         color = spec.textSecondary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium
                     )
                     Text(
                         text = total,
-                        fontFamily = spec.fontFamily,
+                        fontFamily = FontFamily.Monospace,
                         color = spec.textSecondary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium
@@ -1772,14 +1772,14 @@ fun AdaptiveProgressBar(
                 ) {
                     Text(
                         text = elapsed,
-                        fontFamily = spec.fontFamily,
+                        fontFamily = FontFamily.Monospace,
                         color = spec.borderActive,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = total,
-                        fontFamily = spec.fontFamily,
+                        fontFamily = FontFamily.Monospace,
                         color = spec.textSecondary,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Medium
@@ -1848,14 +1848,14 @@ fun AdaptiveProgressBar(
                 ) {
                     Text(
                         text = "TAPE: $elapsed",
-                        fontFamily = spec.fontFamily,
+                        fontFamily = FontFamily.Monospace,
                         color = spec.borderActive,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = total,
-                        fontFamily = spec.fontFamily,
+                        fontFamily = FontFamily.Monospace,
                         color = spec.textSecondary,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Medium

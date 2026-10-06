@@ -129,6 +129,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
+/**
+ * Centerpiece display mode for Now Playing visual module:
+ * - FLOATING: Circular vinyl disc floating freely over blurred album backdrop without outer frame
+ * - TILED: Flat tiled Hyprland window module with 1px active colored border and vector tonearm
+ * - SLEEVE: Tangible gatefold Digipak jacket with sliding peeking vinyl disc
+ */
+enum class NowPlayingCenterpieceMode(val tag: String, val label: String) {
+    FLOATING("FLOAT", "◈ FLOAT"),
+    TILED("TILED", "◈ TILED"),
+    SLEEVE("SLEEVE", "◈ SLEEVE")
+}
+
 @Composable
 fun NowPlayingScreen(
     theme: HyprThemeConfig,
@@ -179,7 +191,13 @@ fun NowPlayingScreen(
 
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
-    var isTurntableMode by rememberSaveable { mutableStateOf(true) }
+    var centerpieceMode by rememberSaveable { mutableStateOf(NowPlayingCenterpieceMode.FLOATING) }
+
+    // Unified Hyprland Rice Window Tokens
+    val uniformRadius = theme.borderRadiusDp.coerceIn(8, 12).dp
+    val riceShape = RoundedCornerShape(uniformRadius)
+    val engagedGreen = Color(0xFF00E676)
+    val activeWindowBorder = if (playbackState.isPlaying) engagedGreen.copy(alpha = 0.40f) else theme.inactiveBorderColor.copy(alpha = 0.45f)
 
     // Fetch real lyrics from local storage (.lrc) or LRCLIB multi-search
     LaunchedEffect(track.id, lyricsRetryKey) {
@@ -236,34 +254,39 @@ fun NowPlayingScreen(
                 .padding(horizontal = theme.windowGapsDp.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header Bar
-            // Header Bar - Clean Arch Hyprland Rice Minimalist Layout
+            // Cohesive Waybar-Style Top Bar (Single Line with Standard 6dp Spacing & Matching 34dp Height)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                    .height(34.dp)
+                    .padding(horizontal = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Minimize Capsule
+                // Minimize Capsule Module
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .height(34.dp)
+                        .clip(riceShape)
                         .background(theme.surfaceVariantColor)
+                        .border(1.dp, theme.inactiveBorderColor.copy(alpha = 0.45f), riceShape)
                         .clickable {
                             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                             onDismiss()
                         }
-                        .padding(horizontal = 8.dp, vertical = 5.dp)
+                        .padding(horizontal = 10.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.KeyboardArrowDown,
                             contentDescription = "Minimize",
                             tint = theme.accentColor,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(3.dp))
                         Text(
                             text = "HIDE",
                             color = theme.accentColor,
@@ -274,58 +297,62 @@ fun NowPlayingScreen(
                     }
                 }
 
-                // Center Album Pill with Direct Navigation
+                // Center Album Window Module with Direct Navigation
                 Box(
                     modifier = Modifier
+                        .height(34.dp)
                         .weight(1f, fill = false)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(theme.surfaceVariantColor.copy(alpha = 0.65f))
+                        .padding(horizontal = 6.dp)
+                        .clip(riceShape)
+                        .background(theme.surfaceVariantColor.copy(alpha = 0.70f))
+                        .border(1.dp, theme.inactiveBorderColor.copy(alpha = 0.40f), riceShape)
                         .clickable {
                             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                             onNavigateToAlbum(track.album)
                         }
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                        .padding(horizontal = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = "[ ${track.album.ifBlank { "STORAGE" }} ]",
-                            color = theme.textPrimaryColor,
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    Text(
+                        text = "[ ${track.album.ifBlank { "STORAGE" }} ]",
+                        color = theme.textPrimaryColor,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
-                // Right Utility Section (Display Mode Switcher + Favorite)
+                // Right Utility Cluster (Display Mode Switcher + Favorite)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    // Vinyl vs Digipak Sleeve Toggle Pill
+                    // Display Mode Switcher Module Pill
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
+                            .height(34.dp)
+                            .clip(riceShape)
                             .background(theme.surfaceVariantColor)
                             .border(
                                 width = 1.dp,
-                                color = theme.accentColor.copy(alpha = 0.35f),
-                                shape = RoundedCornerShape(8.dp)
+                                color = theme.accentColor.copy(alpha = 0.40f),
+                                shape = riceShape
                             )
                             .clickable {
                                 view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                                isTurntableMode = !isTurntableMode
+                                centerpieceMode = when (centerpieceMode) {
+                                    NowPlayingCenterpieceMode.FLOATING -> NowPlayingCenterpieceMode.TILED
+                                    NowPlayingCenterpieceMode.TILED -> NowPlayingCenterpieceMode.SLEEVE
+                                    NowPlayingCenterpieceMode.SLEEVE -> NowPlayingCenterpieceMode.FLOATING
+                                }
                             }
-                            .padding(horizontal = 7.dp, vertical = 5.dp)
+                            .padding(horizontal = 10.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (isTurntableMode) "◈ VINYL" else "◈ SLEEVE",
+                            text = centerpieceMode.label,
                             color = theme.accentColor,
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
@@ -333,19 +360,32 @@ fun NowPlayingScreen(
                         )
                     }
 
-                    // Favorite Button
-                    IconButton(
-                        onClick = {
-                            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                            onToggleFavorite(track.id)
-                        },
-                        modifier = Modifier.size(32.dp)
+                    // Favorite Button Module
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(riceShape)
+                            .background(
+                                if (track.isFavorite) theme.accentColor.copy(alpha = 0.18f)
+                                else theme.surfaceVariantColor
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (track.isFavorite) theme.accentColor.copy(alpha = 0.65f)
+                                       else theme.inactiveBorderColor.copy(alpha = 0.45f),
+                                shape = riceShape
+                            )
+                            .clickable {
+                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                                onToggleFavorite(track.id)
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = "Favorite",
                             tint = if (track.isFavorite) theme.accentColor else theme.textSecondaryColor,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(17.dp)
                         )
                     }
                 }
@@ -369,6 +409,8 @@ fun NowPlayingScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
+                                .clip(riceShape)
+                                .border(1.dp, activeWindowBorder, riceShape)
                                 .hyprTile(theme = theme)
                         ) {
                             SyncedLyricsView(
@@ -383,39 +425,59 @@ fun NowPlayingScreen(
                             )
                         }
                     } else {
-                        // Audiophile Dual-Mode Centerpiece (Turntable vs Digipak Sleeve)
+                        // Multi-Mode Centerpiece: Floating Disc vs Flat Tiled Deck vs Digipak Sleeve
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(0.92f)
                                 .aspectRatio(1f)
                                 .hyprBounceClick {
                                     view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                                    isTurntableMode = !isTurntableMode
+                                    centerpieceMode = when (centerpieceMode) {
+                                        NowPlayingCenterpieceMode.FLOATING -> NowPlayingCenterpieceMode.TILED
+                                        NowPlayingCenterpieceMode.TILED -> NowPlayingCenterpieceMode.SLEEVE
+                                        NowPlayingCenterpieceMode.SLEEVE -> NowPlayingCenterpieceMode.FLOATING
+                                    }
                                 },
                             contentAlignment = Alignment.Center
                         ) {
                             AnimatedContent(
-                                targetState = isTurntableMode,
+                                targetState = centerpieceMode,
                                 transitionSpec = { fadeIn() togetherWith fadeOut() },
-                                label = "turntable_vs_sleeve"
-                            ) { turntableActive ->
-                                if (turntableActive) {
-                                    MasterVinylTurntable(
-                                        theme = theme,
-                                        albumArtUri = track.albumArtUri,
-                                        trackTitle = track.title,
-                                        artist = track.artist,
-                                        isPlaying = playbackState.isPlaying,
-                                        progress = playbackState.progress
-                                    )
-                                } else {
-                                    DigipakSleeve(
-                                        theme = theme,
-                                        albumArtUri = track.albumArtUri,
-                                        trackTitle = track.title,
-                                        artist = track.artist,
-                                        isPlaying = playbackState.isPlaying
-                                    )
+                                label = "centerpiece_mode_transition"
+                            ) { currentMode ->
+                                when (currentMode) {
+                                    NowPlayingCenterpieceMode.FLOATING -> {
+                                        FloatingVinylCenterpiece(
+                                            theme = theme,
+                                            albumArtUri = track.albumArtUri,
+                                            trackTitle = track.title,
+                                            artist = track.artist,
+                                            isPlaying = playbackState.isPlaying
+                                        )
+                                    }
+                                    NowPlayingCenterpieceMode.TILED -> {
+                                        FlatTiledVinylDeck(
+                                            theme = theme,
+                                            albumArtUri = track.albumArtUri,
+                                            trackTitle = track.title,
+                                            artist = track.artist,
+                                            isPlaying = playbackState.isPlaying,
+                                            progress = playbackState.progress,
+                                            riceShape = riceShape,
+                                            activeBorderColor = activeWindowBorder
+                                        )
+                                    }
+                                    NowPlayingCenterpieceMode.SLEEVE -> {
+                                        DigipakSleeve(
+                                            theme = theme,
+                                            albumArtUri = track.albumArtUri,
+                                            trackTitle = track.title,
+                                            artist = track.artist,
+                                            isPlaying = playbackState.isPlaying,
+                                            riceShape = riceShape,
+                                            activeBorderColor = activeWindowBorder
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -452,16 +514,17 @@ fun NowPlayingScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // High-Res Audio Badge & Studio Headroom Indicator
+                // High-Res Audio Badge & Studio Headroom Indicator (Uniform Rice Pill Badges)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(riceShape)
                             .background(theme.surfaceVariantColor)
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                            .border(1.dp, theme.inactiveBorderColor.copy(alpha = 0.40f), riceShape)
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
                             text = "${track.audioFormat} ${track.bitrate}kbps",
@@ -474,9 +537,10 @@ fun NowPlayingScreen(
 
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(riceShape)
                             .background(theme.surfaceVariantColor)
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                            .border(1.dp, theme.inactiveBorderColor.copy(alpha = 0.40f), riceShape)
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
                             text = "16-BIT PCM",
@@ -491,7 +555,7 @@ fun NowPlayingScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Seek Bar & Timers (Isolated composable prevents parent screen recomposition on playback ticks)
+            // Seek Bar & Timers
             PlaybackProgressSection(
                 theme = theme,
                 currentPositionMs = playbackState.currentPositionMs,
@@ -502,50 +566,76 @@ fun NowPlayingScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Main Playback Controls Deck (Machined Audiophile Enclosure with Live Telemetry)
+            // Main Playback Controls Deck (Machined Audiophile Enclosure with Distinct Waybar Pill Modules)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtLeast(14).dp))
+                    .clip(riceShape)
                     .background(theme.surfaceColor.copy(alpha = 0.94f))
                     .border(
                         width = 1.dp,
-                        color = if (playbackState.isPlaying) theme.accentColor.copy(alpha = 0.35f) else theme.inactiveBorderColor.copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(theme.borderRadiusDp.coerceAtLeast(14).dp)
+                        color = activeWindowBorder,
+                        shape = riceShape
                     )
                     .padding(horizontal = 10.dp, vertical = 8.dp)
             ) {
                 Column {
-                    // Status Telemetry LED bar - 3-column layout mathematically pinned to eliminate layout shifts
+                    // Status Telemetry LED bar - Distinct Waybar-Style Pill Modules with clear spacing
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(horizontal = 2.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Start
+                        // Module 1: ENGAGED / PAUSED Status Pill
+                        Box(
+                            modifier = Modifier
+                                .clip(riceShape)
+                                .background(
+                                    if (playbackState.isPlaying) Color(0xFF00E676).copy(alpha = 0.12f)
+                                    else Color(0xFFFFB300).copy(alpha = 0.12f)
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = if (playbackState.isPlaying) Color(0xFF00E676).copy(alpha = 0.40f)
+                                           else Color(0xFFFFB300).copy(alpha = 0.40f),
+                                    shape = riceShape
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(if (playbackState.isPlaying) Color(0xFF00E676) else Color(0xFFFFB300))
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = if (playbackState.isPlaying) "ENGAGED" else "PAUSED",
-                                color = if (playbackState.isPlaying) Color(0xFF00E676) else Color(0xFFFFB300),
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(if (playbackState.isPlaying) Color(0xFF00E676) else Color(0xFFFFB300))
+                                )
+                                Text(
+                                    text = if (playbackState.isPlaying) "ENGAGED" else "PAUSED",
+                                    color = if (playbackState.isPlaying) Color(0xFF00E676) else Color(0xFFFFB300),
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
 
+                        // Module 2: Bit-Perfect Engine Module
                         Box(
-                            modifier = Modifier.weight(1.4f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(riceShape)
+                                .background(theme.surfaceVariantColor.copy(alpha = 0.70f))
+                                .border(
+                                    width = 1.dp,
+                                    color = theme.inactiveBorderColor.copy(alpha = 0.45f),
+                                    shape = riceShape
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -553,13 +643,25 @@ fun NowPlayingScreen(
                                 color = theme.textSecondaryColor,
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 textAlign = TextAlign.Center
                             )
                         }
 
+                        // Module 3: Format & Bitrate Module
                         Box(
-                            modifier = Modifier.weight(1f),
-                            contentAlignment = Alignment.CenterEnd
+                            modifier = Modifier
+                                .clip(riceShape)
+                                .background(theme.surfaceVariantColor.copy(alpha = 0.85f))
+                                .border(
+                                    width = 1.dp,
+                                    color = theme.accentColor.copy(alpha = 0.40f),
+                                    shape = riceShape
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "${track.audioFormat} ${track.bitrate}k",
@@ -567,12 +669,12 @@ fun NowPlayingScreen(
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.End
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -648,6 +750,7 @@ fun NowPlayingScreen(
             WaybarBottomControlsDock(
                 theme = theme,
                 showLyrics = showLyrics,
+                riceShape = riceShape,
                 onToggleLyrics = { showLyrics = !showLyrics },
                 onOpenPlaylist = {
                     if (playlistRepository != null) {
@@ -704,7 +807,8 @@ private fun WaybarBottomControlsDock(
     onOpenSleepTimer: () -> Unit,
     onNavigateToAlbum: () -> Unit,
     onOpenEqualizer: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    riceShape: RoundedCornerShape = RoundedCornerShape(theme.borderRadiusDp.coerceIn(8, 12).dp)
 ) {
     val sleepTimerState by HyprSleepTimer.timerState.collectAsStateWithLifecycle()
     val isTimerActive = sleepTimerState.isActive
@@ -712,12 +816,12 @@ private fun WaybarBottomControlsDock(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(riceShape)
             .background(theme.surfaceColor.copy(alpha = 0.92f))
             .border(
                 width = 1.dp,
-                color = theme.inactiveBorderColor.copy(alpha = 0.5f),
-                shape = RoundedCornerShape(12.dp)
+                color = if (isTimerActive || showLyrics) Color(0xFF00E676).copy(alpha = 0.35f) else theme.inactiveBorderColor.copy(alpha = 0.40f),
+                shape = riceShape
             )
             .padding(horizontal = 4.dp, vertical = 5.dp)
     ) {
@@ -732,6 +836,7 @@ private fun WaybarBottomControlsDock(
                 label = "LYRICS",
                 isActive = showLyrics,
                 indicator = if (showLyrics) "●" else null,
+                riceShape = riceShape,
                 onClick = onToggleLyrics,
                 modifier = Modifier.weight(1f)
             )
@@ -745,6 +850,7 @@ private fun WaybarBottomControlsDock(
                 icon = Icons.AutoMirrored.Filled.PlaylistAdd,
                 label = "PLAYLIST",
                 isActive = false,
+                riceShape = riceShape,
                 onClick = onOpenPlaylist,
                 modifier = Modifier.weight(1f)
             )
@@ -759,6 +865,7 @@ private fun WaybarBottomControlsDock(
                 label = if (isTimerActive) sleepTimerState.formattedRemaining else "TIMER",
                 isActive = isTimerActive,
                 indicator = if (isTimerActive) "●" else null,
+                riceShape = riceShape,
                 onClick = onOpenSleepTimer,
                 modifier = Modifier.weight(1f)
             )
@@ -772,6 +879,7 @@ private fun WaybarBottomControlsDock(
                 icon = Icons.Default.Album,
                 label = "ALBUM",
                 isActive = false,
+                riceShape = riceShape,
                 onClick = onNavigateToAlbum,
                 modifier = Modifier.weight(1f)
             )
@@ -785,6 +893,7 @@ private fun WaybarBottomControlsDock(
                 icon = Icons.Default.Tune,
                 label = "EQ",
                 isActive = false,
+                riceShape = riceShape,
                 onClick = onOpenEqualizer,
                 modifier = Modifier.weight(1f)
             )
@@ -800,12 +909,13 @@ private fun WaybarDockModule(
     isActive: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    indicator: String? = null
+    indicator: String? = null,
+    riceShape: RoundedCornerShape = RoundedCornerShape(8.dp)
 ) {
     val view = LocalView.current
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(riceShape)
             .background(
                 if (isActive) theme.accentColor.copy(alpha = 0.20f)
                 else Color.Transparent
@@ -813,7 +923,7 @@ private fun WaybarDockModule(
             .border(
                 width = 1.dp,
                 color = if (isActive) theme.accentColor.copy(alpha = 0.75f) else Color.Transparent,
-                shape = RoundedCornerShape(8.dp)
+                shape = riceShape
             )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -883,6 +993,9 @@ fun NowPlayingEmptyScreen(
     onRandomMix: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val riceRadius = theme.borderRadiusDp.coerceIn(8, 12).dp
+    val riceShape = RoundedCornerShape(riceRadius)
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -933,12 +1046,12 @@ fun NowPlayingEmptyScreen(
             Box(
                 modifier = Modifier
                     .size(240.dp)
-                    .clip(RoundedCornerShape(theme.borderRadiusDp.dp))
+                    .clip(riceShape)
                     .background(theme.surfaceColor)
                     .border(
-                        width = theme.borderThicknessDp.dp,
-                        brush = Brush.linearGradient(theme.activeBorderGradient),
-                        shape = RoundedCornerShape(theme.borderRadiusDp.dp)
+                        width = 1.dp,
+                        color = theme.inactiveBorderColor.copy(alpha = 0.5f),
+                        shape = riceShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -1005,7 +1118,7 @@ fun NowPlayingEmptyScreen(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(theme.borderRadiusDp.dp))
+                        .clip(riceShape)
                         .background(theme.accentColor)
                         .hyprBounceClick { onRandomMix() }
                         .padding(vertical = 12.dp),
@@ -1032,12 +1145,12 @@ fun NowPlayingEmptyScreen(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(theme.borderRadiusDp.dp))
+                        .clip(riceShape)
                         .background(theme.surfaceVariantColor)
                         .border(
                             1.dp,
                             theme.accentColor.copy(alpha = 0.5f),
-                            RoundedCornerShape(theme.borderRadiusDp.dp)
+                            riceShape
                         )
                         .hyprBounceClick { onBrowseLibrary() }
                         .padding(vertical = 12.dp),
@@ -1102,29 +1215,175 @@ private fun PlaybackProgressSection(
 
 
 /**
- * Master Vinyl Turntable Centerpiece:
- * Direct-drive audiophile turntable with weighted plinth, corner isolation feet,
- * Technics-style pitch strobe illuminator tower, heavy cast-aluminum platter with
- * 4-row strobe calibration dots, anti-static slipmat, realistic 12-inch vinyl disc
- * with anisotropic dual-cone optical sheen, concentric song-track microgrooves,
- * dead-wax matrix etching, vintage center label, and high-precision S-curved tonearm
- * with 3D drop shadow, counterweight tracking-force scale, cueing lever, and calibrated
- * physical tracking geometry that never touches the center label.
+ * Authentic 12-inch Audiophile Vinyl LP:
+ * Precision circular record with anisotropic microgroove optical sheen, 5 concentric
+ * song-track groove bands with inter-track dead-wax gaps, run-out groove, etched matrix ring,
+ * and high-resolution circular album art label with polished perimeter ring and chrome spindle pin.
  */
 @Composable
-fun MasterVinylTurntable(
+fun PureVinylDisc(
     theme: HyprThemeConfig,
     albumArtUri: String?,
     trackTitle: String,
-    isPlaying: Boolean,
-    progress: Float = 0f,
-    modifier: Modifier = Modifier,
-    artist: String = ""
+    artist: String,
+    currentRotation: Float,
+    modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
+    Box(
+        modifier = modifier
+            .rotate(currentRotation)
+            .clip(CircleShape)
+            .background(Color(0xFF09090C)),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val discRadius = size.minDimension / 2f
+
+            // Outer Lead-in Vinyl Rim with Polished Bevel Highlight
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF1A1A22), Color(0xFF08080A)),
+                    center = center,
+                    radius = discRadius
+                ),
+                radius = discRadius,
+                center = center
+            )
+
+            // Anisotropic Optical Bowtie Sheen (Light reflecting off real microgrooves)
+            drawCircle(
+                brush = Brush.sweepGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.White.copy(alpha = 0.05f),
+                        Color.White.copy(alpha = 0.16f),
+                        Color.White.copy(alpha = 0.05f),
+                        Color.Transparent,
+                        Color.Transparent,
+                        Color.White.copy(alpha = 0.05f),
+                        Color.White.copy(alpha = 0.16f),
+                        Color.White.copy(alpha = 0.05f),
+                        Color.Transparent
+                    ),
+                    center = center
+                ),
+                radius = discRadius * 0.97f,
+                center = center
+            )
+
+            // 5 Concentric Music Bands (Song Tracks) with subtle inter-track "dead-wax" gaps
+            val trackGrooveBands = listOf(
+                0.93f to 0.84f,
+                0.83f to 0.74f,
+                0.73f to 0.64f,
+                0.63f to 0.54f,
+                0.53f to 0.44f
+            )
+
+            trackGrooveBands.forEachIndexed { bandIdx, (outerR, innerR) ->
+                val steps = 4
+                for (s in 0..steps) {
+                    val frac = s.toFloat() / steps
+                    val r = discRadius * (innerR + frac * (outerR - innerR))
+                    drawCircle(
+                        color = Color.White.copy(alpha = if (s == 0 || s == steps) 0.06f else 0.035f),
+                        radius = r,
+                        center = center,
+                        style = Stroke(width = 0.7.dp.toPx())
+                    )
+                }
+                // Inter-track dead wax groove gap
+                if (bandIdx < trackGrooveBands.lastIndex) {
+                    drawCircle(
+                        color = Color(0xFF181820),
+                        radius = discRadius * (innerR - 0.005f),
+                        center = center,
+                        style = Stroke(width = 1.4.dp.toPx())
+                    )
+                }
+            }
+
+            // Run-out dead wax groove before center label
+            drawCircle(
+                color = Color.White.copy(alpha = 0.08f),
+                radius = discRadius * 0.41f,
+                center = center,
+                style = Stroke(width = 1.4.dp.toPx())
+            )
+
+            // Etched matrix runout ring
+            drawCircle(
+                color = Color(0xFF1C1C24),
+                radius = discRadius * 0.39f,
+                center = center,
+                style = Stroke(width = 2.dp.toPx())
+            )
+        }
+
+        // Center Circular Album Artwork Label (36% of disc diameter)
+        Box(
+            modifier = Modifier
+                .fillMaxSize(0.36f)
+                .clip(CircleShape)
+                .background(theme.surfaceVariantColor),
+            contentAlignment = Alignment.Center
+        ) {
+            HyprArtworkImage(
+                artworkUri = albumArtUri,
+                title = trackTitle,
+                artist = artist,
+                shape = CircleShape,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Inner label perimeter ring & vintage record typography outline
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .border(1.2.dp, Color.White.copy(alpha = 0.28f), CircleShape)
+            )
+
+            // Heavy Chrome Center Spindle Pin with 3D Conical Highlight
+            Box(
+                modifier = Modifier
+                    .size(11.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.sweepGradient(
+                            colors = listOf(
+                                Color(0xFFFFFFFF),
+                                Color(0xFF8E8E98),
+                                Color(0xFFFFFFFF),
+                                Color(0xFF70707C),
+                                Color(0xFFFFFFFF)
+                            )
+                        )
+                    )
+                    .border(0.8.dp, Color(0xFFDDDDDD), CircleShape)
+            )
+        }
+    }
+}
+
+/**
+ * Ultra-Clean Floating Vinyl Centerpiece:
+ * Pure circular vinyl disc floating freely over the ambient blurred album art backdrop.
+ * Ditching the skeuomorphic outer frame completely, with a soft neon backlight aura and
+ * a razor-thin active border.
+ */
+@Composable
+fun FloatingVinylCenterpiece(
+    theme: HyprThemeConfig,
+    albumArtUri: String?,
+    trackTitle: String,
+    artist: String,
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier
+) {
     val rotationAnimatable = remember { Animatable(0f) }
 
-    // Physical 33 1/3 RPM speed = 1.8 seconds (1800ms) per full 360-degree revolution
     LaunchedEffect(isPlaying) {
         if (isPlaying) {
             while (isActive) {
@@ -1137,10 +1396,90 @@ fun MasterVinylTurntable(
     }
     val currentRotation = rotationAnimatable.value % 360f
 
-    // Calibrated Tonearm Physical Tracking Geometry:
-    // Parked (Paused): 0° resting on the arm-rest clip at the right plinth
-    // Playing (Active): 18° at track start (outer lead-in groove) to 36° at track end (inner dead wax before label)
-    // The needle strictly tracks within the vinyl music grooves and never crosses into the center label!
+    val pulseScale by animateFloatAsState(
+        targetValue = if (isPlaying) 1.0f else 0.97f,
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
+        label = "floating_vinyl_scale"
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth(0.88f)
+            .aspectRatio(1f)
+            .graphicsLayer {
+                scaleX = pulseScale
+                scaleY = pulseScale
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        // Soft Ambient Neon Underglow behind floating disc
+        Box(
+            modifier = Modifier
+                .fillMaxSize(0.96f)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            (if (isPlaying) Color(0xFF00E676) else theme.accentColor).copy(
+                                alpha = if (isPlaying) 0.22f else 0.08f
+                            ),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+
+        // Free-floating circular vinyl disc with thin 1px border
+        PureVinylDisc(
+            theme = theme,
+            albumArtUri = albumArtUri,
+            trackTitle = trackTitle,
+            artist = artist,
+            currentRotation = currentRotation,
+            modifier = Modifier
+                .fillMaxSize(0.92f)
+                .border(
+                    width = 1.dp,
+                    color = if (isPlaying) Color(0xFF00E676).copy(alpha = 0.45f)
+                           else Color.White.copy(alpha = 0.12f),
+                    shape = CircleShape
+                )
+        )
+    }
+}
+
+/**
+ * Flat Tiled Vinyl Deck (Hyprland Rice Architecture):
+ * A true flat, tiled desktop window module with uniform corner radius, flat dark surface,
+ * razor-thin 1px active colored border, flat recessed platter well with minimal calibration dots,
+ * spinning vinyl disc, and a flat precision vector tonearm.
+ */
+@Composable
+fun FlatTiledVinylDeck(
+    theme: HyprThemeConfig,
+    albumArtUri: String?,
+    trackTitle: String,
+    artist: String,
+    isPlaying: Boolean,
+    progress: Float,
+    riceShape: RoundedCornerShape = RoundedCornerShape(theme.borderRadiusDp.coerceIn(8, 12).dp),
+    activeBorderColor: Color = if (isPlaying) Color(0xFF00E676).copy(alpha = 0.40f) else theme.inactiveBorderColor.copy(alpha = 0.45f),
+    modifier: Modifier = Modifier
+) {
+    val rotationAnimatable = remember { Animatable(0f) }
+
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            while (isActive) {
+                rotationAnimatable.animateTo(
+                    targetValue = rotationAnimatable.value + 360f,
+                    animationSpec = tween(durationMillis = 1800, easing = LinearEasing)
+                )
+            }
+        }
+    }
+    val currentRotation = rotationAnimatable.value % 360f
+
     val targetTonearmAngle = if (isPlaying) {
         18f + (progress.coerceIn(0f, 1f) * 18f)
     } else {
@@ -1150,444 +1489,104 @@ fun MasterVinylTurntable(
     val tonearmAngle by animateFloatAsState(
         targetValue = targetTonearmAngle,
         animationSpec = spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessLow),
-        label = "tonearm_angle"
+        label = "tiled_tonearm_angle"
     )
 
     Box(
         modifier = modifier
             .fillMaxWidth(0.92f)
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtLeast(18).dp))
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF16161B),
-                        Color(0xFF101014),
-                        Color(0xFF09090C)
-                    )
-                )
-            )
+            .clip(riceShape)
+            .background(theme.surfaceColor.copy(alpha = 0.90f))
             .border(
                 width = 1.dp,
-                color = if (isPlaying) theme.accentColor.copy(alpha = 0.45f) else theme.inactiveBorderColor.copy(alpha = 0.35f),
-                shape = RoundedCornerShape(theme.borderRadiusDp.coerceAtLeast(18).dp)
+                color = activeBorderColor,
+                shape = riceShape
             ),
         contentAlignment = Alignment.Center
     ) {
-        // Base Plinth Graphics, Platter Well, Strobe Illuminator, and Gimbal Assembly
+        // Flat Platter Well & Tonearm Gimbal Canvas
         Canvas(modifier = Modifier.fillMaxSize()) {
             val plinthW = size.width
             val plinthH = size.height
             val platterCenter = Offset(plinthW * 0.44f, plinthH * 0.50f)
             val platterRadius = plinthW * 0.40f
 
-            // 4 Corner Machined Aluminum Isolation Damping Feet
-            val footOffset = 18.dp.toPx()
-            val footRadius = 8.dp.toPx()
-            val footCenters = listOf(
-                Offset(footOffset, footOffset),
-                Offset(plinthW - footOffset, footOffset),
-                Offset(footOffset, plinthH - footOffset),
-                Offset(plinthW - footOffset, plinthH - footOffset)
-            )
-            footCenters.forEach { pos ->
-                // Outer rubber damping ring
-                drawCircle(color = Color(0xFF08080A), radius = footRadius + 2.dp.toPx(), center = pos)
-                // Machined aluminum foot cap
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color(0xFF6A6A76), Color(0xFF2E2E36)),
-                        center = pos,
-                        radius = footRadius
-                    ),
-                    radius = footRadius,
-                    center = pos
-                )
-                drawCircle(color = Color(0xFF888898), radius = footRadius, center = pos, style = Stroke(width = 0.8.dp.toPx()))
-            }
-
-            // Recessed Platter Well with Deep Radial Ambient Occlusion Shadow
+            // Flat recessed circular platter well
             drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFF040406), Color(0xFF121216)),
-                    center = platterCenter,
-                    radius = platterRadius * 1.06f
-                ),
-                radius = platterRadius * 1.05f,
+                color = Color(0xFF070709),
+                radius = platterRadius * 1.04f,
                 center = platterCenter
             )
             drawCircle(
-                color = Color(0xFF22222A),
-                radius = platterRadius * 1.05f,
+                color = Color(0xFF1E1E26),
+                radius = platterRadius * 1.04f,
                 center = platterCenter,
-                style = Stroke(width = 1.2.dp.toPx())
+                style = Stroke(width = 1.dp.toPx())
             )
 
-            // Heavy Cast Aluminum Platter with Beveled Machined Rim
-            drawCircle(
-                brush = Brush.sweepGradient(
-                    colors = listOf(
-                        Color(0xFF484856),
-                        Color(0xFF26262E),
-                        Color(0xFF565666),
-                        Color(0xFF2A2A34),
-                        Color(0xFF484856)
-                    ),
-                    center = platterCenter
-                ),
-                radius = platterRadius,
-                center = platterCenter
-            )
-
-            // 4 Rings of Machined Strobe Calibration Dots (50Hz / 60Hz calibration rings)
-            val dotCount = 44
-            val strobeRadius = platterRadius * 0.97f
+            // Minimalist hairline strobe calibration dots
+            val dotCount = 36
+            val strobeRadius = platterRadius * 0.98f
             for (i in 0 until dotCount) {
                 val angle = Math.toRadians((i * (360f / dotCount)).toDouble())
                 val x = platterCenter.x + (strobeRadius * Math.cos(angle)).toFloat()
                 val y = platterCenter.y + (strobeRadius * Math.sin(angle)).toFloat()
-                val isNearStrobeTower = x < platterCenter.x && y > platterCenter.y * 0.7f
-                val isStrobeGlint = isPlaying && isNearStrobeTower && (i % 2 == 0)
-
                 drawCircle(
-                    color = if (isStrobeGlint) theme.accentColor else Color(0xFF828292),
-                    radius = if (i % 2 == 0) 1.6.dp.toPx() else 1.1.dp.toPx(),
+                    color = if (isPlaying && i % 2 == 0) Color(0xFF00E676).copy(alpha = 0.75f) else Color(0xFF4A4A58),
+                    radius = 1.1.dp.toPx(),
                     center = Offset(x, y)
                 )
             }
 
-            // Heavy Anti-Static Felt / Rubber Slipmat (Charcoal matte with concentric grip rings)
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFF141418), Color(0xFF0B0B0E)),
-                    center = platterCenter,
-                    radius = platterRadius * 0.94f
-                ),
-                radius = platterRadius * 0.93f,
-                center = platterCenter
-            )
-            for (ring in 1..3) {
-                drawCircle(
-                    color = Color(0xFF1F1F26),
-                    radius = platterRadius * (0.35f + ring * 0.18f),
-                    center = platterCenter,
-                    style = Stroke(width = 1.dp.toPx())
-                )
-            }
-
-            // Technics-style Strobe Illuminator Tower (Bottom-Left of Plinth)
-            val strobeTowerPos = Offset(plinthW * 0.12f, plinthH * 0.86f)
-            // Strobe housing base
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFF3E3E4A), Color(0xFF1A1A20)),
-                    center = strobeTowerPos,
-                    radius = 12.dp.toPx()
-                ),
-                radius = 10.dp.toPx(),
-                center = strobeTowerPos
-            )
-            drawCircle(color = Color(0xFF555562), radius = 10.dp.toPx(), center = strobeTowerPos, style = Stroke(width = 1.dp.toPx()))
-
-            // Strobe prism lamp window
-            drawCircle(
-                color = if (isPlaying) theme.accentColor else Color(0xFF282832),
-                radius = 4.5.dp.toPx(),
-                center = strobeTowerPos
-            )
-            if (isPlaying) {
-                // Subtle horizontal neon glow beaming towards the platter strobe dots
-                drawLine(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(theme.accentColor.copy(alpha = 0.5f), Color.Transparent),
-                        startX = strobeTowerPos.x,
-                        endX = platterCenter.x - platterRadius * 0.6f
-                    ),
-                    start = strobeTowerPos,
-                    end = Offset(platterCenter.x - platterRadius * 0.6f, strobeTowerPos.y),
-                    strokeWidth = 3.dp.toPx()
-                )
-            }
-
-            // 33 1/3 RPM Tactile Speed Selector Pill (Bottom Plinth)
-            val speedBtnPos = Offset(plinthW * 0.24f, plinthH * 0.86f)
-            drawRoundRect(
-                color = Color(0xFF1E1E24),
-                topLeft = Offset(speedBtnPos.x - 14.dp.toPx(), speedBtnPos.y - 7.dp.toPx()),
-                size = Size(28.dp.toPx(), 14.dp.toPx()),
-                cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
-            )
-            drawCircle(
-                color = if (isPlaying) theme.accentColor else Color(0xFF40404C),
-                radius = 2.2.dp.toPx(),
-                center = speedBtnPos
-            )
-
-            // Fixed Gimbal Base & Tonearm Mounting Assembly (Top-Right Plinth)
+            // Pivot bearing mount (Top-Right)
             val pivotCenter = Offset(plinthW * 0.83f, plinthH * 0.18f)
-
-            // Brushed aluminum outer gimbal deck ring
             drawCircle(
-                brush = Brush.sweepGradient(
-                    colors = listOf(
-                        Color(0xFF4A4A58),
-                        Color(0xFF24242C),
-                        Color(0xFF5A5A6C),
-                        Color(0xFF282832),
-                        Color(0xFF4A4A58)
-                    ),
-                    center = pivotCenter
-                ),
-                radius = 20.dp.toPx(),
+                color = Color(0xFF22222A),
+                radius = 14.dp.toPx(),
                 center = pivotCenter
             )
-            drawCircle(color = Color(0xFF6E6E80), radius = 20.dp.toPx(), center = pivotCenter, style = Stroke(width = 1.dp.toPx()))
-
-            // Inner bearing housing collar
             drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFF2C2C36), Color(0xFF141418)),
-                    center = pivotCenter,
-                    radius = 14.dp.toPx()
-                ),
-                radius = 13.dp.toPx(),
-                center = pivotCenter
+                color = Color(0xFF3E3E4C),
+                radius = 14.dp.toPx(),
+                center = pivotCenter,
+                style = Stroke(width = 1.dp.toPx())
             )
-
-            // Anti-Skate Bias Knob with scale marks (North-East of pivot)
-            val antiSkatePos = Offset(pivotCenter.x + 12.dp.toPx(), pivotCenter.y - 12.dp.toPx())
             drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFF50505E), Color(0xFF22222A)),
-                    center = antiSkatePos,
-                    radius = 5.dp.toPx()
-                ),
-                radius = 4.5.dp.toPx(),
-                center = antiSkatePos
-            )
-            drawCircle(color = Color(0xFF888898), radius = 4.5.dp.toPx(), center = antiSkatePos, style = Stroke(width = 0.6.dp.toPx()))
-
-            // Cueing Arm-Rest Clip & Lift Lever (Where tonearm parks when stopped)
-            val armRestPos = Offset(plinthW * 0.83f, plinthH * 0.44f)
-            // Arm rest base post
-            drawCircle(color = Color(0xFF2A2A34), radius = 5.dp.toPx(), center = armRestPos)
-            // U-shaped arm cradle clip
-            drawCircle(
-                color = if (!isPlaying) theme.accentColor else Color(0xFF606070),
+                color = if (isPlaying) Color(0xFF00E676) else theme.accentColor,
                 radius = 3.dp.toPx(),
-                center = armRestPos
+                center = pivotCenter
             )
 
-            // Curved rubber cueing lift bar running from near pivot down to arm rest
-            val cueBarPath = Path().apply {
-                moveTo(pivotCenter.x - 3.dp.toPx(), pivotCenter.y + 16.dp.toPx())
-                quadraticTo(
-                    pivotCenter.x - 8.dp.toPx(),
-                    armRestPos.y - 10.dp.toPx(),
-                    armRestPos.x - 4.dp.toPx(),
-                    armRestPos.y
-                )
-            }
-            drawPath(
-                path = cueBarPath,
-                color = Color(0xFF1E1E26),
-                style = Stroke(width = 2.4.dp.toPx(), cap = StrokeCap.Round)
+            // Cue rest cradle
+            val armRestPos = Offset(plinthW * 0.83f, plinthH * 0.44f)
+            drawCircle(
+                color = if (!isPlaying) Color(0xFF00E676) else Color(0xFF3E3E4C),
+                radius = 3.5.dp.toPx(),
+                center = armRestPos
             )
         }
 
-        // Rotating 12-inch Audiophile Vinyl LP (Directly aligned over platter well)
-        Box(
+        // Spinning Vinyl Disc
+        PureVinylDisc(
+            theme = theme,
+            albumArtUri = albumArtUri,
+            trackTitle = trackTitle,
+            artist = artist,
+            currentRotation = currentRotation,
             modifier = Modifier
                 .fillMaxSize(0.77f)
                 .graphicsLayer { translationX = -size.width * 0.06f }
-                .rotate(currentRotation)
-                .clip(CircleShape)
-                .background(Color(0xFF09090C)),
-            contentAlignment = Alignment.Center
-        ) {
-            // Vinyl Surface: Anisotropic Optical Sheen, Song Tracks, & Dead Wax
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val center = Offset(size.width / 2f, size.height / 2f)
-                val discRadius = size.minDimension / 2f
+        )
 
-                // Outer Lead-in Vinyl Rim with Polished Bevel Highlight
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color(0xFF1A1A22), Color(0xFF08080A)),
-                        center = center,
-                        radius = discRadius
-                    ),
-                    radius = discRadius,
-                    center = center
-                )
-
-                // Anisotropic Optical Bowtie Sheen (Light reflecting off real microgrooves)
-                drawCircle(
-                    brush = Brush.sweepGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.White.copy(alpha = 0.05f),
-                            Color.White.copy(alpha = 0.16f),
-                            Color.White.copy(alpha = 0.05f),
-                            Color.Transparent,
-                            Color.Transparent,
-                            Color.White.copy(alpha = 0.05f),
-                            Color.White.copy(alpha = 0.16f),
-                            Color.White.copy(alpha = 0.05f),
-                            Color.Transparent
-                        ),
-                        center = center
-                    ),
-                    radius = discRadius * 0.97f,
-                    center = center
-                )
-
-                // 5 Concentric Music Bands (Song Tracks) with subtle inter-track "dead-wax" gaps
-                val trackGrooveBands = listOf(
-                    0.93f to 0.84f,
-                    0.83f to 0.74f,
-                    0.73f to 0.64f,
-                    0.63f to 0.54f,
-                    0.53f to 0.44f
-                )
-
-                trackGrooveBands.forEachIndexed { bandIdx, (outerR, innerR) ->
-                    val steps = 4
-                    for (s in 0..steps) {
-                        val frac = s.toFloat() / steps
-                        val r = discRadius * (innerR + frac * (outerR - innerR))
-                        drawCircle(
-                            color = Color.White.copy(alpha = if (s == 0 || s == steps) 0.06f else 0.035f),
-                            radius = r,
-                            center = center,
-                            style = Stroke(width = 0.7.dp.toPx())
-                        )
-                    }
-                    // Inter-track dead wax groove gap
-                    if (bandIdx < trackGrooveBands.lastIndex) {
-                        drawCircle(
-                            color = Color(0xFF181820),
-                            radius = discRadius * (innerR - 0.005f),
-                            center = center,
-                            style = Stroke(width = 1.4.dp.toPx())
-                        )
-                    }
-                }
-
-                // Run-out dead wax groove before center label
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.08f),
-                    radius = discRadius * 0.41f,
-                    center = center,
-                    style = Stroke(width = 1.4.dp.toPx())
-                )
-
-                // Etched matrix runout ring
-                drawCircle(
-                    color = Color(0xFF1C1C24),
-                    radius = discRadius * 0.39f,
-                    center = center,
-                    style = Stroke(width = 2.dp.toPx())
-                )
-            }
-
-            // Center Circular Album Artwork Label (36% of disc diameter)
-            Box(
-                modifier = Modifier
-                    .fillMaxSize(0.36f)
-                    .clip(CircleShape)
-                    .background(theme.surfaceVariantColor),
-                contentAlignment = Alignment.Center
-            ) {
-                HyprArtworkImage(
-                    artworkUri = albumArtUri,
-                    title = trackTitle,
-                    artist = artist,
-                    shape = CircleShape,
-                    modifier = Modifier.fillMaxSize()
-                )
-
-                // Inner label perimeter ring & vintage record typography outline
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                        .border(1.2.dp, Color.White.copy(alpha = 0.28f), CircleShape)
-                )
-
-                // Heavy Chrome Center Spindle Pin with 3D Conical Highlight
-                Box(
-                    modifier = Modifier
-                        .size(11.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.sweepGradient(
-                                colors = listOf(
-                                    Color(0xFFFFFFFF),
-                                    Color(0xFF8E8E98),
-                                    Color(0xFFFFFFFF),
-                                    Color(0xFF70707C),
-                                    Color(0xFFFFFFFF)
-                                )
-                            )
-                        )
-                        .border(0.8.dp, Color(0xFFDDDDDD), CircleShape)
-                )
-            }
-        }
-
-        // Precision Audiophile S-Curved Tonearm with 3D Drop Shadow & Calibrated Tracking
+        // Flat Precision Tonearm Canvas
         Canvas(modifier = Modifier.fillMaxSize()) {
             val plinthW = size.width
             val plinthH = size.height
             val pivotCenter = Offset(plinthW * 0.83f, plinthH * 0.18f)
 
-            // Stationary Pivot Bearing Core (Stationary top gimbal housing)
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFF6E6E7C), Color(0xFF26262E)),
-                    center = pivotCenter,
-                    radius = 9.dp.toPx()
-                ),
-                radius = 8.dp.toPx(),
-                center = pivotCenter
-            )
-            drawCircle(color = Color(0xFFAAAAAA), radius = 3.5.dp.toPx(), center = pivotCenter)
-
-            // Rotating Arm Structure strictly anchored to pivotCenter
             rotate(degrees = tonearmAngle, pivot = pivotCenter) {
-                // 1. Rear Stainless Steel Stub & Stepped Heavy Counterweight
-                val cwStubEnd = Offset(pivotCenter.x + 16.dp.toPx(), pivotCenter.y - 14.dp.toPx())
-                drawLine(
-                    color = Color(0xFF50505C),
-                    start = pivotCenter,
-                    end = cwStubEnd,
-                    strokeWidth = 3.5.dp.toPx(),
-                    cap = StrokeCap.Round
-                )
-
-                // Counterweight cylinder with tracking force ring
-                val cwCenter = Offset(pivotCenter.x + 11.dp.toPx(), pivotCenter.y - 10.dp.toPx())
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color(0xFF828292), Color(0xFF383842)),
-                        center = cwCenter,
-                        radius = 8.5.dp.toPx()
-                    ),
-                    radius = 7.5.dp.toPx(),
-                    center = cwCenter
-                )
-                drawCircle(color = Color(0xFFB0B0C0), radius = 7.5.dp.toPx(), center = cwCenter, style = Stroke(width = 0.8.dp.toPx()))
-                // Numbered gram tracking dial line
-                drawCircle(color = Color(0xFF202026), radius = 5.dp.toPx(), center = cwCenter, style = Stroke(width = 1.dp.toPx()))
-
-                // 2. Tonearm Tube Geometry (Authentic Audiophile S-Curve)
-                // In local frame from pivotCenter (0,0):
-                // Total arm length L = plinthW * 0.37f
                 val armLength = plinthW * 0.37f
-
-                // Tube endpoints:
-                // Starts at (0,0), curves right (+X), then sweeps left (-X), ending at headshell connector
                 val p0 = pivotCenter
                 val c1 = Offset(pivotCenter.x + armLength * 0.08f, pivotCenter.y + armLength * 0.30f)
                 val c2 = Offset(pivotCenter.x - armLength * 0.06f, pivotCenter.y + armLength * 0.65f)
@@ -1598,106 +1597,50 @@ fun MasterVinylTurntable(
                     cubicTo(c1.x, c1.y, c2.x, c2.y, tubeEnd.x, tubeEnd.y)
                 }
 
-                // Headshell offset tangent to grooves:
                 val hsLength = 14.dp.toPx()
                 val hsAngleRad = Math.toRadians(24.0)
                 val hsEndX = tubeEnd.x + (hsLength * Math.sin(hsAngleRad)).toFloat()
                 val hsEndY = tubeEnd.y + (hsLength * Math.cos(hsAngleRad)).toFloat()
                 val hsEnd = Offset(hsEndX, hsEndY)
 
-                // Finger lift hook extending outward from headshell
-                val flEnd = Offset(tubeEnd.x + 8.dp.toPx(), tubeEnd.y + 4.dp.toPx())
-
-                // 3. PHYSICAL 3D DROP SHADOW:
-                // Projects the tonearm onto the spinning platter beneath it!
-                translate(left = 4.dp.toPx(), top = 6.dp.toPx()) {
+                // Drop shadow
+                translate(left = 3.dp.toPx(), top = 4.dp.toPx()) {
                     drawPath(
                         path = sPath,
-                        color = Color.Black.copy(alpha = 0.38f),
-                        style = Stroke(width = 4.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-                    )
-                    drawLine(
-                        color = Color.Black.copy(alpha = 0.38f),
-                        start = tubeEnd,
-                        end = hsEnd,
-                        strokeWidth = 6.5.dp.toPx(),
-                        cap = StrokeCap.Square
+                        color = Color.Black.copy(alpha = 0.35f),
+                        style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round)
                     )
                 }
 
-                // 4. Polished Chrome Tonearm Tube Multi-Pass Rendering
-                // Outer tube dark rim
-                drawPath(
-                    path = sPath,
-                    color = Color(0xFF1E1E24),
-                    style = Stroke(width = 3.6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-                )
-                // Cylindrical chrome highlight gradient
+                // Clean Tonearm Tube
                 drawPath(
                     path = sPath,
                     brush = Brush.linearGradient(
-                        colors = listOf(Color(0xFFFFFFFF), Color(0xFFDDDDDC), Color(0xFF9494A0)),
+                        colors = listOf(Color(0xFFE0E0E8), Color(0xFF90909A)),
                         start = p0,
                         end = tubeEnd
                     ),
-                    style = Stroke(width = 2.4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-                )
-                // Specular reflection center line
-                drawPath(
-                    path = sPath,
-                    color = Color.White.copy(alpha = 0.85f),
-                    style = Stroke(width = 0.8.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                    style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round)
                 )
 
-                // 5. Knurled Connector Collar & Precision Headshell
-                // Aluminum locking collar
-                drawCircle(
-                    color = Color(0xFF6E6E7C),
-                    radius = 2.4.dp.toPx(),
-                    center = tubeEnd
-                )
-
-                // Technics/Ortofon Precision Headshell Body
+                // Headshell & Stylus
                 drawLine(
-                    color = Color(0xFF18181E),
+                    color = Color(0xFF1E1E26),
                     start = tubeEnd,
                     end = hsEnd,
-                    strokeWidth = 6.dp.toPx(),
+                    strokeWidth = 5.dp.toPx(),
                     cap = StrokeCap.Square
                 )
-                // Dual ventilation slots
-                val slotMid1 = Offset(
-                    tubeEnd.x + (hsEnd.x - tubeEnd.x) * 0.35f,
-                    tubeEnd.y + (hsEnd.y - tubeEnd.y) * 0.35f
-                )
-                drawCircle(color = Color(0xFF0A0A0E), radius = 1.dp.toPx(), center = slotMid1)
-
-                // Phono Cartridge Body (Accent highlight)
-                val cartStart = Offset(
-                    tubeEnd.x + (hsEnd.x - tubeEnd.x) * 0.45f,
-                    tubeEnd.y + (hsEnd.y - tubeEnd.y) * 0.45f
-                )
                 drawLine(
-                    color = theme.accentColor,
-                    start = cartStart,
+                    color = if (isPlaying) Color(0xFF00E676) else theme.accentColor,
+                    start = Offset(tubeEnd.x + (hsEnd.x - tubeEnd.x) * 0.5f, tubeEnd.y + (hsEnd.y - tubeEnd.y) * 0.5f),
                     end = hsEnd,
-                    strokeWidth = 3.5.dp.toPx(),
+                    strokeWidth = 3.dp.toPx(),
                     cap = StrokeCap.Round
                 )
-
-                // Finger Lift Hook for manual cueing
-                drawLine(
-                    color = Color(0xFFD6D6E0),
-                    start = tubeEnd,
-                    end = flEnd,
-                    strokeWidth = 1.3.dp.toPx(),
-                    cap = StrokeCap.Round
-                )
-
-                // Diamond Stylus Tip Touching the Vinyl Groove
                 drawCircle(
                     color = Color.White,
-                    radius = 1.6.dp.toPx(),
+                    radius = 1.4.dp.toPx(),
                     center = hsEnd
                 )
             }
@@ -1706,10 +1649,34 @@ fun MasterVinylTurntable(
 }
 
 /**
+ * Backwards-compatible alias for MasterVinylTurntable delegating to FlatTiledVinylDeck.
+ */
+@Composable
+fun MasterVinylTurntable(
+    theme: HyprThemeConfig,
+    albumArtUri: String?,
+    trackTitle: String,
+    isPlaying: Boolean,
+    progress: Float = 0f,
+    modifier: Modifier = Modifier,
+    artist: String = ""
+) {
+    FlatTiledVinylDeck(
+        theme = theme,
+        albumArtUri = albumArtUri,
+        trackTitle = trackTitle,
+        artist = artist,
+        isPlaying = isPlaying,
+        progress = progress,
+        modifier = modifier
+    )
+}
+
+/**
  * Digipak Sleeve Centerpiece:
  * Tangible physical gatefold/digipak record jacket with realistic book spine fold,
  * open right pocket slot with inner depth shadow, and sliding 12-inch vinyl record
- * revealing grooved reflections and the circular center album label.
+ * styled with the uniform rice corner radius and active window border.
  */
 @Composable
 fun DigipakSleeve(
@@ -1718,12 +1685,12 @@ fun DigipakSleeve(
     trackTitle: String,
     isPlaying: Boolean,
     modifier: Modifier = Modifier,
+    riceShape: RoundedCornerShape = RoundedCornerShape(theme.borderRadiusDp.coerceIn(8, 12).dp),
+    activeBorderColor: Color = if (isPlaying) Color(0xFF00E676).copy(alpha = 0.40f) else theme.inactiveBorderColor.copy(alpha = 0.45f),
     artist: String = ""
 ) {
-    val context = LocalContext.current
     val rms = if (isPlaying) 0.04f else 0f
 
-    // Rotation for peeking vinyl disc: freezes at exact angle on pause, resumes smoothly
     val rotationAnimatable = remember { Animatable(0f) }
     LaunchedEffect(isPlaying) {
         if (isPlaying) {
@@ -1737,7 +1704,6 @@ fun DigipakSleeve(
     }
     val currentRotation = rotationAnimatable.value % 360f
 
-    // Dynamic slide-out distance: 58dp when playing, 36dp when paused
     val slideTarget = if (isPlaying) (58f + rms * 6f) else 36f
     val slideOffset by animateDpAsState(
         targetValue = slideTarget.dp,
@@ -1761,11 +1727,11 @@ fun DigipakSleeve(
         Box(
             modifier = Modifier
                 .fillMaxSize(0.92f)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(riceShape)
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            theme.accentColor.copy(alpha = if (isPlaying) 0.22f else 0.08f),
+                            (if (isPlaying) Color(0xFF00E676) else theme.accentColor).copy(alpha = if (isPlaying) 0.20f else 0.08f),
                             Color.Transparent
                         )
                     )
@@ -1776,96 +1742,38 @@ fun DigipakSleeve(
         Box(
             modifier = Modifier
                 .fillMaxSize(0.86f)
-                .graphicsLayer { translationX = slideOffset.toPx() }
-                .rotate(currentRotation)
-                .clip(CircleShape)
-                .background(Color(0xFF0C0C0F))
-                .border(0.8.dp, Color(0xFF222228), CircleShape),
+                .graphicsLayer { translationX = slideOffset.toPx() },
             contentAlignment = Alignment.Center
         ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val center = Offset(size.width / 2f, size.height / 2f)
-                val radius = size.minDimension / 2f
-
-                // Optical Anisotropic Sheen on Peeking Disc
-                drawCircle(
-                    brush = Brush.sweepGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.White.copy(alpha = 0.07f),
-                            Color.Transparent,
-                            Color.White.copy(alpha = 0.07f),
-                            Color.Transparent
-                        ),
-                        center = center
-                    ),
-                    radius = radius * 0.98f,
-                    center = center
-                )
-
-                // Concentric Sound Grooves
-                for (i in 1..8) {
-                    drawCircle(
-                        color = Color.White.copy(alpha = if (i % 2 == 0) 0.06f else 0.03f),
-                        radius = radius * (0.42f + i * 0.07f),
-                        center = center,
-                        style = Stroke(width = 0.8.dp.toPx())
-                    )
-                }
-
-                // Dead-wax runoff ring
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.08f),
-                    radius = radius * 0.40f,
-                    center = center,
-                    style = Stroke(width = 1.2.dp.toPx())
-                )
-            }
-
-            // Circular Center Album Art Label on Peeking Disc (visible when sliding out!)
-            Box(
+            PureVinylDisc(
+                theme = theme,
+                albumArtUri = albumArtUri,
+                trackTitle = trackTitle,
+                artist = artist,
+                currentRotation = currentRotation,
                 modifier = Modifier
-                    .fillMaxSize(0.36f)
-                    .clip(CircleShape)
-                    .background(theme.surfaceVariantColor),
-                contentAlignment = Alignment.Center
-            ) {
-                HyprArtworkImage(
-                    artworkUri = albumArtUri,
-                    title = trackTitle,
-                    artist = artist,
-                    shape = CircleShape,
-                    modifier = Modifier.fillMaxSize()
-                )
-
-                // Central spindle hole
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF09090C))
-                        .border(0.6.dp, Color(0xFF888890), CircleShape)
-                )
-            }
+                    .fillMaxSize()
+                    .border(0.8.dp, Color(0xFF222228), CircleShape)
+            )
         }
 
-        // Tangible Physical Gatefold Digipak Sleeve
+        // Tangible Physical Gatefold Digipak Sleeve with uniform riceShape and active border
         Box(
             modifier = Modifier
                 .fillMaxSize(0.92f)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(riceShape)
                 .background(Color(0xFF141418))
+                .border(1.dp, activeBorderColor, riceShape)
         ) {
             HyprArtworkImage(
                 artworkUri = albumArtUri,
                 title = trackTitle,
                 artist = artist,
-                shape = RoundedCornerShape(8.dp),
+                shape = riceShape,
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Authentic Physical Sleeve Finishes:
-            // 1. Left Book Spine Fold Crease Highlight
+            // Left Book Spine Fold Crease Highlight
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1884,11 +1792,11 @@ fun DigipakSleeve(
                     )
             )
 
-            // 2. Right Open Pocket Shadow & Notch
+            // Right Open Pocket Shadow & Notch
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .border(0.8.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                    .border(0.8.dp, Color.White.copy(alpha = 0.12f), riceShape)
             )
         }
     }
