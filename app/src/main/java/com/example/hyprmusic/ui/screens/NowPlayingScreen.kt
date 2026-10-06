@@ -44,6 +44,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import com.example.hyprmusic.ui.components.HyprArtworkImage
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Equalizer
@@ -403,6 +404,7 @@ fun NowPlayingScreen(
                                         theme = theme,
                                         albumArtUri = track.albumArtUri,
                                         trackTitle = track.title,
+                                        artist = track.artist,
                                         isPlaying = playbackState.isPlaying,
                                         progress = playbackState.progress
                                     )
@@ -411,6 +413,7 @@ fun NowPlayingScreen(
                                         theme = theme,
                                         albumArtUri = track.albumArtUri,
                                         trackTitle = track.title,
+                                        artist = track.artist,
                                         isPlaying = playbackState.isPlaying
                                     )
                                 }
@@ -1115,7 +1118,8 @@ fun MasterVinylTurntable(
     trackTitle: String,
     isPlaying: Boolean,
     progress: Float = 0f,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    artist: String = ""
 ) {
     val context = LocalContext.current
     val rotationAnimatable = remember { Animatable(0f) }
@@ -1495,31 +1499,13 @@ fun MasterVinylTurntable(
                     .background(theme.surfaceVariantColor),
                 contentAlignment = Alignment.Center
             ) {
-                if (!albumArtUri.isNullOrBlank()) {
-                    val labelReq = remember(albumArtUri) {
-                        ImageRequest.Builder(context)
-                            .data(albumArtUri)
-                            .size(360, 360)
-                            .allowHardware(true)
-                            .memoryCachePolicy(CachePolicy.ENABLED)
-                            .diskCachePolicy(CachePolicy.ENABLED)
-                            .crossfade(false)
-                            .build()
-                    }
-                    AsyncImage(
-                        model = labelReq,
-                        contentDescription = trackTitle,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = theme.accentColor,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
+                HyprArtworkImage(
+                    artworkUri = albumArtUri,
+                    title = trackTitle,
+                    artist = artist,
+                    shape = CircleShape,
+                    modifier = Modifier.fillMaxSize()
+                )
 
                 // Inner label perimeter ring & vintage record typography outline
                 Box(
@@ -1731,7 +1717,8 @@ fun DigipakSleeve(
     albumArtUri: String?,
     trackTitle: String,
     isPlaying: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    artist: String = ""
 ) {
     val context = LocalContext.current
     val rms = if (isPlaying) 0.04f else 0f
@@ -1843,31 +1830,13 @@ fun DigipakSleeve(
                     .background(theme.surfaceVariantColor),
                 contentAlignment = Alignment.Center
             ) {
-                if (!albumArtUri.isNullOrBlank()) {
-                    val labelReq = remember(albumArtUri) {
-                        ImageRequest.Builder(context)
-                            .data(albumArtUri)
-                            .size(240, 240)
-                            .allowHardware(true)
-                            .memoryCachePolicy(CachePolicy.ENABLED)
-                            .diskCachePolicy(CachePolicy.ENABLED)
-                            .crossfade(false)
-                            .build()
-                    }
-                    AsyncImage(
-                        model = labelReq,
-                        contentDescription = trackTitle,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = theme.accentColor,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+                HyprArtworkImage(
+                    artworkUri = albumArtUri,
+                    title = trackTitle,
+                    artist = artist,
+                    shape = CircleShape,
+                    modifier = Modifier.fillMaxSize()
+                )
 
                 // Central spindle hole
                 Box(
@@ -1887,47 +1856,13 @@ fun DigipakSleeve(
                 .clip(RoundedCornerShape(8.dp))
                 .background(Color(0xFF141418))
         ) {
-            if (!albumArtUri.isNullOrBlank()) {
-                val sleeveReq = remember(albumArtUri) {
-                    ImageRequest.Builder(context)
-                        .data(albumArtUri)
-                        .size(800, 800)
-                        .allowHardware(true)
-                        .memoryCachePolicy(CachePolicy.ENABLED)
-                        .diskCachePolicy(CachePolicy.ENABLED)
-                        .crossfade(false)
-                        .build()
-                }
-
-                // Layer 1: Ambient background filling the sleeve
-                AsyncImage(
-                    model = sleeveReq,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                    alpha = 0.40f
-                )
-
-                // Layer 2: 100% fitted foreground jacket artwork (Zero-Crop)
-                AsyncImage(
-                    model = sleeveReq,
-                    contentDescription = trackTitle,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
-            } else {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = theme.accentColor,
-                        modifier = Modifier.size(72.dp)
-                    )
-                }
-            }
+            HyprArtworkImage(
+                artworkUri = albumArtUri,
+                title = trackTitle,
+                artist = artist,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxSize()
+            )
 
             // Authentic Physical Sleeve Finishes:
             // 1. Left Book Spine Fold Crease Highlight

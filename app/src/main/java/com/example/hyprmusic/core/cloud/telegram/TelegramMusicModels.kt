@@ -120,6 +120,51 @@ data class TelegramLibraryResponseDto(
     @SerialName("authenticated_user_id") val authenticatedUserId: Long? = null
 )
 
+sealed interface CloudAccessState {
+    object ConfigRequired : CloudAccessState
+    object Checking : CloudAccessState
+    object Authorized : CloudAccessState
+    data class AccessDenied(
+        val httpCode: Int,
+        val reason: String,
+        val botUsername: String?,
+        val userId: Long
+    ) : CloudAccessState
+    data class ServerOffline(val message: String) : CloudAccessState
+    data class RequestPending(val message: String) : CloudAccessState
+}
+
+class CloudAccessDeniedException(
+    val httpCode: Int,
+    message: String,
+    val botUsername: String? = null,
+    val userId: Long = 0L
+) : SecurityException(message)
+
+enum class CloudTrackSortOrder(val label: String, val chipText: String) {
+    RECENT("RECENTLY ADDED", "RECENT"),
+    OLDEST("FIRST ADDED", "OLDEST"),
+    TITLE_AZ("TITLE (A-Z)", "A-Z"),
+    TITLE_ZA("TITLE (Z-A)", "Z-A"),
+    ARTIST_AZ("ARTIST (A-Z)", "ARTIST"),
+    DURATION_DESC("DURATION", "TIME"),
+    SIZE_DESC("FILE SIZE", "SIZE")
+}
+
+enum class CloudAlbumSortOrder(val label: String, val chipText: String) {
+    TITLE_AZ("ALBUM (A-Z)", "A-Z"),
+    TITLE_ZA("ALBUM (Z-A)", "Z-A"),
+    ARTIST_AZ("ARTIST (A-Z)", "ARTIST"),
+    TRACK_COUNT_DESC("MOST TRACKS", "TRACKS")
+}
+
+enum class CloudArtistSortOrder(val label: String, val chipText: String) {
+    NAME_AZ("ARTIST (A-Z)", "A-Z"),
+    NAME_ZA("ARTIST (Z-A)", "Z-A"),
+    TRACK_COUNT_DESC("MOST SONGS", "SONGS")
+}
+
 private fun absHash(value: String): Long {
     return Math.abs(value.hashCode().toLong())
 }
+

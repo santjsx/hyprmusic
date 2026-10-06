@@ -8,6 +8,15 @@ import androidx.compose.ui.platform.LocalView
 import com.example.hyprmusic.core.cloud.telegram.TelegramMusicRepository
 import com.example.hyprmusic.core.data.PlaylistRepository
 import com.example.hyprmusic.core.data.CustomPlaylist
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import com.example.hyprmusic.ui.components.HyprArtworkImage
+import com.example.hyprmusic.core.cloud.telegram.CloudAccessState
+import com.example.hyprmusic.core.cloud.telegram.CloudTrackSortOrder
+import com.example.hyprmusic.core.cloud.telegram.CloudAlbumSortOrder
+import com.example.hyprmusic.core.cloud.telegram.CloudArtistSortOrder
 import com.example.hyprmusic.core.model.AlbumSortOption
 import com.example.hyprmusic.core.model.ArtistSortOption
 import com.example.hyprmusic.core.model.LibrarySortPreferences
@@ -2689,6 +2698,17 @@ fun HyprAlphabetScroller(
  * Cloud Library View: Displays tracks synced from Telegram Personal Music Cloud (TPMC),
  * offering direct HTTP 206 streaming and background Scoped Storage downloads.
  */
+enum class CloudSubFilter(val label: String) {
+    SONGS("SONGS"),
+    ALBUMS("ALBUMS"),
+    ARTISTS("ARTISTS")
+}
+
+/**
+ * Cloud Library View: Displays tracks, albums, and artists synced from Telegram Personal Music Cloud (TPMC),
+ * featuring Spotify-grade browsing, sub-tabs, comprehensive sorting, 100% reliable artwork,
+ * direct HTTP 206 streaming, and permission/access management.
+ */
 @Composable
 private fun CloudLibraryView(
     theme: HyprThemeConfig,
@@ -2698,42 +2718,163 @@ private fun CloudLibraryView(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
     val coroutineScope = rememberCoroutineScope()
     var cloudSearchQuery by remember { mutableStateOf("") }
+    var activeSubFilter by remember { mutableStateOf(CloudSubFilter.SONGS) }
+
+    var selectedCloudAlbum by remember { mutableStateOf<Album?>(null) }
+    var selectedCloudArtist by remember { mutableStateOf<Artist?>(null) }
+    var showSortDialog by remember { mutableStateOf(false) }
+    var showTokenDialog by remember { mutableStateOf(false) }
 
     val cloudTracks = telegramRepository?.cloudTracks?.collectAsStateWithLifecycle()?.value ?: emptyList()
+    val cloudAlbums = telegramRepository?.cloudAlbums?.collectAsStateWithLifecycle()?.value ?: emptyList()
+    val cloudArtists = telegramRepository?.cloudArtists?.collectAsStateWithLifecycle()?.value ?: emptyList()
     val isSyncing = telegramRepository?.isSyncing?.collectAsStateWithLifecycle()?.value ?: false
     val isWaking = telegramRepository?.isWakingServer?.collectAsStateWithLifecycle()?.value ?: false
     val serverHealth = telegramRepository?.serverHealth?.collectAsStateWithLifecycle()?.value
     val syncError = telegramRepository?.syncError?.collectAsStateWithLifecycle()?.value
+    val accessState = telegramRepository?.accessState?.collectAsStateWithLifecycle()?.value ?: CloudAccessState.ConfigRequired
     val downloadedTrackIds = telegramRepository?.downloadedTrackIds?.collectAsStateWithLifecycle()?.value ?: emptySet()
     val downloadingProgress = telegramRepository?.downloadingProgress?.collectAsStateWithLifecycle()?.value ?: emptyMap()
     val config = telegramRepository?.config?.settings?.collectAsStateWithLifecycle()?.value
 
-    val filteredCloudTracks = remember(cloudTracks, cloudSearchQuery) {
+    val trackSort by (telegramRepository?.trackSortOrder?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(CloudTrackSortOrder.RECENT) })
+    val albumSort by (telegramRepository?.albumSortOrder?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(CloudAlbumSortOrder.TITLE_AZ) })
+    val artistSort by (telegramRepository?.artistSortOrder?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(CloudArtistSortOrder.NAME_AZ) })
+
+    // Filter tracks
+    val filteredTracks = remember(cloudTracks, cloudSearchQuery, trackSort) {
         val q = cloudSearchQuery.trim().lowercase()
-        if (q.isBlank()) cloudTracks
-        else cloudTracks.filter {
+        val base = if (q.isBlank()) cloudTracks else cloudTracks.filter {
             it.title.lowercase().contains(q) ||
             it.artist.lowercase().contains(q) ||
             it.album.lowercase().contains(q)
         }
+        telegramRepository?.sortTracks(base, trackSort) ?: base
     }
 
-    val cloudAlphabetMap = remember(filteredCloudTracks) {
-        val map = mutableMapOf<Char, Int>()
-        filteredCloudTracks.forEachIndexed { index, track ->
-            val firstChar = track.title.firstOrNull()?.uppercaseChar() ?: '#'
-            val key = if (firstChar in 'A'..'Z') firstChar else '#'
-            if (!map.containsKey(key)) {
-                map[key] = index
-            }
+    // Filter albums
+    val filteredAlbums = remember(cloudAlbums, cloudSearchQuery, albumSort) {
+        val q = cloudSearchQuery.trim().lowercase()
+        val base = if (q.isBlank()) cloudAlbums else cloudAlbums.filter {
+            it.title.lowercase().contains(q) || it.artist.lowercase().contains(q)
         }
-        map
+        telegramRepository?.sortAlbums(base, albumSort) ?: base
     }
 
-    val listState = rememberLazyListState()
-    var draggingLetter by remember { mutableStateOf<Char?>(null) }
+    // Filter artists
+    val filteredArtists = remember(cloudArtists, cloudSearchQuery, artistSort) {
+        val q = cloudSearchQuery.trim().lowercase()
+        val base = if (q.isBlank()) cloudArtists else cloudArtists.filter {
+            it.name.lowercase().contains(q)
+        }
+        telegramRepository?.sortArtists(base, artistSort) ?: base
+    }
+
+    val songsListState = rememberLazyListState()
+    val albumsGridState = rememberLazyGridState()
+    val artistsListState = rememberLazyListState()
+
+    // Deep navigation handlers
+    if (selectedCloudAlbum != null) {
+        val currentAlbum = selectedCloudAlbum!!
+        val albumTracks = remember(currentAlbum, cloudTracks) {
+            cloudTracks.filter { it.album.equals(currentAlbum.title, ignoreCase = true) }
+        }
+        CloudAlbumDetailView(
+            theme = theme,
+            album = currentAlbum,
+            albumTracks = albumTracks,
+            playbackState = playbackState,
+            downloadedTrackIds = downloadedTrackIds,
+            downloadingProgress = downloadingProgress,
+            onBack = { selectedCloudAlbum = null },
+            onTrackSelected = onTrackSelected,
+            onDownloadTrack = { track ->
+                coroutineScope.launch {
+                    telegramRepository?.downloadTrack(track)
+                }
+            },
+            onDownloadAlbum = {
+                coroutineScope.launch {
+                    Toast.makeText(context, "Queuing album download: ${currentAlbum.title}...", Toast.LENGTH_SHORT).show()
+                    telegramRepository?.downloadAlbum(currentAlbum, albumTracks)
+                }
+            }
+        )
+        return
+    }
+
+    if (selectedCloudArtist != null) {
+        val currentArtist = selectedCloudArtist!!
+        val artistTracks = remember(currentArtist, cloudTracks) {
+            cloudTracks.filter { it.artist.equals(currentArtist.name, ignoreCase = true) }
+        }
+        val artistAlbums = remember(currentArtist, cloudAlbums) {
+            cloudAlbums.filter { it.artist.equals(currentArtist.name, ignoreCase = true) }
+        }
+        CloudArtistDetailView(
+            theme = theme,
+            artist = currentArtist,
+            artistTracks = artistTracks,
+            artistAlbums = artistAlbums,
+            playbackState = playbackState,
+            downloadedTrackIds = downloadedTrackIds,
+            downloadingProgress = downloadingProgress,
+            onBack = { selectedCloudArtist = null },
+            onSelectAlbum = { alb -> selectedCloudAlbum = alb },
+            onTrackSelected = onTrackSelected,
+            onDownloadTrack = { track ->
+                coroutineScope.launch {
+                    telegramRepository?.downloadTrack(track)
+                }
+            }
+        )
+        return
+    }
+
+    // Access Denied Permission Gateway View
+    if (accessState is CloudAccessState.AccessDenied) {
+        CloudAccessPermissionView(
+            theme = theme,
+            accessState = accessState,
+            serverUrl = config?.serverUrl ?: "https://tpmc-music-cloud.onrender.com",
+            onRetry = {
+                coroutineScope.launch { telegramRepository?.syncLibrary(force = true) }
+            },
+            onRequestDirect = {
+                coroutineScope.launch {
+                    val res = telegramRepository?.requestDirectAccess()
+                    if (res?.isSuccess == true) {
+                        Toast.makeText(context, "Direct access request sent to server admin!", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(context, "Request: ${res?.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            },
+            onEnterKey = { showTokenDialog = true }
+        )
+
+        if (showTokenDialog) {
+            CloudTokenEntryDialog(
+                theme = theme,
+                initialToken = config?.apiSecretKey.orEmpty(),
+                onDismiss = { showTokenDialog = false },
+                onSave = { newToken ->
+                    showTokenDialog = false
+                    telegramRepository?.config?.updateSettings(
+                        serverUrl = config?.serverUrl ?: "https://tpmc-music-cloud.onrender.com",
+                        userId = config?.userId ?: 0L,
+                        apiSecretKey = newToken
+                    )
+                    coroutineScope.launch { telegramRepository?.syncLibrary(force = true) }
+                }
+            )
+        }
+        return
+    }
 
     Column(
         modifier = modifier
@@ -2802,8 +2943,13 @@ private fun CloudLibraryView(
                     .background(theme.surfaceVariantColor)
                     .padding(horizontal = 6.dp, vertical = 3.dp)
             ) {
+                val displayCount = when (activeSubFilter) {
+                    CloudSubFilter.SONGS -> "${filteredTracks.size}/${cloudTracks.size}"
+                    CloudSubFilter.ALBUMS -> "${filteredAlbums.size}/${cloudAlbums.size}"
+                    CloudSubFilter.ARTISTS -> "${filteredArtists.size}/${cloudArtists.size}"
+                }
                 Text(
-                    text = "${filteredCloudTracks.size} / ${cloudTracks.size}",
+                    text = displayCount,
                     color = theme.accentColor,
                     fontFamily = FontFamily.Monospace,
                     fontSize = 10.sp,
@@ -2841,7 +2987,93 @@ private fun CloudLibraryView(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Status Banner (Waking up / Error / Status)
+        // Sub-Tabs Bar: SONGS, ALBUMS, ARTISTS + Sort Pill Capsule
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Sub-Tabs
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CloudSubFilter.entries.forEach { sub ->
+                    val isTabActive = activeSubFilter == sub
+                    val count = when (sub) {
+                        CloudSubFilter.SONGS -> cloudTracks.size
+                        CloudSubFilter.ALBUMS -> cloudAlbums.size
+                        CloudSubFilter.ARTISTS -> cloudArtists.size
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(
+                                if (isTabActive) theme.accentColor.copy(alpha = 0.22f)
+                                else theme.surfaceVariantColor
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (isTabActive) theme.accentColor.copy(alpha = 0.8f) else Color.Transparent,
+                                shape = RoundedCornerShape(6.dp)
+                            )
+                            .clickable { activeSubFilter = sub }
+                            .padding(horizontal = 8.dp, vertical = 5.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = sub.label,
+                                color = if (isTabActive) theme.accentColor else theme.textSecondaryColor,
+                                fontSize = 10.5.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = if (isTabActive) FontWeight.Bold else FontWeight.Medium
+                            )
+                            Text(
+                                text = "($count)",
+                                color = if (isTabActive) theme.accentColor.copy(alpha = 0.8f) else theme.textSecondaryColor.copy(alpha = 0.6f),
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Sort Pill Capsule
+            val currentSortChip = when (activeSubFilter) {
+                CloudSubFilter.SONGS -> trackSort.chipText
+                CloudSubFilter.ALBUMS -> albumSort.chipText
+                CloudSubFilter.ARTISTS -> artistSort.chipText
+            }
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(theme.surfaceVariantColor)
+                    .border(1.dp, theme.accentColor.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                    .clickable { showSortDialog = true }
+                    .padding(horizontal = 7.dp, vertical = 4.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Text(
+                        text = "⇅ $currentSortChip ▼",
+                        color = theme.accentColor,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Status Banners
         if (isWaking) {
             Box(
                 modifier = Modifier
@@ -2864,6 +3096,40 @@ private fun CloudLibraryView(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+        } else if (accessState is CloudAccessState.RequestPending) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(theme.accentColor.copy(alpha = 0.15f))
+                    .border(1.dp, theme.accentColor.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "⏳ ${accessState.message}",
+                        color = theme.accentColor,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "[CHECK]",
+                        color = theme.textPrimaryColor,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable {
+                            coroutineScope.launch { telegramRepository?.syncLibrary(force = true) }
+                        }
                     )
                 }
             }
@@ -2905,32 +3171,9 @@ private fun CloudLibraryView(
                 }
             }
             Spacer(modifier = Modifier.height(6.dp))
-        } else if (serverHealth != null) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "● TPMC ONLINE: ${serverHealth.bot}",
-                    color = Color(0xFF98C379),
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "${cloudTracks.size} CLOUD TRACKS",
-                    color = theme.textSecondaryColor,
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
         }
 
-        // Main Cloud Content
+        // Main Catalog Content
         if (cloudTracks.isEmpty() && !isSyncing && !isWaking) {
             Box(
                 modifier = Modifier
@@ -2992,64 +3235,311 @@ private fun CloudLibraryView(
                 }
             }
         } else {
-            Row(modifier = Modifier.fillMaxSize()) {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(theme.windowGapsDp.dp)
-                ) {
-                    items(
-                        items = filteredCloudTracks,
-                        key = { "cloud_${it.id}" },
-                        contentType = { "cloud_track" }
-                    ) { track ->
-                        val isPlaying = playbackState.currentTrack?.id == track.id
-                        val isDownloaded = downloadedTrackIds.contains(track.id)
-                        val progress = downloadingProgress[track.id]
-
-                        HyprCloudTrackRow(
-                            theme = theme,
-                            track = track,
-                            isPlaying = isPlaying,
-                            isAudioActive = isPlaying && playbackState.isPlaying,
-                            isDownloaded = isDownloaded,
-                            downloadProgress = progress,
-                            onClick = {
-                                onTrackSelected(track, filteredCloudTracks)
-                            },
-                            onDownloadClick = {
-                                coroutineScope.launch {
-                                    Toast.makeText(context, "Downloading: ${track.title}...", Toast.LENGTH_SHORT).show()
-                                    if (telegramRepository != null) {
-                                        val success = telegramRepository.downloadTrack(track)
-                                        if (success) {
-                                            Toast.makeText(context, "Saved to library: ${track.title}", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            Toast.makeText(context, "Download failed for ${track.title}", Toast.LENGTH_LONG).show()
-                                        }
-                                    }
-                                }
-                            }
-                        )
+            when (activeSubFilter) {
+                CloudSubFilter.SONGS -> {
+                    val alphabetMap = remember(filteredTracks) {
+                        val map = mutableMapOf<Char, Int>()
+                        filteredTracks.forEachIndexed { index, track ->
+                            val firstChar = track.title.firstOrNull()?.uppercaseChar() ?: '#'
+                            val key = if (firstChar in 'A'..'Z') firstChar else '#'
+                            if (!map.containsKey(key)) map[key] = index
+                        }
+                        map
                     }
 
-                    item { Spacer(modifier = Modifier.height(90.dp)) }
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        LazyColumn(
+                            state = songsListState,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            verticalArrangement = Arrangement.spacedBy(theme.windowGapsDp.dp)
+                        ) {
+                            items(
+                                items = filteredTracks,
+                                key = { "cloud_track_${it.id}" },
+                                contentType = { "cloud_track" }
+                            ) { track ->
+                                val isPlaying = playbackState.currentTrack?.id == track.id
+                                val isDownloaded = downloadedTrackIds.contains(track.id)
+                                val progress = downloadingProgress[track.id]
+
+                                HyprCloudTrackRow(
+                                    theme = theme,
+                                    track = track,
+                                    isPlaying = isPlaying,
+                                    isAudioActive = isPlaying && playbackState.isPlaying,
+                                    isDownloaded = isDownloaded,
+                                    downloadProgress = progress,
+                                    onClick = { onTrackSelected(track, filteredTracks) },
+                                    onDownloadClick = {
+                                        coroutineScope.launch {
+                                            Toast.makeText(context, "Downloading: ${track.title}...", Toast.LENGTH_SHORT).show()
+                                            telegramRepository?.downloadTrack(track)
+                                        }
+                                    }
+                                )
+                            }
+                            item { Spacer(modifier = Modifier.height(90.dp)) }
+                        }
+
+                        HyprAlphabetScroller(
+                            theme = theme,
+                            onLetterSelected = { letter ->
+                                alphabetMap[letter]?.let { targetIndex ->
+                                    coroutineScope.launch { songsListState.scrollToItem(targetIndex) }
+                                }
+                            },
+                            onDragEnd = {}
+                        )
+                    }
                 }
 
-                // Alphabet scroller for cloud
-                HyprAlphabetScroller(
-                    theme = theme,
-                    onLetterSelected = { letter ->
-                        draggingLetter = letter
-                        cloudAlphabetMap[letter]?.let { targetIndex ->
-                            coroutineScope.launch {
-                                listState.scrollToItem(targetIndex)
-                            }
+                CloudSubFilter.ALBUMS -> {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        state = albumsGridState,
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(bottom = 90.dp)
+                    ) {
+                        items(
+                            items = filteredAlbums,
+                            key = { "cloud_alb_${it.id}" }
+                        ) { album ->
+                            HyprCloudAlbumCard(
+                                theme = theme,
+                                album = album,
+                                onClick = { selectedCloudAlbum = album }
+                            )
                         }
+                    }
+                }
+
+                CloudSubFilter.ARTISTS -> {
+                    LazyColumn(
+                        state = artistsListState,
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        contentPadding = PaddingValues(bottom = 90.dp)
+                    ) {
+                        items(
+                            items = filteredArtists,
+                            key = { "cloud_art_${it.id}" }
+                        ) { artist ->
+                            HyprCloudArtistRow(
+                                theme = theme,
+                                artist = artist,
+                                onClick = { selectedCloudArtist = artist }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort Modal Dialog
+    if (showSortDialog) {
+        when (activeSubFilter) {
+            CloudSubFilter.SONGS -> {
+                HyprSortModalDialog(
+                    theme = theme,
+                    title = "SORT CLOUD TRACKS",
+                    options = CloudTrackSortOrder.entries.map { it.label to (it == trackSort) },
+                    onSelectIndex = { idx ->
+                        telegramRepository?.trackSortOrder?.value = CloudTrackSortOrder.entries[idx]
+                        showSortDialog = false
                     },
-                    onDragEnd = { draggingLetter = null }
+                    onDismiss = { showSortDialog = false }
+                )
+            }
+            CloudSubFilter.ALBUMS -> {
+                HyprSortModalDialog(
+                    theme = theme,
+                    title = "SORT CLOUD ALBUMS",
+                    options = CloudAlbumSortOrder.entries.map { it.label to (it == albumSort) },
+                    onSelectIndex = { idx ->
+                        telegramRepository?.albumSortOrder?.value = CloudAlbumSortOrder.entries[idx]
+                        showSortDialog = false
+                    },
+                    onDismiss = { showSortDialog = false }
+                )
+            }
+            CloudSubFilter.ARTISTS -> {
+                HyprSortModalDialog(
+                    theme = theme,
+                    title = "SORT CLOUD ARTISTS",
+                    options = CloudArtistSortOrder.entries.map { it.label to (it == artistSort) },
+                    onSelectIndex = { idx ->
+                        telegramRepository?.artistSortOrder?.value = CloudArtistSortOrder.entries[idx]
+                        showSortDialog = false
+                    },
+                    onDismiss = { showSortDialog = false }
+                )
+            }
+        }
+    }
+
+    if (showTokenDialog) {
+        CloudTokenEntryDialog(
+            theme = theme,
+            initialToken = config?.apiSecretKey.orEmpty(),
+            onDismiss = { showTokenDialog = false },
+            onSave = { newToken ->
+                showTokenDialog = false
+                telegramRepository?.config?.updateSettings(
+                    serverUrl = config?.serverUrl ?: "https://tpmc-music-cloud.onrender.com",
+                    userId = config?.userId ?: 0L,
+                    apiSecretKey = newToken
+                )
+                coroutineScope.launch { telegramRepository?.syncLibrary(force = true) }
+            }
+        )
+    }
+}
+
+/**
+ * Cloud Album Card (Grid View)
+ */
+@Composable
+private fun HyprCloudAlbumCard(
+    theme: HyprThemeConfig,
+    album: Album,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .hyprTile(theme = theme)
+            .clickable(onClick = onClick)
+            .padding(8.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(8.dp))
+            ) {
+                HyprArtworkImage(
+                    artworkUri = album.coverUri,
+                    title = album.title,
+                    artist = album.artist,
+                    isAlbum = true,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            Text(
+                text = album.title,
+                color = theme.textPrimaryColor,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.5.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = album.artist,
+                    color = theme.textSecondaryColor,
+                    fontSize = 10.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(theme.surfaceVariantColor)
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "${album.trackCount} trk",
+                        color = theme.accentColor,
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Cloud Artist Row (List View)
+ */
+@Composable
+private fun HyprCloudArtistRow(
+    theme: HyprThemeConfig,
+    artist: Artist,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .hyprTile(theme = theme)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+            ) {
+                HyprArtworkImage(
+                    artworkUri = null,
+                    title = artist.name,
+                    artist = artist.name,
+                    shape = CircleShape,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = artist.name,
+                    color = theme.textPrimaryColor,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${artist.trackCount} cloud tracks",
+                    color = theme.textSecondaryColor,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(theme.surfaceVariantColor)
+                    .padding(horizontal = 6.dp, vertical = 3.dp)
+            ) {
+                Text(
+                    text = "VIEW ➔",
+                    color = theme.accentColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
@@ -3057,7 +3547,812 @@ private fun CloudLibraryView(
 }
 
 /**
- * Cloud Track Row with stream playback and direct Scoped Storage MediaStore download integration.
+ * Cloud Album Detail View
+ */
+@Composable
+private fun CloudAlbumDetailView(
+    theme: HyprThemeConfig,
+    album: Album,
+    albumTracks: List<Track>,
+    playbackState: PlaybackState,
+    downloadedTrackIds: Set<String>,
+    downloadingProgress: Map<String, Float>,
+    onBack: () -> Unit,
+    onTrackSelected: (Track, List<Track>) -> Unit,
+    onDownloadTrack: (Track) -> Unit,
+    onDownloadAlbum: () -> Unit
+) {
+    BackHandler(onBack = onBack)
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = theme.windowGapsDp.dp)
+    ) {
+        // Back Navigation Bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(theme.surfaceVariantColor)
+                    .clickable(onClick = onBack)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "← CATALOG",
+                    color = theme.accentColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "ALBUM // ${album.title}",
+                color = theme.textPrimaryColor,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Album Header Card
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .hyprTile(theme = theme)
+                .padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(90.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                ) {
+                    HyprArtworkImage(
+                        artworkUri = album.coverUri,
+                        title = album.title,
+                        artist = album.artist,
+                        isAlbum = true,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = album.title,
+                        color = theme.textPrimaryColor,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = album.artist,
+                        color = theme.accentColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${albumTracks.size} tracks",
+                        color = theme.textSecondaryColor,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Actions Row: Play All, Shuffle, Download All Album
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(theme.accentColor)
+                    .clickable {
+                        albumTracks.firstOrNull()?.let { onTrackSelected(it, albumTracks) }
+                    }
+                    .padding(vertical = 7.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "▶ PLAY ALL",
+                    color = theme.backgroundColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(theme.surfaceVariantColor)
+                    .clickable {
+                        val shuffled = albumTracks.shuffled()
+                        shuffled.firstOrNull()?.let { onTrackSelected(it, shuffled) }
+                    }
+                    .padding(vertical = 7.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "🔀 SHUFFLE",
+                    color = theme.textPrimaryColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1.2f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(theme.surfaceVariantColor)
+                    .border(1.dp, theme.accentColor.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                    .clickable(onClick = onDownloadAlbum)
+                    .padding(vertical = 7.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "⬇ DOWNLOAD ALBUM",
+                    color = theme.accentColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.5.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Tracks List
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(theme.windowGapsDp.dp),
+            contentPadding = PaddingValues(bottom = 90.dp)
+        ) {
+            items(
+                items = albumTracks,
+                key = { "alb_trk_${it.id}" }
+            ) { track ->
+                val isPlaying = playbackState.currentTrack?.id == track.id
+                val isDownloaded = downloadedTrackIds.contains(track.id)
+                val progress = downloadingProgress[track.id]
+
+                HyprCloudTrackRow(
+                    theme = theme,
+                    track = track,
+                    isPlaying = isPlaying,
+                    isAudioActive = isPlaying && playbackState.isPlaying,
+                    isDownloaded = isDownloaded,
+                    downloadProgress = progress,
+                    onClick = { onTrackSelected(track, albumTracks) },
+                    onDownloadClick = { onDownloadTrack(track) }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Cloud Artist Detail View
+ */
+@Composable
+private fun CloudArtistDetailView(
+    theme: HyprThemeConfig,
+    artist: Artist,
+    artistTracks: List<Track>,
+    artistAlbums: List<Album>,
+    playbackState: PlaybackState,
+    downloadedTrackIds: Set<String>,
+    downloadingProgress: Map<String, Float>,
+    onBack: () -> Unit,
+    onSelectAlbum: (Album) -> Unit,
+    onTrackSelected: (Track, List<Track>) -> Unit,
+    onDownloadTrack: (Track) -> Unit
+) {
+    BackHandler(onBack = onBack)
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = theme.windowGapsDp.dp)
+    ) {
+        // Back Navigation Bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(theme.surfaceVariantColor)
+                    .clickable(onClick = onBack)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "← ARTISTS",
+                    color = theme.accentColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "ARTIST // ${artist.name}",
+                color = theme.textPrimaryColor,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Artist Header Card
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .hyprTile(theme = theme)
+                .padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                ) {
+                    HyprArtworkImage(
+                        artworkUri = null,
+                        title = artist.name,
+                        artist = artist.name,
+                        shape = CircleShape,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = artist.name,
+                        color = theme.textPrimaryColor,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "${artistTracks.size} tracks • ${artistAlbums.size} albums",
+                        color = theme.textSecondaryColor,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Actions Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(theme.accentColor)
+                    .clickable {
+                        artistTracks.firstOrNull()?.let { onTrackSelected(it, artistTracks) }
+                    }
+                    .padding(vertical = 7.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "▶ PLAY ALL",
+                    color = theme.backgroundColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(theme.surfaceVariantColor)
+                    .clickable {
+                        val shuffled = artistTracks.shuffled()
+                        shuffled.firstOrNull()?.let { onTrackSelected(it, shuffled) }
+                    }
+                    .padding(vertical = 7.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "🔀 SHUFFLE",
+                    color = theme.textPrimaryColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Tracks List
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(theme.windowGapsDp.dp),
+            contentPadding = PaddingValues(bottom = 90.dp)
+        ) {
+            items(
+                items = artistTracks,
+                key = { "art_trk_${it.id}" }
+            ) { track ->
+                val isPlaying = playbackState.currentTrack?.id == track.id
+                val isDownloaded = downloadedTrackIds.contains(track.id)
+                val progress = downloadingProgress[track.id]
+
+                HyprCloudTrackRow(
+                    theme = theme,
+                    track = track,
+                    isPlaying = isPlaying,
+                    isAudioActive = isPlaying && playbackState.isPlaying,
+                    isDownloaded = isDownloaded,
+                    downloadProgress = progress,
+                    onClick = { onTrackSelected(track, artistTracks) },
+                    onDownloadClick = { onDownloadTrack(track) }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Arch Hyprland Access & Permission Gateway Screen
+ */
+@Composable
+private fun CloudAccessPermissionView(
+    theme: HyprThemeConfig,
+    accessState: CloudAccessState.AccessDenied,
+    serverUrl: String,
+    onRetry: () -> Unit,
+    onRequestDirect: () -> Unit,
+    onEnterKey: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
+    val botUsername = accessState.botUsername?.removePrefix("@") ?: "tpmc_bot"
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = theme.windowGapsDp.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Header Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .hyprTile(theme = theme)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "[ SYSTEM // SECURITY // ACCESS RESTRICTED ]",
+                    color = Color(0xFFE06C75),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color(0xFFE06C75).copy(alpha = 0.2f))
+                        .border(1.dp, Color(0xFFE06C75), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "● ${accessState.httpCode} FORBIDDEN",
+                        color = Color(0xFFE06C75),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Diagnostics Box
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .hyprTile(theme = theme)
+                    .padding(14.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "ACCESS DENIED BY TPMC GATEWAY",
+                        color = theme.textPrimaryColor,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                    Text(
+                        text = accessState.reason,
+                        color = Color(0xFFE06C75),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Telemetry Grid
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(theme.backgroundColor)
+                            .padding(10.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "TELEGRAM USER ID:",
+                                    color = theme.textSecondaryColor,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "${accessState.userId}",
+                                        color = theme.accentColor,
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(theme.surfaceVariantColor)
+                                            .clickable {
+                                                clipboardManager.setText(AnnotatedString("${accessState.userId}"))
+                                                Toast.makeText(context, "Copied ID: ${accessState.userId}", Toast.LENGTH_SHORT).show()
+                                            }
+                                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = "COPY",
+                                            color = theme.textPrimaryColor,
+                                            fontSize = 9.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "SERVER HOST:",
+                                    color = theme.textSecondaryColor,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Text(
+                                    text = serverUrl.removePrefix("https://").removePrefix("http://"),
+                                    color = theme.textPrimaryColor,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "BOT GATEWAY:",
+                                    color = theme.textSecondaryColor,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Text(
+                                    text = "@$botUsername",
+                                    color = theme.accentColor,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Action 1: Deep Link to Telegram Bot
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(theme.accentColor)
+                    .clickable {
+                        val uri = Uri.parse("tg://resolve?domain=$botUsername&start=access_${accessState.userId}")
+                        val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        try {
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                            val fallback = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/$botUsername?start=access_${accessState.userId}")).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            context.startActivity(fallback)
+                        }
+                    }
+                    .padding(vertical = 12.dp, horizontal = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "✈ REQUEST ACCESS VIA TELEGRAM BOT",
+                    color = theme.backgroundColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+            }
+
+            // Action 2: Direct In-App Request
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(theme.surfaceVariantColor)
+                    .border(1.dp, theme.inactiveBorderColor, RoundedCornerShape(8.dp))
+                    .clickable(onClick = onRequestDirect)
+                    .padding(vertical = 11.dp, horizontal = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "⚡ SEND IN-APP DIRECT ACCESS REQUEST",
+                    color = theme.textPrimaryColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.5.sp
+                )
+            }
+
+            // Action 3: Enter Access Token
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(theme.surfaceVariantColor)
+                    .border(1.dp, theme.inactiveBorderColor, RoundedCornerShape(8.dp))
+                    .clickable(onClick = onEnterKey)
+                    .padding(vertical = 11.dp, horizontal = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "🔑 ENTER ACCESS TOKEN / SECRET KEY",
+                    color = theme.textPrimaryColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.5.sp
+                )
+            }
+
+            // Action 4: Retry
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.Transparent)
+                    .border(1.dp, theme.accentColor.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                    .clickable(onClick = onRetry)
+                    .padding(vertical = 11.dp, horizontal = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "🔄 RE-CHECK & VERIFY ACCESS",
+                    color = theme.accentColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.5.sp
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Access Token / API Key Input Modal Dialog
+ */
+@Composable
+private fun CloudTokenEntryDialog(
+    theme: HyprThemeConfig,
+    initialToken: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var tokenInput by remember { mutableStateOf(initialToken) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.7f))
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismiss
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 24.dp)
+                    .fillMaxWidth()
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null,
+                        onClick = {}
+                    )
+                    .hyprTile(theme = theme)
+                    .border(1.dp, theme.accentColor.copy(alpha = 0.6f), RoundedCornerShape(theme.borderRadiusDp.dp))
+                    .padding(18.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "ENTER TPMC SECRET KEY",
+                        color = theme.textPrimaryColor,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+
+                    Text(
+                        text = "Paste your authorization token or admin API key below to unlock catalog access.",
+                        color = theme.textSecondaryColor,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(theme.surfaceVariantColor)
+                            .border(1.dp, theme.inactiveBorderColor, RoundedCornerShape(6.dp))
+                            .padding(10.dp)
+                    ) {
+                        BasicTextField(
+                            value = tokenInput,
+                            onValueChange = { tokenInput = it },
+                            textStyle = TextStyle(
+                                color = theme.textPrimaryColor,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 12.sp
+                            ),
+                            cursorBrush = SolidColor(theme.accentColor),
+                            modifier = Modifier.fillMaxWidth(),
+                            decorationBox = { innerTextField ->
+                                if (tokenInput.isEmpty()) {
+                                    Text(
+                                        text = "token_or_secret_key...",
+                                        color = theme.textSecondaryColor.copy(alpha = 0.5f),
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(theme.surfaceVariantColor)
+                                .clickable(onClick = onDismiss)
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "CANCEL",
+                                color = theme.textSecondaryColor,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(theme.accentColor)
+                                .clickable { onSave(tokenInput.trim()) }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "SAVE & VERIFY",
+                                color = theme.backgroundColor,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Cloud Track Row with 100% reliable HyprArtworkImage and direct Scoped Storage MediaStore download integration.
  */
 @Composable
 private fun HyprCloudTrackRow(
@@ -3071,7 +4366,6 @@ private fun HyprCloudTrackRow(
     onDownloadClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -3083,44 +4377,34 @@ private fun HyprCloudTrackRow(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Artwork or Cloud Note
+            // Artwork via HyprArtworkImage (100% reliable with 4-tier fallback)
             Box(
                 modifier = Modifier
                     .size(42.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(theme.surfaceVariantColor),
+                    .clip(RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 if (isAudioActive) {
-                    Icon(
-                        imageVector = Icons.Default.Equalizer,
-                        contentDescription = "Playing",
-                        tint = theme.accentColor,
-                        modifier = Modifier.size(24.dp)
-                    )
-                } else if (!track.albumArtUri.isNullOrBlank()) {
-                    val cloudTrackReq = remember(track.albumArtUri) {
-                        ImageRequest.Builder(context)
-                            .data(track.albumArtUri)
-                            .size(120, 120)
-                            .allowHardware(true)
-                            .memoryCachePolicy(CachePolicy.ENABLED)
-                            .diskCachePolicy(CachePolicy.ENABLED)
-                            .crossfade(false)
-                            .build()
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(theme.surfaceVariantColor),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Equalizer,
+                            contentDescription = "Playing",
+                            tint = theme.accentColor,
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
-                    AsyncImage(
-                        model = cloudTrackReq,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
                 } else {
-                    Icon(
-                        imageVector = Icons.Default.Cloud,
-                        contentDescription = null,
-                        tint = theme.accentColor.copy(alpha = 0.8f),
-                        modifier = Modifier.size(20.dp)
+                    HyprArtworkImage(
+                        artworkUri = track.albumArtUri,
+                        title = track.title,
+                        artist = track.artist,
+                        trackId = track.id,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
             }
@@ -3204,17 +4488,12 @@ private fun HyprCloudTrackRow(
                             .background(Color(0xFF98C379).copy(alpha = 0.18f))
                             .padding(horizontal = 5.dp, vertical = 3.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "Downloaded",
-                                tint = Color(0xFF98C379),
-                                modifier = Modifier.size(12.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "Downloaded",
+                            tint = Color(0xFF98C379),
+                            modifier = Modifier.size(12.dp)
+                        )
                     }
                 } else {
                     IconButton(

@@ -469,7 +469,9 @@ fun MiniVinylRecord(
     albumArtUri: String?,
     trackTitle: String,
     isPlaying: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    artist: String = "",
+    trackId: String = ""
 ) {
     val rotationAnimatable = remember { Animatable(0f) }
     LaunchedEffect(isPlaying) {
@@ -526,31 +528,14 @@ fun MiniVinylRecord(
                 .background(theme.surfaceVariantColor),
             contentAlignment = Alignment.Center
         ) {
-            if (!albumArtUri.isNullOrBlank()) {
-                val miniLabelReq = remember(albumArtUri) {
-                    ImageRequest.Builder(context)
-                        .data(albumArtUri)
-                        .size(100, 100)
-                        .allowHardware(true)
-                        .memoryCachePolicy(CachePolicy.ENABLED)
-                        .diskCachePolicy(CachePolicy.ENABLED)
-                        .crossfade(false)
-                        .build()
-                }
-                AsyncImage(
-                    model = miniLabelReq,
-                    contentDescription = trackTitle,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.MusicNote,
-                    contentDescription = null,
-                    tint = theme.accentColor,
-                    modifier = Modifier.size(14.dp)
-                )
-            }
+            HyprArtworkImage(
+                artworkUri = albumArtUri,
+                title = trackTitle,
+                artist = artist,
+                trackId = trackId,
+                modifier = Modifier.fillMaxSize(),
+                shape = CircleShape
+            )
 
             // Center spindle hole
             Box(
@@ -648,7 +633,9 @@ fun MiniPlayer(
                     theme = theme,
                     albumArtUri = track.albumArtUri,
                     trackTitle = track.title,
-                    isPlaying = playbackState.isPlaying
+                    isPlaying = playbackState.isPlaying,
+                    artist = track.artist,
+                    trackId = track.id.toString()
                 )
 
                 Spacer(modifier = Modifier.width(10.dp))

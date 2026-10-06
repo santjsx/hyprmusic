@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.example.hyprmusic.ui.components.HyprArtworkImage
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -373,32 +374,14 @@ fun HyprMusicApp(
                                                     .background(themeConfig.surfaceVariantColor),
                                                 contentAlignment = Alignment.Center
                                             ) {
-                                                if (track.albumArtUri != null) {
-                                                    val context = LocalContext.current
-                                                    val searchThumbReq = remember(track.albumArtUri) {
-                                                        ImageRequest.Builder(context)
-                                                            .data(track.albumArtUri)
-                                                            .size(120, 120)
-                                                            .allowHardware(true)
-                                                            .memoryCachePolicy(CachePolicy.ENABLED)
-                                                            .diskCachePolicy(CachePolicy.ENABLED)
-                                                            .crossfade(false)
-                                                            .build()
-                                                    }
-                                                    AsyncImage(
-                                                        model = searchThumbReq,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.fillMaxSize(),
-                                                        contentScale = ContentScale.Crop
-                                                    )
-                                                } else {
-                                                    Icon(
-                                                        imageVector = Icons.Default.MusicNote,
-                                                        contentDescription = null,
-                                                        tint = themeConfig.accentColor,
-                                                        modifier = Modifier.size(22.dp)
-                                                    )
-                                                }
+                                                HyprArtworkImage(
+                                                    artworkUri = track.albumArtUri,
+                                                    title = track.title,
+                                                    artist = track.artist,
+                                                    trackId = track.id,
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    modifier = Modifier.fillMaxSize()
+                                                )
                                             }
 
                                             Spacer(modifier = Modifier.width(12.dp))

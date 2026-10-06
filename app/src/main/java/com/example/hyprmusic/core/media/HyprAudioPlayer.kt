@@ -61,13 +61,13 @@ class HyprAudioPlayer private constructor(private val context: Context) {
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
 
-        // Generous buffer thresholds for lossless high-resolution audio (FLAC, WAV, M4A)
+        // Spotify-grade buffer thresholds: instant sub-250ms playback start with deep 180s background headroom
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                /* minBufferMs = */ 30000,
-                /* maxBufferMs = */ 60000,
-                /* bufferForPlaybackMs = */ 1000,
-                /* bufferForPlaybackAfterRebufferMs = */ 2000
+                /* minBufferMs = */ 60000,
+                /* maxBufferMs = */ 180000,
+                /* bufferForPlaybackMs = */ 250,
+                /* bufferForPlaybackAfterRebufferMs = */ 500
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
@@ -215,6 +215,17 @@ class HyprAudioPlayer private constructor(private val context: Context) {
             if (autoPlay) {
                 exoPlayer.play()
                 ensureServiceRunning()
+            }
+
+            // Spotify-grade predictive prefetch: asynchronously pre-cache upcoming track into SimpleCache
+            val nextIndex = index + 1
+            if (nextIndex < queue.size) {
+                val nextTrack = queue[nextIndex]
+                if (nextTrack.contentUri.startsWith("http://") || nextTrack.contentUri.startsWith("https://")) {
+                    applicationScope.launch(Dispatchers.IO) {
+                        com.example.hyprmusic.core.cloud.telegram.TelegramMediaSource.prefetchTrackHeader(context, nextTrack.contentUri)
+                    }
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()

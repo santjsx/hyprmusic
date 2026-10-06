@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.hyprmusic"
         minSdk = 29
         targetSdk = 36
-        versionCode = 18
-        versionName = "1.9.6"
+        versionCode = 19
+        versionName = "1.9.7"
     }
 
     buildTypes {
@@ -72,6 +72,7 @@ dependencies {
   implementation(libs.androidx.media3.common)
   implementation(libs.androidx.media3.ui)
   implementation("androidx.media3:media3-datasource:1.5.1")
+  implementation("androidx.media3:media3-datasource-okhttp:1.5.1")
   implementation("androidx.media3:media3-database:1.5.1")
 
   // Networking (OkHttp)

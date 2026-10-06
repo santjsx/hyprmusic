@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import com.example.hyprmusic.ui.components.HyprArtworkImage
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
@@ -247,31 +248,13 @@ fun HomeScreen(
                             .background(theme.surfaceVariantColor),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (currentTrack?.albumArtUri != null) {
-                            val heroReq = remember(currentTrack.albumArtUri) {
-                                ImageRequest.Builder(context)
-                                    .data(currentTrack.albumArtUri)
-                                    .size(200, 200)
-                                    .allowHardware(true)
-                                    .memoryCachePolicy(CachePolicy.ENABLED)
-                                    .diskCachePolicy(CachePolicy.ENABLED)
-                                    .crossfade(false)
-                                    .build()
-                            }
-                            AsyncImage(
-                                model = heroReq,
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.MusicNote,
-                                contentDescription = null,
-                                tint = theme.accentColor,
-                                modifier = Modifier.size(36.dp)
-                            )
-                        }
+                        HyprArtworkImage(
+                            artworkUri = currentTrack?.albumArtUri,
+                            title = currentTrack?.title ?: "Music",
+                            artist = currentTrack?.artist ?: "Unknown Artist",
+                            shape = RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(14).dp),
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
 
                     Spacer(modifier = Modifier.width(14.dp))
@@ -561,31 +544,14 @@ fun HomeTrackRowItem(
                     .background(theme.surfaceVariantColor),
                 contentAlignment = Alignment.Center
             ) {
-                if (!track.albumArtUri.isNullOrBlank()) {
-                    val rowReq = remember(track.albumArtUri) {
-                        ImageRequest.Builder(context)
-                            .data(track.albumArtUri)
-                            .size(140, 140)
-                            .allowHardware(true)
-                            .memoryCachePolicy(CachePolicy.ENABLED)
-                            .diskCachePolicy(CachePolicy.ENABLED)
-                            .crossfade(false)
-                            .build()
-                    }
-                    AsyncImage(
-                        model = rowReq,
-                        contentDescription = track.title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = theme.accentColor,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
+                HyprArtworkImage(
+                    artworkUri = track.albumArtUri,
+                    title = track.title,
+                    artist = track.artist,
+                    trackId = track.id,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxSize()
+                )
             }
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -946,31 +912,14 @@ private fun TerminalRowsHomeScreen(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (!track.albumArtUri.isNullOrBlank()) {
-                            val rowReq = remember(track.albumArtUri) {
-                                ImageRequest.Builder(context)
-                                    .data(track.albumArtUri)
-                                    .size(120, 120)
-                                    .allowHardware(true)
-                                    .memoryCachePolicy(CachePolicy.ENABLED)
-                                    .diskCachePolicy(CachePolicy.ENABLED)
-                                    .crossfade(false)
-                                    .build()
-                            }
-                            AsyncImage(
-                                model = rowReq,
-                                contentDescription = track.title,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.MusicNote,
-                                contentDescription = null,
-                                tint = if (isCurrent) spec.borderActive else spec.textSecondary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+                        HyprArtworkImage(
+                            artworkUri = track.albumArtUri,
+                            title = track.title,
+                            artist = track.artist,
+                            trackId = track.id,
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.fillMaxSize()
+                        )
 
                         // Live Equalizer overlay on art when active
                         if (isPlaying) {

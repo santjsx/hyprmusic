@@ -22,11 +22,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
-import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
+import kotlin.math.abs
 
 class TelegramMusicRepository(
     private val context: Context,
@@ -61,6 +60,11 @@ class TelegramMusicRepository(
     private val _syncError = MutableStateFlow<String?>(null)
     val syncError: StateFlow<String?> = _syncError.asStateFlow()
 
+    private val _accessState = MutableStateFlow<CloudAccessState>(
+        if (config.isConfigured()) CloudAccessState.Authorized else CloudAccessState.ConfigRequired
+    )
+    val accessState: StateFlow<CloudAccessState> = _accessState.asStateFlow()
+
     private val _serverHealth = MutableStateFlow<ServerHealthInfo?>(null)
     val serverHealth: StateFlow<ServerHealthInfo?> = _serverHealth.asStateFlow()
 
@@ -69,6 +73,10 @@ class TelegramMusicRepository(
 
     private val _downloadedTrackIds = MutableStateFlow<Set<String>>(emptySet())
     val downloadedTrackIds: StateFlow<Set<String>> = _downloadedTrackIds.asStateFlow()
+
+    val trackSortOrder = MutableStateFlow(CloudTrackSortOrder.RECENT)
+    val albumSortOrder = MutableStateFlow(CloudAlbumSortOrder.TITLE_AZ)
+    val artistSortOrder = MutableStateFlow(CloudArtistSortOrder.NAME_AZ)
 
     init {
         // Hydrate from disk cache immediately (0ms perceived latency)
@@ -101,14 +109,45 @@ class TelegramMusicRepository(
             val dto = json.decodeFromString<TelegramLibraryResponseDto>(content)
             val settings = config.settings.value
             val mappedTracks = dto.tracks.map { it.toTrack(settings.serverUrl, settings.userId, settings.apiSecretKey) }
-            val mappedAlbums = dto.albums.map { it.toAlbum(settings.serverUrl, settings.userId, settings.apiSecretKey) }
-            val mappedArtists = dto.artists.map { it.toArtist() }
+            val mappedAlbums = if (dto.albums.isNotEmpty()) {
+                dto.albums.map { it.toAlbum(settings.serverUrl, settings.userId, settings.apiSecretKey) }
+            } else {
+                synthesizeAlbums(mappedTracks)
+            }
+            val mappedArtists = if (dto.artists.isNotEmpty()) {
+                dto.artists.map { it.toArtist() }
+            } else {
+                synthesizeArtists(mappedTracks)
+            }
 
             _cloudTracks.value = mappedTracks
             _cloudAlbums.value = mappedAlbums
             _cloudArtists.value = mappedArtists
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    private fun synthesizeAlbums(tracks: List<Track>): List<Album> {
+        return tracks.groupBy { it.album.ifBlank { "Unknown Album" } }.map { (albumName, albumTracks) ->
+            Album(
+                id = "tg_alb_${abs(albumName.hashCode().toLong())}",
+                title = albumName,
+                artist = albumTracks.firstOrNull()?.artist ?: "Unknown Artist",
+                coverUri = albumTracks.firstOrNull { !it.albumArtUri.isNullOrBlank() }?.albumArtUri,
+                trackCount = albumTracks.size
+            )
+        }
+    }
+
+    private fun synthesizeArtists(tracks: List<Track>): List<Artist> {
+        return tracks.groupBy { it.artist.ifBlank { "Unknown Artist" } }.map { (artistName, artistTracks) ->
+            Artist(
+                id = "tg_art_${abs(artistName.hashCode().toLong())}",
+                name = artistName,
+                trackCount = artistTracks.size,
+                albumCount = artistTracks.map { it.album }.distinct().size
+            )
         }
     }
 
@@ -148,11 +187,13 @@ class TelegramMusicRepository(
         val settings = config.settings.value
         if (!config.isConfigured()) {
             _syncError.value = "TPMC Cloud is not configured. Go to Settings > Telegram Cloud."
+            _accessState.value = CloudAccessState.ConfigRequired
             return@withContext
         }
 
         _isSyncing.value = true
         _syncError.value = null
+        _accessState.value = CloudAccessState.Checking
 
         // Check health / wake instance if necessary
         val healthResult = TelegramMusicApi.checkHealth(settings.serverUrl)
@@ -172,7 +213,9 @@ class TelegramMusicRepository(
             _isWakingServer.value = false
             if (!wokeUp) {
                 _isSyncing.value = false
-                _syncError.value = "Server unreachable. If on Render free tier, server may still be booting."
+                val msg = "Server unreachable. If on Render free tier, server may still be booting."
+                _syncError.value = msg
+                _accessState.value = CloudAccessState.ServerOffline(msg)
                 return@withContext
             }
         } else {
@@ -188,8 +231,16 @@ class TelegramMusicRepository(
         libResult.fold(
             onSuccess = { dto ->
                 val mappedTracks = dto.tracks.map { it.toTrack(settings.serverUrl, settings.userId, settings.apiSecretKey) }
-                val mappedAlbums = dto.albums.map { it.toAlbum(settings.serverUrl, settings.userId, settings.apiSecretKey) }
-                val mappedArtists = dto.artists.map { it.toArtist() }
+                val mappedAlbums = if (dto.albums.isNotEmpty()) {
+                    dto.albums.map { it.toAlbum(settings.serverUrl, settings.userId, settings.apiSecretKey) }
+                } else {
+                    synthesizeAlbums(mappedTracks)
+                }
+                val mappedArtists = if (dto.artists.isNotEmpty()) {
+                    dto.artists.map { it.toArtist() }
+                } else {
+                    synthesizeArtists(mappedTracks)
+                }
 
                 _cloudTracks.value = mappedTracks
                 _cloudAlbums.value = mappedAlbums
@@ -211,13 +262,83 @@ class TelegramMusicRepository(
 
                 updateDownloadedStatus(localMusicRepository.tracks.value)
                 _syncError.value = null
+                _accessState.value = CloudAccessState.Authorized
             },
             onFailure = { err ->
-                _syncError.value = err.localizedMessage ?: "Sync failed"
+                val errMsg = err.localizedMessage ?: "Sync failed"
+                _syncError.value = errMsg
+                if (err is CloudAccessDeniedException) {
+                    _accessState.value = CloudAccessState.AccessDenied(
+                        httpCode = err.httpCode,
+                        reason = err.message ?: "Access restricted by server access control.",
+                        botUsername = err.botUsername ?: _serverHealth.value?.bot,
+                        userId = err.userId
+                    )
+                } else {
+                    _accessState.value = CloudAccessState.ServerOffline(errMsg)
+                }
             }
         )
 
         _isSyncing.value = false
+    }
+
+    suspend fun requestDirectAccess(note: String = "Requested via HyprMusic client"): Result<String> = withContext(Dispatchers.IO) {
+        val settings = config.settings.value
+        _accessState.value = CloudAccessState.RequestPending("Sending access request to server...")
+        val res = TelegramMusicApi.requestDirectAccess(settings.serverUrl, settings.userId, note)
+        res.fold(
+            onSuccess = { msg ->
+                _accessState.value = CloudAccessState.RequestPending(msg)
+            },
+            onFailure = { err ->
+                _accessState.value = CloudAccessState.AccessDenied(
+                    httpCode = 403,
+                    reason = err.localizedMessage ?: "Access denied",
+                    botUsername = _serverHealth.value?.bot,
+                    userId = settings.userId
+                )
+            }
+        )
+        res
+    }
+
+    fun sortTracks(tracks: List<Track>, order: CloudTrackSortOrder): List<Track> {
+        return when (order) {
+            CloudTrackSortOrder.RECENT -> tracks
+            CloudTrackSortOrder.OLDEST -> tracks.reversed()
+            CloudTrackSortOrder.TITLE_AZ -> tracks.sortedBy { it.title.lowercase() }
+            CloudTrackSortOrder.TITLE_ZA -> tracks.sortedByDescending { it.title.lowercase() }
+            CloudTrackSortOrder.ARTIST_AZ -> tracks.sortedBy { it.artist.lowercase() }
+            CloudTrackSortOrder.DURATION_DESC -> tracks.sortedByDescending { it.durationMs }
+            CloudTrackSortOrder.SIZE_DESC -> tracks.sortedByDescending { it.fileSize }
+        }
+    }
+
+    fun sortAlbums(albums: List<Album>, order: CloudAlbumSortOrder): List<Album> {
+        return when (order) {
+            CloudAlbumSortOrder.TITLE_AZ -> albums.sortedBy { it.title.lowercase() }
+            CloudAlbumSortOrder.TITLE_ZA -> albums.sortedByDescending { it.title.lowercase() }
+            CloudAlbumSortOrder.ARTIST_AZ -> albums.sortedBy { it.artist.lowercase() }
+            CloudAlbumSortOrder.TRACK_COUNT_DESC -> albums.sortedByDescending { it.trackCount }
+        }
+    }
+
+    fun sortArtists(artists: List<Artist>, order: CloudArtistSortOrder): List<Artist> {
+        return when (order) {
+            CloudArtistSortOrder.NAME_AZ -> artists.sortedBy { it.name.lowercase() }
+            CloudArtistSortOrder.NAME_ZA -> artists.sortedByDescending { it.name.lowercase() }
+            CloudArtistSortOrder.TRACK_COUNT_DESC -> artists.sortedByDescending { it.trackCount }
+        }
+    }
+
+    suspend fun downloadAlbum(album: Album, albumTracks: List<Track>): Boolean = withContext(Dispatchers.IO) {
+        var allSuccess = true
+        for (track in albumTracks) {
+            val ok = downloadTrack(track)
+            if (!ok) allSuccess = false
+        }
+        allSuccess
     }
 
     suspend fun downloadTrack(track: Track): Boolean = withContext(Dispatchers.IO) {
@@ -230,10 +351,7 @@ class TelegramMusicRepository(
 
         _downloadingProgress.update { it + (track.id to 0.01f) }
 
-        val downloadClient = OkHttpClient.Builder()
-            .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .build()
+        val downloadClient = TelegramMediaSource.sharedOkHttpClient
 
         var success = false
         var targetUri: Uri? = null
@@ -242,7 +360,7 @@ class TelegramMusicRepository(
             val request = Request.Builder()
                 .url(downloadUrl)
                 .get()
-                .header("User-Agent", "HyprMusic/1.9.0 (Android)")
+                .header("User-Agent", "HyprMusic/1.9.7 (Android)")
                 .build()
 
             downloadClient.newCall(request).execute().use { response ->
@@ -282,7 +400,8 @@ class TelegramMusicRepository(
 
                 resolver.openOutputStream(audioUri)?.use { output ->
                     body.byteStream().use { input ->
-                        val buffer = ByteArray(64 * 1024)
+                        // Upgraded 256KB buffer chunking for maximum download throughput
+                        val buffer = ByteArray(256 * 1024)
                         var bytesRead: Int
                         var accumulated = 0L
 
