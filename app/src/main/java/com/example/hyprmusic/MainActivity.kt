@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -30,10 +32,13 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -250,157 +255,249 @@ fun HyprMusicApp(
             // Linux Waybar Top Status Header
             HyprWaybarHeader(
                 theme = themeConfig,
-                title = "~ / hypr / ${currentWorkspace.label}",
+                title = if (isSearchActive) "~ / hypr / search" else "~ / hypr / ${currentWorkspace.label}",
                 onOpenEqualizer = { showEqualizerDialog = true }
             )
 
             // Dynamic Workspace Content or Live Search Results
             Box(modifier = Modifier.weight(1f)) {
-                if (isSearchActive && searchQuery.isNotBlank()) {
-                    val cloudTracks by telegramRepository.cloudTracks.collectAsStateWithLifecycle()
-                    var searchResults by remember { mutableStateOf<List<Track>>(emptyList()) }
+                if (isSearchActive) {
+                    if (searchQuery.isNotBlank()) {
+                        val cloudTracks by telegramRepository.cloudTracks.collectAsStateWithLifecycle()
+                        var searchResults by remember { mutableStateOf<List<Track>>(emptyList()) }
 
-                    LaunchedEffect(searchQuery, tracks, cloudTracks) {
-                        searchResults = withContext(Dispatchers.Default) {
-                            val localMatches = musicRepository.search(searchQuery)
-                            val q = searchQuery.trim().lowercase()
-                            val cloudMatches = cloudTracks.filter {
-                                it.title.lowercase().contains(q) ||
-                                it.artist.lowercase().contains(q) ||
-                                it.album.lowercase().contains(q)
+                        LaunchedEffect(searchQuery, tracks, cloudTracks) {
+                            searchResults = withContext(Dispatchers.Default) {
+                                val localMatches = musicRepository.search(searchQuery)
+                                val q = searchQuery.trim().lowercase()
+                                val cloudMatches = cloudTracks.filter {
+                                    it.title.lowercase().contains(q) ||
+                                    it.artist.lowercase().contains(q) ||
+                                    it.album.lowercase().contains(q)
+                                }
+                                localMatches + cloudMatches
                             }
-                            localMatches + cloudMatches
-                        }
-                    }
-
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = themeConfig.windowGapsDp.dp),
-                        verticalArrangement = Arrangement.spacedBy(themeConfig.windowGapsDp.dp)
-                    ) {
-                        item {
-                            Text(
-                                text = "SEARCH RESULTS: ${searchResults.size} MATCHES",
-                                color = themeConfig.textSecondaryColor,
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)
-                            )
                         }
 
-                        items(
-                            items = searchResults,
-                            key = { "search_${it.id}" },
-                            contentType = { "search_track_item" }
-                        ) { track ->
-                            val isPlaying = playbackState.currentTrack?.id == track.id && playbackState.isPlaying
-                            val isCurrent = playbackState.currentTrack?.id == track.id
-
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .hyprTile(theme = themeConfig, isActive = isCurrent)
-                                    .hyprBounceClick {
-                                        audioPlayer.playTrack(track, searchResults)
-                                    }
-                                    .padding(10.dp)
-                            ) {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = themeConfig.windowGapsDp.dp),
+                            contentPadding = PaddingValues(top = 4.dp, bottom = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(themeConfig.windowGapsDp.dp)
+                        ) {
+                            item {
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 4.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    Text(
+                                        text = "SEARCH RESULTS: ${searchResults.size} MATCHES",
+                                        color = themeConfig.accentColor,
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "FILTER: \"$searchQuery\"",
+                                        color = themeConfig.textSecondaryColor,
+                                        fontSize = 10.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+
+                            if (searchResults.isEmpty()) {
+                                item {
                                     Box(
                                         modifier = Modifier
-                                            .size(46.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(themeConfig.surfaceVariantColor),
+                                            .fillMaxWidth()
+                                            .padding(vertical = 40.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        if (track.albumArtUri != null) {
-                                            val context = LocalContext.current
-                                            val searchThumbReq = remember(track.albumArtUri) {
-                                                ImageRequest.Builder(context)
-                                                    .data(track.albumArtUri)
-                                                    .size(120, 120)
-                                                    .allowHardware(true)
-                                                    .memoryCachePolicy(CachePolicy.ENABLED)
-                                                    .diskCachePolicy(CachePolicy.ENABLED)
-                                                    .crossfade(false)
-                                                    .build()
-                                            }
-                                            AsyncImage(
-                                                model = searchThumbReq,
-                                                contentDescription = null,
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        } else {
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
                                             Icon(
-                                                imageVector = Icons.Default.MusicNote,
+                                                imageVector = Icons.Default.SearchOff,
                                                 contentDescription = null,
-                                                tint = themeConfig.accentColor,
-                                                modifier = Modifier.size(22.dp)
+                                                tint = themeConfig.textSecondaryColor.copy(alpha = 0.45f),
+                                                modifier = Modifier.size(36.dp)
+                                            )
+                                            Text(
+                                                text = "NO TRACKS MATCHING \"$searchQuery\"",
+                                                color = themeConfig.textSecondaryColor,
+                                                fontSize = 11.sp,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = "Check spelling or search by artist/album name",
+                                                color = themeConfig.textSecondaryColor.copy(alpha = 0.6f),
+                                                fontSize = 10.5.sp,
+                                                fontFamily = FontFamily.Monospace
                                             )
                                         }
                                     }
+                                }
+                            } else {
+                                items(
+                                    items = searchResults,
+                                    key = { "search_${it.id}" },
+                                    contentType = { "search_track_item" }
+                                ) { track ->
+                                    val isPlaying = playbackState.currentTrack?.id == track.id && playbackState.isPlaying
+                                    val isCurrent = playbackState.currentTrack?.id == track.id
 
-                                    Spacer(modifier = Modifier.width(12.dp))
-
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = track.title,
-                                                color = if (isCurrent) themeConfig.accentColor else themeConfig.textPrimaryColor,
-                                                fontSize = 13.5.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.weight(1f, fill = false)
-                                            )
-                                            if (track.isCloudTrack) {
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Box(
-                                                    modifier = Modifier
-                                                        .clip(RoundedCornerShape(4.dp))
-                                                        .background(themeConfig.accentColor.copy(alpha = 0.2f))
-                                                        .padding(horizontal = 4.dp, vertical = 2.dp)
-                                                ) {
-                                                    Text(
-                                                        text = "CLOUD",
-                                                        color = themeConfig.accentColor,
-                                                        fontSize = 9.sp,
-                                                        fontFamily = FontFamily.Monospace,
-                                                        fontWeight = FontWeight.Bold
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .hyprTile(theme = themeConfig, isActive = isCurrent)
+                                            .hyprBounceClick {
+                                                audioPlayer.playTrack(track, searchResults)
+                                            }
+                                            .padding(10.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(46.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(themeConfig.surfaceVariantColor),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                if (track.albumArtUri != null) {
+                                                    val context = LocalContext.current
+                                                    val searchThumbReq = remember(track.albumArtUri) {
+                                                        ImageRequest.Builder(context)
+                                                            .data(track.albumArtUri)
+                                                            .size(120, 120)
+                                                            .allowHardware(true)
+                                                            .memoryCachePolicy(CachePolicy.ENABLED)
+                                                            .diskCachePolicy(CachePolicy.ENABLED)
+                                                            .crossfade(false)
+                                                            .build()
+                                                    }
+                                                    AsyncImage(
+                                                        model = searchThumbReq,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentScale = ContentScale.Crop
+                                                    )
+                                                } else {
+                                                    Icon(
+                                                        imageVector = Icons.Default.MusicNote,
+                                                        contentDescription = null,
+                                                        tint = themeConfig.accentColor,
+                                                        modifier = Modifier.size(22.dp)
                                                     )
                                                 }
                                             }
-                                        }
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = "${track.artist} • ${track.album}",
-                                            color = themeConfig.textSecondaryColor,
-                                            fontSize = 11.5.sp,
-                                            fontFamily = FontFamily.Monospace,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
 
-                                    if (isPlaying) {
-                                        Icon(
-                                            imageVector = Icons.Default.GraphicEq,
-                                            contentDescription = null,
-                                            tint = themeConfig.accentColor,
-                                            modifier = Modifier.size(18.dp)
-                                        )
+                                            Spacer(modifier = Modifier.width(12.dp))
+
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(
+                                                        text = track.title,
+                                                        color = if (isCurrent) themeConfig.accentColor else themeConfig.textPrimaryColor,
+                                                        fontSize = 13.5.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        modifier = Modifier.weight(1f, fill = false)
+                                                    )
+                                                    if (track.isCloudTrack) {
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .clip(RoundedCornerShape(4.dp))
+                                                                .background(themeConfig.accentColor.copy(alpha = 0.2f))
+                                                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = "CLOUD",
+                                                                color = themeConfig.accentColor,
+                                                                fontSize = 9.sp,
+                                                                fontFamily = FontFamily.Monospace,
+                                                                fontWeight = FontWeight.Bold
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = "${track.artist} • ${track.album}",
+                                                    color = themeConfig.textSecondaryColor,
+                                                    fontSize = 11.5.sp,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+
+                                            if (isPlaying) {
+                                                Icon(
+                                                    imageVector = Icons.Default.GraphicEq,
+                                                    contentDescription = null,
+                                                    tint = themeConfig.accentColor,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
-
-                        item { Spacer(modifier = Modifier.height(80.dp)) }
+                    } else {
+                        // Empty query initial helper state
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = themeConfig.windowGapsDp.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(46.dp)
+                                        .clip(CircleShape)
+                                        .background(themeConfig.accentColor.copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = null,
+                                        tint = themeConfig.accentColor,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                                Text(
+                                    text = "HYPR // SPOTLIGHT SEARCH",
+                                    color = themeConfig.accentColor,
+                                    fontSize = 12.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Search by track, artist, or album across local library & Telegram cloud",
+                                    color = themeConfig.textSecondaryColor,
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    modifier = Modifier.padding(horizontal = 24.dp)
+                                )
+                            }
+                        }
                     }
                 } else {
                     when (currentWorkspace) {
@@ -506,6 +603,7 @@ fun HyprMusicApp(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .imePadding()
                     .navigationBarsPadding()
             ) {
                 // Bottom Quick Search Runner
@@ -521,8 +619,8 @@ fun HyprMusicApp(
                     )
                 }
 
-                // Persistent Floating Mini-Player Dock
-                if (playbackState.currentTrack != null && !isNowPlayingExpanded && currentWorkspace != HyprWorkspace.PLAYING) {
+                // Persistent Floating Mini-Player Dock (dismissed during active search to maximize search viewport)
+                if (playbackState.currentTrack != null && !isNowPlayingExpanded && currentWorkspace != HyprWorkspace.PLAYING && !isSearchActive) {
                     MiniPlayer(
                         theme = themeConfig,
                         playbackState = playbackState,
@@ -534,25 +632,27 @@ fun HyprMusicApp(
                     )
                 }
 
-                // Bottom Hyprland Workspace Dock
-                HyprBottomDock(
-                    theme = themeConfig,
-                    currentWorkspace = if (isNowPlayingExpanded) HyprWorkspace.PLAYING else currentWorkspace,
-                    onWorkspaceSelected = { ws ->
-                        if (ws == HyprWorkspace.PLAYING) {
-                            if (playbackState.currentTrack == null && tracks.isNotEmpty()) {
-                                audioPlayer.prepareTrack(tracks.first(), tracks)
+                // Bottom Hyprland Workspace Dock (dismissed during active search)
+                if (!isSearchActive) {
+                    HyprBottomDock(
+                        theme = themeConfig,
+                        currentWorkspace = if (isNowPlayingExpanded) HyprWorkspace.PLAYING else currentWorkspace,
+                        onWorkspaceSelected = { ws ->
+                            if (ws == HyprWorkspace.PLAYING) {
+                                if (playbackState.currentTrack == null && tracks.isNotEmpty()) {
+                                    audioPlayer.prepareTrack(tracks.first(), tracks)
+                                }
+                                isNowPlayingExpanded = true
+                            } else {
+                                isNowPlayingExpanded = false
+                                currentWorkspace = ws
                             }
-                            isNowPlayingExpanded = true
-                        } else {
-                            isNowPlayingExpanded = false
-                            currentWorkspace = ws
-                        }
-                    },
-                    onToggleSearch = { isSearchActive = !isSearchActive },
-                    isSearchActive = isSearchActive,
-                    isPlaying = playbackState.isPlaying
-                )
+                        },
+                        onToggleSearch = { isSearchActive = !isSearchActive },
+                        isSearchActive = isSearchActive,
+                        isPlaying = playbackState.isPlaying
+                    )
+                }
             }
         }
 

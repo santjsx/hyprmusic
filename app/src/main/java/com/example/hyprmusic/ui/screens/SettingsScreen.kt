@@ -870,6 +870,8 @@ fun SettingsScreen(
                         .padding(14.dp)
                 ) {
                     Column {
+                        val currentInstalledBuild = remember(context) { HyprUpdateManager.getCurrentVersion(context) }
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -877,7 +879,7 @@ fun SettingsScreen(
                         ) {
                             Column {
                                 Text(
-                                    text = "Current Build: ${HyprUpdateManager.CURRENT_VERSION}",
+                                    text = "Current Build: $currentInstalledBuild",
                                     color = theme.textPrimaryColor,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
@@ -896,7 +898,7 @@ fun SettingsScreen(
                                     .background(theme.surfaceVariantColor)
                                     .clickable(enabled = !isCheckingUpdate) {
                                         coroutineScope.launch {
-                                            HyprUpdateManager.checkForUpdates()
+                                            HyprUpdateManager.checkForUpdates(context)
                                         }
                                     }
                                     .padding(horizontal = 10.dp, vertical = 6.dp)
@@ -1081,24 +1083,52 @@ fun SettingsScreen(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .clip(RoundedCornerShape(6.dp))
-                                                        .background(theme.accentColor)
-                                                        .clickable {
-                                                            HyprUpdateManager.startApkDownload(context, info.downloadUrl)
+                                                if (info.isUpdateAvailable) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .clip(RoundedCornerShape(6.dp))
+                                                            .background(theme.accentColor)
+                                                            .clickable {
+                                                                HyprUpdateManager.startApkDownload(context, info.downloadUrl)
+                                                            }
+                                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = "DOWNLOAD & UPDATE",
+                                                            color = theme.backgroundColor,
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontFamily = FontFamily.Monospace
+                                                        )
+                                                    }
+                                                } else {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .clip(RoundedCornerShape(6.dp))
+                                                            .background(theme.surfaceVariantColor)
+                                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .size(6.dp)
+                                                                    .clip(CircleShape)
+                                                                    .background(Color(0xFF50FA7B))
+                                                            )
+                                                            Spacer(modifier = Modifier.width(6.dp))
+                                                            Text(
+                                                                text = "UP TO DATE ($currentInstalledBuild)",
+                                                                color = Color(0xFF50FA7B),
+                                                                fontSize = 11.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontFamily = FontFamily.Monospace
+                                                            )
                                                         }
-                                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(
-                                                        text = if (info.isUpdateAvailable) "DOWNLOAD & UPDATE" else "RE-DOWNLOAD / TEST OTA",
-                                                        color = theme.backgroundColor,
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        fontFamily = FontFamily.Monospace
-                                                    )
+                                                    }
                                                 }
 
                                                 Box(

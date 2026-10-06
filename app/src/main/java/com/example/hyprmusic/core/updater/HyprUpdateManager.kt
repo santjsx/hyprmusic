@@ -2,8 +2,10 @@ package com.example.hyprmusic.core.updater
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.CancellationException
@@ -60,10 +62,34 @@ sealed interface UpdateDownloadState {
 
 object HyprUpdateManager {
 
-    const val CURRENT_VERSION = "v1.9.0"
+    const val CURRENT_VERSION = "v1.9.3"
     const val DEVELOPER_NAME = "Santhosh Reddy"
     const val GITHUB_REPO_URL = "https://github.com/santjsx/hyprmusic"
     private const val GITHUB_API_URL = "https://api.github.com/repos/santjsx/hyprmusic/releases/latest"
+
+    private var cachedInstalledVersion: String? = null
+
+    fun getCurrentVersion(context: Context? = null): String {
+        if (cachedInstalledVersion != null) return cachedInstalledVersion!!
+        if (context != null) {
+            try {
+                val pInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    context.packageManager.getPackageInfo(
+                        context.packageName,
+                        PackageManager.PackageInfoFlags.of(0)
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    context.packageManager.getPackageInfo(context.packageName, 0)
+                }
+                val rawVersion = pInfo.versionName ?: "1.9.2"
+                val resolved = if (rawVersion.startsWith("v", ignoreCase = true)) rawVersion else "v$rawVersion"
+                cachedInstalledVersion = resolved
+                return resolved
+            } catch (_: Exception) {}
+        }
+        return CURRENT_VERSION
+    }
 
     private val _updateState = MutableStateFlow<UpdateReleaseInfo?>(null)
     val updateState: StateFlow<UpdateReleaseInfo?> = _updateState.asStateFlow()
@@ -80,7 +106,8 @@ object HyprUpdateManager {
     private var downloadJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Main)
 
-    suspend fun checkForUpdates(): UpdateReleaseInfo? = withContext(Dispatchers.IO) {
+    suspend fun checkForUpdates(context: Context? = null): UpdateReleaseInfo? = withContext(Dispatchers.IO) {
+        val currentVersion = getCurrentVersion(context)
         _isChecking.value = true
         try {
             val url = URL(GITHUB_API_URL)
@@ -88,14 +115,14 @@ object HyprUpdateManager {
                 connectTimeout = 8000
                 readTimeout = 8000
                 requestMethod = "GET"
-                setRequestProperty("User-Agent", "HyprMusic-Updater/$CURRENT_VERSION")
+                setRequestProperty("User-Agent", "HyprMusic-Updater/$currentVersion")
                 setRequestProperty("Accept", "application/vnd.github.v3+json")
             }
 
             if (connection.responseCode == 200) {
                 val responseStr = connection.inputStream.bufferedReader().use { it.readText() }
                 val json = JSONObject(responseStr)
-                val tagName = json.optString("tag_name", "v1.0.0")
+                val tagName = json.optString("tag_name", currentVersion)
                 val name = json.optString("name", "HyprMusic $tagName")
                 val body = json.optString("body", "Performance improvements & bugfixes.")
                 val publishedAt = json.optString("published_at", "")
@@ -128,7 +155,7 @@ object HyprUpdateManager {
                     downloadUrl = json.optString("html_url", "$GITHUB_REPO_URL/releases")
                 }
 
-                val isNewer = compareVersions(tagName, CURRENT_VERSION) > 0
+                val isNewer = compareVersions(tagName, currentVersion) > 0
                 val info = UpdateReleaseInfo(
                     tagName = tagName,
                     releaseTitle = name,
@@ -150,14 +177,14 @@ object HyprUpdateManager {
         _isChecking.value = false
         // Fallback up-to-date representation if offline or rate-limited
         val fallback = UpdateReleaseInfo(
-            tagName = CURRENT_VERSION,
-            releaseTitle = "HyprMusic $CURRENT_VERSION",
+            tagName = currentVersion,
+            releaseTitle = "HyprMusic $currentVersion",
             releaseNotes = "You are currently running the latest bit-perfect build.",
             downloadUrl = "$GITHUB_REPO_URL/releases",
-            publishedAt = "2026-09-30",
+            publishedAt = "2026-10-06",
             isUpdateAvailable = false,
             assetSize = 0L,
-            apkFileName = "HyprMusic-$CURRENT_VERSION.apk"
+            apkFileName = "HyprMusic-$currentVersion.apk"
         )
         _updateState.value = fallback
         return@withContext fallback
@@ -175,7 +202,10 @@ object HyprUpdateManager {
 
         downloadJob?.cancel()
         downloadJob = scope.launch(Dispatchers.IO) {
-            val destinationFile = File(context.cacheDir, "hyprmusic-update.apk")
+            val destinationDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                ?: context.filesDir
+            destinationDir.mkdirs()
+            val destinationFile = File(destinationDir, "hyprmusic-update.apk")
             if (destinationFile.exists()) {
                 destinationFile.delete()
             }
@@ -200,7 +230,8 @@ object HyprUpdateManager {
                         connectTimeout = 15000
                         readTimeout = 30000
                         instanceFollowRedirects = true
-                        setRequestProperty("User-Agent", "HyprMusic-Updater/$CURRENT_VERSION")
+                        val currentVer = getCurrentVersion(context)
+                        setRequestProperty("User-Agent", "HyprMusic-Updater/$currentVer")
                     }
 
                     val code = connection.responseCode
@@ -329,8 +360,32 @@ object HyprUpdateManager {
 
             val installIntent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(apkUri, "application/vnd.android.package-archive")
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
+
+            // Explicitly grant URI read permissions to any resolving package installer
+            val resolveInfoList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.queryIntentActivities(
+                    installIntent,
+                    PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong())
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.queryIntentActivities(installIntent, PackageManager.MATCH_DEFAULT_ONLY)
+            }
+            for (resolveInfo in resolveInfoList) {
+                try {
+                    context.grantUriPermission(
+                        resolveInfo.activityInfo.packageName,
+                        apkUri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                } catch (_: Exception) {}
+            }
+
             context.startActivity(installIntent)
             _downloadProgress.value = "Package installer opened."
         } catch (e: Exception) {

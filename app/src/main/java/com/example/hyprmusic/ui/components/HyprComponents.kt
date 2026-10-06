@@ -27,6 +27,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
+import kotlinx.coroutines.delay
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -748,6 +755,16 @@ fun HyprBottomSearchRunner(
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(Unit) {
+        delay(120)
+        try {
+            focusRequester.requestFocus()
+        } catch (_: Exception) {}
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -795,7 +812,11 @@ fun HyprBottomSearchRunner(
                     )
                 },
                 singleLine = true,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = theme.textPrimaryColor,
                     unfocusedTextColor = theme.textPrimaryColor,
@@ -819,7 +840,10 @@ fun HyprBottomSearchRunner(
             }
 
             IconButton(
-                onClick = onClose,
+                onClick = {
+                    keyboardController?.hide()
+                    onClose()
+                },
                 modifier = Modifier.size(28.dp)
             ) {
                 Box(
