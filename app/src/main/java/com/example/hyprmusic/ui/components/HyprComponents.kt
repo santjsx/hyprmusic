@@ -20,6 +20,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -156,65 +157,57 @@ fun HyprWaybarHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Linux terminal path identifier
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(theme.accentColor)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = title,
-                color = theme.textPrimaryColor,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        // Bit-perfect Audio & Equalizer Telemetry Pill
+        // Terminal-style path identifier with small purple status dot: ● ~/hypr/lib
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(8).dp))
-                    .background(theme.surfaceVariantColor)
-                    .padding(horizontal = 7.dp, vertical = 4.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.GraphicEq,
-                    contentDescription = null,
-                    tint = theme.accentColor,
-                    modifier = Modifier.size(12.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "16-BIT/44.1k",
-                    color = theme.textSecondaryColor,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(8).dp))
-                    .background(theme.accentColor.copy(alpha = 0.15f))
-                    .border(1.dp, theme.accentColor.copy(alpha = 0.4f), RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(8).dp))
-                    .clickable { onOpenEqualizer() }
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFC7A5FF))
+            )
+            Text(
+                text = title.replace(" ", ""),
+                color = Color(0xFFF2EFF8),
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        // Small technical status line in upper-right: 16-BIT / 44.1k     EQ
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "16-BIT / 44.1k",
+                color = Color(0xFFAAA4B9),
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
+            )
+
+            // Interactive EQ button with 44dp touch target
+            Box(
+                modifier = Modifier
+                    .height(28.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onOpenEqualizer
+                    )
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "[EQ]",
-                    color = theme.accentColor,
+                    text = "EQ",
+                    color = Color(0xFFC7A5FF),
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -284,19 +277,27 @@ fun HyprBottomDock(
                         label = "pill_indicator_width"
                     )
 
+                    val wsName = when (ws) {
+                        HyprWorkspace.HOME -> "HOME"
+                        HyprWorkspace.LIBRARY -> "LIB"
+                        HyprWorkspace.PLAYING -> "PLAYER"
+                        HyprWorkspace.SETTINGS -> "RICE"
+                    }
+                    val wsTag = "[${ws.index}]"
+
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .heightIn(min = 48.dp)
-                            .clip(RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(12)).dp))
+                            .clip(RoundedCornerShape(6.dp))
                             .background(
-                                if (isActive) theme.accentColor.copy(alpha = 0.18f)
+                                if (isActive) Color(0xFF111117)
                                 else Color.Transparent
                             )
                             .border(
                                 width = if (isActive) 1.dp else 0.dp,
-                                color = if (isActive) theme.accentColor.copy(alpha = 0.7f) else Color.Transparent,
-                                shape = RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(12)).dp)
+                                color = if (isActive) Color(0xFFC7A5FF) else Color.Transparent,
+                                shape = RoundedCornerShape(6.dp)
                             )
                             .hyprBounceClick {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -319,31 +320,29 @@ fun HyprBottomDock(
                                 Icon(
                                     imageVector = icon,
                                     contentDescription = ws.label,
-                                    tint = if (isActive) theme.accentColor else theme.textSecondaryColor,
-                                    modifier = Modifier.size(18.dp)
+                                    tint = if (isActive) Color(0xFFC7A5FF) else Color(0xFF696473),
+                                    modifier = Modifier.size(17.dp)
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(2.dp))
+                            Spacer(modifier = Modifier.height(1.dp))
 
                             Text(
-                                text = "[${ws.index}:${ws.label}]",
-                                color = if (isActive) theme.accentColor else theme.textSecondaryColor,
+                                text = wsName,
+                                color = if (isActive) Color(0xFFF2EFF8) else Color(0xFFAAA4B9),
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = 10.5.sp,
+                                fontSize = 9.5.sp,
                                 fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
                                 maxLines = 1,
                                 overflow = TextOverflow.Clip
                             )
 
-                            Spacer(modifier = Modifier.height(2.dp))
-
-                            Box(
-                                modifier = Modifier
-                                    .width(pillIndicatorWidth)
-                                    .height(2.dp)
-                                    .clip(RoundedCornerShape(1.dp))
-                                    .background(theme.accentColor)
+                            Text(
+                                text = wsTag,
+                                color = if (isActive) Color(0xFFC7A5FF) else Color(0xFF696473),
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Normal
                             )
                         }
                     }
@@ -586,24 +585,17 @@ fun MiniPlayer(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = theme.windowGapsDp.dp)
+            .padding(horizontal = theme.windowGapsDp.dp.coerceAtMost(10.dp))
             .graphicsLayer {
                 translationX = animatedDragX
-                rotationZ = animatedDragX * 0.02f
+                rotationZ = animatedDragX * 0.015f
             }
-            .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtLeast(14).dp))
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        theme.surfaceColor.copy(alpha = 0.95f),
-                        theme.surfaceColor.copy(alpha = 0.98f)
-                    )
-                )
-            )
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFF101017))
             .border(
-                width = theme.borderThicknessDp.dp,
-                color = if (playbackState.isPlaying) theme.accentColor.copy(alpha = 0.5f) else theme.inactiveBorderColor.copy(alpha = 0.6f),
-                shape = RoundedCornerShape(theme.borderRadiusDp.coerceAtLeast(14).dp)
+                width = 1.dp,
+                color = if (playbackState.isPlaying) Color(0xFFC7A5FF).copy(alpha = 0.45f) else Color(0xFF25232F),
+                shape = RoundedCornerShape(8.dp)
             )
             .pointerInput(track.id) {
                 detectHorizontalDragGestures(
@@ -630,28 +622,36 @@ fun MiniPlayer(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Interactive Mini Vinyl Record
-                MiniVinylRecord(
-                    theme = theme,
-                    albumArtUri = track.albumArtUri,
-                    trackTitle = track.title,
-                    isPlaying = playbackState.isPlaying,
-                    artist = track.artist,
-                    trackId = track.id.toString()
-                )
+                // 44dp Compact Rack Thumbnail
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xFF181822))
+                        .border(0.5.dp, Color(0xFF3A3545), RoundedCornerShape(6.dp))
+                ) {
+                    HyprArtworkImage(
+                        artworkUri = track.albumArtUri,
+                        title = track.title,
+                        artist = track.artist,
+                        trackId = track.id,
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
 
                 Spacer(modifier = Modifier.width(10.dp))
 
-                // Title and Artist with live mini equalizer & audiophile codec badge
+                // Title and Artist / Technical Codec Metadata
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = track.title,
-                            color = theme.textPrimaryColor,
-                            fontSize = 13.5.sp,
+                            color = Color(0xFFF2EFF8),
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -664,58 +664,51 @@ fun MiniPlayer(
                         )
                     }
                     Spacer(modifier = Modifier.height(2.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = track.artist,
-                            color = theme.textSecondaryColor,
-                            fontSize = 11.5.sp,
-                            fontFamily = HyprTheme.spec.fontFamily,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(theme.surfaceVariantColor)
-                                .padding(horizontal = 4.dp, vertical = 1.dp)
-                        ) {
-                            Text(
-                                text = "${track.audioFormat} ${track.bitrate}k",
-                                color = theme.accentColor,
-                                fontSize = 9.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
+                    Text(
+                        text = "${track.artist}  ·  ${track.audioFormat}",
+                        color = Color(0xFFAAA4B9),
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(6.dp))
 
-                // Adaptive Controls matching selected geometry and icon pack
-                AdaptivePlayButton(
-                    isPlaying = playbackState.isPlaying,
+                // Minimal Rack Controls: Play / Pause
+                IconButton(
                     onClick = onPlayPause,
-                    size = 36.dp
-                )
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = if (playbackState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (playbackState.isPlaying) "Pause" else "Play",
+                        tint = Color(0xFFC7A5FF),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
 
-                Spacer(modifier = Modifier.width(6.dp))
-
-                AdaptiveSkipButton(
-                    isNext = true,
+                // Next
+                IconButton(
                     onClick = onSkipNext,
-                    size = 32.dp
-                )
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.SkipNext,
+                        contentDescription = "Next",
+                        tint = Color(0xFFAAA4B9),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
 
             // High Precision Luminous Audio Progress Filament
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(2.5.dp)
-                    .background(theme.surfaceVariantColor.copy(alpha = 0.5f))
+                    .height(2.dp)
+                    .background(Color(0xFF181822))
             ) {
                 Box(
                     modifier = Modifier
@@ -724,8 +717,8 @@ fun MiniPlayer(
                         .background(
                             Brush.horizontalGradient(
                                 colors = listOf(
-                                    theme.accentColor.copy(alpha = 0.6f),
-                                    theme.accentColor
+                                    Color(0xFFC7A5FF).copy(alpha = 0.7f),
+                                    Color(0xFFE0C9FF)
                                 )
                             )
                         )

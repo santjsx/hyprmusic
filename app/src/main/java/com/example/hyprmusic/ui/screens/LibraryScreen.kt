@@ -122,6 +122,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -214,70 +216,65 @@ fun LibraryScreen(
     val coroutineScope = rememberCoroutineScope()
     val tracksListState = rememberLazyListState()
     val albumsGridState = rememberLazyGridState()
+    val albumsRackState = rememberLazyListState()
     val artistsListState = rememberLazyListState()
 
     Column(modifier = modifier.fillMaxSize()) {
-        // Scope Switcher Tabs
+        // Compact Segmented Source Selector (Rack Style)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = theme.windowGapsDp.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = theme.windowGapsDp.dp.coerceAtMost(12.dp), vertical = 4.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF0A0A0F))
+                .border(1.dp, Color(0xFF25232F), RoundedCornerShape(8.dp))
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             LibraryScope.entries.forEach { scope ->
                 val isScopeActive = currentScope == scope
                 val count = if (scope == LibraryScope.LOCAL) tracks.size else cloudTracks.size
+                val label = if (scope == LibraryScope.LOCAL) "LOCAL" else "TPMC CLOUD"
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            if (isScopeActive) theme.accentColor.copy(alpha = 0.2f)
-                            else theme.surfaceVariantColor
-                        )
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (isScopeActive) Color(0xFF111117) else Color.Transparent)
                         .border(
                             width = 1.dp,
-                            color = if (isScopeActive) theme.accentColor.copy(alpha = 0.8f) else Color.Transparent,
-                            shape = RoundedCornerShape(8.dp)
+                            color = if (isScopeActive) Color(0xFFC7A5FF).copy(alpha = 0.5f) else Color.Transparent,
+                            shape = RoundedCornerShape(6.dp)
                         )
                         .clickable { currentScope = scope }
-                        .padding(vertical = 7.dp, horizontal = 10.dp),
+                        .padding(vertical = 6.dp, horizontal = 10.dp)
+                        .semantics {
+                            contentDescription = if (scope == LibraryScope.LOCAL) "Local library, $count items" else "TPMC cloud, $count items"
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(7.dp)
                     ) {
-                        Icon(
-                            imageVector = if (scope == LibraryScope.LOCAL) Icons.Default.Folder else Icons.Default.Cloud,
-                            contentDescription = null,
-                            tint = if (isScopeActive) theme.accentColor else theme.textSecondaryColor,
-                            modifier = Modifier.size(14.dp)
+                        Text(
+                            text = if (isScopeActive) "●" else "○",
+                            color = if (isScopeActive) Color(0xFFC7A5FF) else Color(0xFF696473),
+                            fontSize = 11.sp
                         )
                         Text(
-                            text = "[${scope.id}:${scope.label}]",
-                            color = if (isScopeActive) theme.accentColor else theme.textSecondaryColor,
-                            fontSize = 11.5.sp,
+                            text = label,
+                            color = if (isScopeActive) Color(0xFFF2EFF8) else Color(0xFFAAA4B9),
+                            fontSize = 12.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = if (isScopeActive) FontWeight.Bold else FontWeight.Medium
                         )
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(
-                                    if (isScopeActive) theme.accentColor.copy(alpha = 0.25f)
-                                    else Color.Black.copy(alpha = 0.3f)
-                                )
-                                .padding(horizontal = 5.dp, vertical = 1.dp)
-                        ) {
-                            Text(
-                                text = "$count",
-                                color = if (isScopeActive) theme.accentColor else theme.textSecondaryColor,
-                                fontSize = 9.5.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                        Text(
+                            text = "$count",
+                            color = if (isScopeActive) Color(0xFFC7A5FF) else Color(0xFF696473),
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
             }
@@ -315,7 +312,7 @@ fun LibraryScreen(
                                 isScanning = isScanning,
                                 onRescan = onRescan,
                                 tracksListState = tracksListState,
-                                albumsGridState = albumsGridState,
+                                albumsRackState = albumsRackState,
                                 artistsListState = artistsListState,
                                 onTrackSelected = onTrackSelected,
                                 onToggleFavorite = onToggleFavorite,
@@ -397,7 +394,7 @@ private fun MainLibraryView(
     isScanning: Boolean,
     onRescan: () -> Unit,
     tracksListState: LazyListState,
-    albumsGridState: LazyGridState,
+    albumsRackState: LazyListState,
     artistsListState: LazyListState,
     onTrackSelected: (Track, List<Track>) -> Unit,
     onToggleFavorite: (String) -> Unit,
@@ -485,29 +482,32 @@ private fun MainLibraryView(
             .padding(horizontal = theme.windowGapsDp.dp)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Search Bar & Rescan Header
+            // Slim Rack Search Bar (48dp height)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .hyprTile(theme = theme)
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF101017))
+                    .border(1.dp, Color(0xFF25232F), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
                     imageVector = Icons.Default.Search,
                     contentDescription = "Search",
-                    tint = theme.accentColor,
+                    tint = Color(0xFFAAA4B9),
                     modifier = Modifier.size(18.dp)
                 )
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
                 Box(modifier = Modifier.weight(1f)) {
                     if (searchQuery.isEmpty()) {
                         Text(
-                            text = "grep -i library...",
-                            color = theme.textSecondaryColor.copy(alpha = 0.6f),
-                            fontSize = 13.sp,
+                            text = if (activeFilter == LibraryFilter.ALBUMS) "Search albums..." else "Search library...",
+                            color = Color(0xFF696473),
+                            fontSize = 13.5.sp,
                             fontFamily = FontFamily.Monospace
                         )
                     }
@@ -515,12 +515,12 @@ private fun MainLibraryView(
                         value = searchQuery,
                         onValueChange = onSearchQueryChange,
                         textStyle = TextStyle(
-                            color = theme.textPrimaryColor,
-                            fontSize = 13.sp,
+                            color = Color(0xFFF2EFF8),
+                            fontSize = 13.5.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Medium
                         ),
-                        cursorBrush = SolidColor(theme.accentColor),
+                        cursorBrush = SolidColor(Color(0xFFC7A5FF)),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -529,13 +529,13 @@ private fun MainLibraryView(
                 if (searchQuery.isNotEmpty()) {
                     IconButton(
                         onClick = { onSearchQueryChange("") },
-                        modifier = Modifier.size(26.dp)
+                        modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Clear",
-                            tint = theme.textSecondaryColor,
-                            modifier = Modifier.size(15.dp)
+                            tint = Color(0xFFAAA4B9),
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
@@ -549,132 +549,103 @@ private fun MainLibraryView(
                     LibraryFilter.ALL -> filteredTracks.size + filteredAlbums.size + filteredArtists.size + filteredPlaylists.size
                 }
 
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(theme.surfaceVariantColor)
-                        .padding(horizontal = 6.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = "$totalMatches",
-                        color = theme.accentColor,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(4.dp))
-
-                // Waybar Sort Capsule
-                val currentSortLabel = when (activeFilter) {
-                    LibraryFilter.TRACKS, LibraryFilter.HI_RES, LibraryFilter.FAVORITES -> trackSort.shortLabel
-                    LibraryFilter.ALBUMS -> albumSort.shortLabel
-                    LibraryFilter.ARTISTS -> artistSort.shortLabel
-                    LibraryFilter.PLAYLISTS -> playlistSort.shortLabel
-                    LibraryFilter.ALL -> trackSort.shortLabel
-                }
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(theme.surfaceVariantColor)
-                        .border(
-                            width = 1.dp,
-                            color = theme.accentColor.copy(alpha = 0.4f),
-                            shape = RoundedCornerShape(6.dp)
-                        )
-                        .clickable { isSortModalOpen = true }
-                        .padding(horizontal = 6.dp, vertical = 3.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Sort,
-                            contentDescription = "Sort",
-                            tint = theme.accentColor,
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Text(
-                            text = currentSortLabel,
-                            color = theme.accentColor,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "▼",
-                            color = theme.accentColor.copy(alpha = 0.7f),
-                            fontSize = 7.sp
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "$totalMatches",
+                    color = Color(0xFFC7A5FF),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 6.dp)
+                )
 
                 IconButton(
                     onClick = onRescan,
-                    modifier = Modifier.size(28.dp),
+                    modifier = Modifier.size(32.dp),
                     enabled = !isScanning
                 ) {
                     if (isScanning) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(16.dp),
                             strokeWidth = 2.dp,
-                            color = theme.accentColor
+                            color = Color(0xFFC7A5FF)
                         )
                     } else {
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Rescan",
-                            tint = theme.accentColor,
+                            tint = Color(0xFFAAA4B9),
                             modifier = Modifier.size(18.dp)
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // Filter Chips Carousel
-            val scrollState = rememberScrollState()
+            // Compact Command/Filter Row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(scrollState)
                     .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                LibraryFilter.entries.forEach { filter ->
-                    val isSelected = filter == activeFilter
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                if (isSelected) theme.accentColor.copy(alpha = 0.22f)
-                                else theme.surfaceVariantColor
+                val scrollState = rememberScrollState()
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .horizontalScroll(scrollState),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    LibraryFilter.entries.forEach { filter ->
+                        val isSelected = filter == activeFilter
+                        Column(
+                            modifier = Modifier
+                                .clickable { onFilterChange(filter) }
+                                .padding(vertical = 4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = filter.label,
+                                color = if (isSelected) Color(0xFFF2EFF8) else Color(0xFF696473),
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                fontFamily = FontFamily.Monospace,
+                                maxLines = 1,
+                                softWrap = false
                             )
-                            .border(
-                                width = 1.dp,
-                                color = if (isSelected) theme.accentColor.copy(alpha = 0.8f) else Color.Transparent,
-                                shape = RoundedCornerShape(8.dp)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Box(
+                                modifier = Modifier
+                                    .width(if (isSelected) 18.dp else 0.dp)
+                                    .height(2.dp)
+                                    .background(
+                                        if (isSelected) Color(0xFFC7A5FF) else Color.Transparent,
+                                        shape = RoundedCornerShape(1.dp)
+                                    )
                             )
-                            .clickable { onFilterChange(filter) }
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                    ) {
-                        Text(
-                            text = "[ ${filter.label} ]",
-                            color = if (isSelected) theme.accentColor else theme.textSecondaryColor,
-                            fontSize = 11.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            fontFamily = FontFamily.Monospace,
-                            maxLines = 1,
-                            softWrap = false
-                        )
+                        }
                     }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // SORT ↕ command button
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable { isSortModalOpen = true }
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "SORT ↕",
+                        color = Color(0xFFAAA4B9),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
 
@@ -730,27 +701,13 @@ private fun MainLibraryView(
                     }
 
                     LibraryFilter.ALBUMS -> {
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(2),
-                            state = albumsGridState,
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(theme.windowGapsDp.dp),
-                            horizontalArrangement = Arrangement.spacedBy(theme.windowGapsDp.dp)
-                        ) {
-                            items(
-                                items = filteredAlbums,
-                                key = { it.id },
-                                contentType = { "album" }
-                            ) { album ->
-                                HyprAlbumCard(
-                                    theme = theme,
-                                    album = album,
-                                    onClick = { onOpenAlbum(album) }
-                                )
-                            }
-
-                            item { Spacer(modifier = Modifier.height(90.dp)) }
-                        }
+                        AlbumRackView(
+                            theme = theme,
+                            albums = filteredAlbums,
+                            playbackState = playbackState,
+                            onOpenAlbum = onOpenAlbum,
+                            state = albumsRackState
+                        )
                     }
 
                     LibraryFilter.ARTISTS -> {
@@ -2448,8 +2405,253 @@ fun HyprTrackRow(
  * Album Card for 2-column Grid with click-to-open detail view.
  */
 /**
- * Vinyl & Digipak Album Sleeve with 1:1 Aspect Ratio, Dual-Layer Zero-Crop Engine,
- * Grooved Vinyl Disc Peek, and Corner Audio Chip Badge.
+ * PHYSICAL UNDERGROUND MIXTAPE RACK / DIGITAL MUSIC LIBRARY
+ * Replaces the conventional two-column album card grid with a physical vertical rack of horizontal album slots.
+ * Features:
+ * - Wide horizontal artwork strip filling the slot
+ * - Dark horizontal gradient fade ensuring flawless typography readability
+ * - Monospace archive slot index (01, 02, ...)
+ * - Integrated metadata: Title, Artist · Track count (no badges/pills)
+ * - Lavender active edge & animated equalizer for currently playing album
+ * - ContentScale.Crop and Coil memory/disk caching for 1000+ albums ultra-smooth performance
+ */
+@Composable
+fun AlbumRackView(
+    theme: HyprThemeConfig,
+    albums: List<Album>,
+    playbackState: PlaybackState,
+    onOpenAlbum: (Album) -> Unit,
+    modifier: Modifier = Modifier,
+    state: LazyListState = rememberLazyListState()
+) {
+    if (albums.isEmpty()) {
+        Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "NO ALBUMS FOUND IN RACK",
+                color = Color(0xFF696473),
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    } else {
+        LazyColumn(
+            state = state,
+            modifier = modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            contentPadding = PaddingValues(top = 4.dp, bottom = 90.dp)
+        ) {
+            itemsIndexed(
+                items = albums,
+                key = { _, album -> album.id },
+                contentType = { _, _ -> "album_rack_slot" }
+            ) { index, album ->
+                val currentTrack = playbackState.currentTrack
+                val isCurrentAlbum = currentTrack != null && currentTrack.album.equals(album.title, ignoreCase = true)
+                val isPlayingThisAlbum = isCurrentAlbum && playbackState.isPlaying
+
+                AlbumRackItem(
+                    index = index,
+                    album = album,
+                    isPlaying = isPlayingThisAlbum,
+                    onClick = { onOpenAlbum(album) },
+                    theme = theme
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun AlbumRackItem(
+    index: Int,
+    album: Album,
+    isPlaying: Boolean,
+    onClick: () -> Unit,
+    theme: HyprThemeConfig,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+
+    val imageRequest = remember(album.coverUri) {
+        if (!album.coverUri.isNullOrBlank()) {
+            ImageRequest.Builder(context)
+                .data(album.coverUri)
+                .size(720, 240)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .crossfade(true)
+                .build()
+        } else null
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(86.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color(0xFF101017))
+            .border(
+                width = 1.dp,
+                color = if (isPlaying) Color(0xFFC7A5FF).copy(alpha = 0.85f) else Color(0xFF25232F),
+                shape = RoundedCornerShape(6.dp)
+            )
+            .clickable(onClick = onClick)
+            .semantics {
+                contentDescription = "Album ${album.title} by ${album.artist}, ${album.trackCount} tracks"
+            }
+    ) {
+        // Wide Horizontal Artwork Strip (fills left to middle of slot)
+        if (imageRequest != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(0.68f)
+                    .align(Alignment.CenterStart)
+            ) {
+                AsyncImage(
+                    model = imageRequest,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                // Dark horizontal gradient fade from transparent to slot background
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color(0xFF101017).copy(alpha = 0.25f),
+                                    Color(0xFF101017).copy(alpha = 0.85f),
+                                    Color(0xFF101017)
+                                )
+                            )
+                        )
+                )
+            }
+        } else {
+            // Procedural aesthetic slot pattern for empty / missing artwork
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(0.5f)
+                    .align(Alignment.CenterStart)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                Color(0xFF181822),
+                                Color(0xFF101017)
+                            )
+                        )
+                    )
+            )
+        }
+
+        // Top structural shelf highlight line (subtle physical depth)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(0.5.dp)
+                .align(Alignment.TopCenter)
+                .background(Color(0xFF3A3545).copy(alpha = 0.45f))
+        )
+
+        // Metadata and Technical Indexing Overlay
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Subtle Rack Archive Index (01, 02, ...)
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color(0xFF08080D).copy(alpha = 0.75f))
+                    .border(
+                        0.5.dp,
+                        if (isPlaying) Color(0xFFC7A5FF).copy(alpha = 0.5f) else Color(0xFF25232F),
+                        RoundedCornerShape(3.dp)
+                    )
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "%02d".format(index + 1),
+                    color = if (isPlaying) Color(0xFFC7A5FF) else Color(0xFF8E889B),
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Album Metadata: Title, Artist · Track count (clean typography, no pills!)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = album.title,
+                    color = Color(0xFFF2EFF8),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                val metaText = buildString {
+                    append(album.artist)
+                    append("  ·  ")
+                    append("${album.trackCount} TRK")
+                    if (album.releaseYear != null && album.releaseYear > 0) {
+                        append("  ·  ")
+                        append(album.releaseYear)
+                    }
+                }
+                Text(
+                    text = metaText,
+                    color = Color(0xFFAAA4B9),
+                    fontSize = 12.5.sp,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Right side slot indicator / active playback state
+            if (isPlaying) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    MiniEqualizerBars(
+                        theme = theme,
+                        isPlaying = true
+                    )
+                }
+            } else {
+                Text(
+                    text = "❯",
+                    color = Color(0xFF3A3545),
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Backwards-compatible shim pointing to AlbumRackItem.
  */
 @Composable
 fun HyprAlbumCard(
@@ -2458,135 +2660,14 @@ fun HyprAlbumCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    Box(
+    AlbumRackItem(
+        index = 0,
+        album = album,
+        isPlaying = false,
+        onClick = onClick,
+        theme = theme,
         modifier = modifier
-            .fillMaxWidth()
-            .hyprTile(theme = theme)
-            .hyprBounceClick(onClick = onClick)
-            .padding(8.dp)
-    ) {
-        Column {
-            // Physical Vinyl Sleeve + Ambient Backdrop Engine
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(theme.borderRadiusDp.coerceAtMost(12).dp))
-                    .background(theme.surfaceVariantColor),
-                contentAlignment = Alignment.Center
-            ) {
-                // Vinyl Record Edge Peek (Simulating physical LP sleeve)
-                Canvas(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(end = 1.dp)
-                ) {
-                    val discRadius = size.height * 0.47f
-                    val centerOffset = Offset(size.width * 0.99f, size.height * 0.5f)
-                    // Outer vinyl black rim
-                    drawCircle(
-                        color = Color(0xFF141416),
-                        radius = discRadius,
-                        center = centerOffset
-                    )
-                    // Concentric vinyl grooves
-                    for (i in 1..4) {
-                        drawCircle(
-                            color = Color(0xFF2E2E36).copy(alpha = 0.55f),
-                            radius = discRadius * (0.38f + i * 0.12f),
-                            center = centerOffset,
-                            style = Stroke(width = 1.dp.toPx())
-                        )
-                    }
-                    // Center label ring
-                    drawCircle(
-                        color = theme.accentColor.copy(alpha = 0.85f),
-                        radius = discRadius * 0.28f,
-                        center = centerOffset
-                    )
-                }
-
-                if (!album.coverUri.isNullOrBlank()) {
-                    val albumCardReq = remember(album.coverUri) {
-                        ImageRequest.Builder(context)
-                            .data(album.coverUri)
-                            .size(360, 360)
-                            .allowHardware(true)
-                            .memoryCachePolicy(CachePolicy.ENABLED)
-                            .diskCachePolicy(CachePolicy.ENABLED)
-                            .crossfade(false)
-                            .build()
-                    }
-                    // Ambient blurred underglow so wide or non-square art fills the sleeve
-                    AsyncImage(
-                        model = albumCardReq,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer { alpha = 0.35f },
-                        contentScale = ContentScale.Crop
-                    )
-                    // Crisp foreground jacket fitted with zero cropping of faces, banners, or titles
-                    AsyncImage(
-                        model = albumCardReq,
-                        contentDescription = album.title,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(4.dp)
-                            .clip(RoundedCornerShape((theme.borderRadiusDp.coerceAtMost(10) - 2).coerceAtLeast(4).dp)),
-                        contentScale = ContentScale.Fit
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Album,
-                        contentDescription = null,
-                        tint = theme.accentColor,
-                        modifier = Modifier.size(48.dp)
-                    )
-                }
-
-                // Sleek Monospace Audio Chip Badge
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color.Black.copy(alpha = 0.7f))
-                        .border(0.5.dp, theme.accentColor.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 5.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "${album.trackCount} TRK",
-                        color = theme.accentColor,
-                        fontSize = 9.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = album.title,
-                color = theme.textPrimaryColor,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = album.artist,
-                color = theme.textSecondaryColor,
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
+    )
 }
 
 /**
@@ -2774,7 +2855,7 @@ private fun CloudLibraryView(
     }
 
     val songsListState = rememberLazyListState()
-    val albumsGridState = rememberLazyGridState()
+    val albumsRackState = rememberLazyListState()
     val artistsListState = rememberLazyListState()
 
     // Deep navigation handlers
@@ -2881,29 +2962,32 @@ private fun CloudLibraryView(
             .fillMaxSize()
             .padding(horizontal = theme.windowGapsDp.dp)
     ) {
-        // Search & Sync Header
+        // Slim Rack Search Bar (48dp height)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .hyprTile(theme = theme)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .height(48.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF101017))
+                .border(1.dp, Color(0xFF25232F), RoundedCornerShape(8.dp))
+                .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = Icons.Default.Cloud,
                 contentDescription = "Cloud Search",
-                tint = theme.accentColor,
+                tint = Color(0xFFAAA4B9),
                 modifier = Modifier.size(18.dp)
             )
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
             Box(modifier = Modifier.weight(1f)) {
                 if (cloudSearchQuery.isEmpty()) {
                     Text(
-                        text = "grep -i cloud...",
-                        color = theme.textSecondaryColor.copy(alpha = 0.6f),
-                        fontSize = 13.sp,
+                        text = if (activeSubFilter == CloudSubFilter.ALBUMS) "Search cloud albums..." else "Search cloud library...",
+                        color = Color(0xFF696473),
+                        fontSize = 13.5.sp,
                         fontFamily = FontFamily.Monospace
                     )
                 }
@@ -2911,12 +2995,12 @@ private fun CloudLibraryView(
                     value = cloudSearchQuery,
                     onValueChange = { cloudSearchQuery = it },
                     textStyle = TextStyle(
-                        color = theme.textPrimaryColor,
-                        fontSize = 13.sp,
+                        color = Color(0xFFF2EFF8),
+                        fontSize = 13.5.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Medium
                     ),
-                    cursorBrush = SolidColor(theme.accentColor),
+                    cursorBrush = SolidColor(Color(0xFFC7A5FF)),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -2925,39 +3009,31 @@ private fun CloudLibraryView(
             if (cloudSearchQuery.isNotEmpty()) {
                 IconButton(
                     onClick = { cloudSearchQuery = "" },
-                    modifier = Modifier.size(26.dp)
+                    modifier = Modifier.size(28.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Clear",
-                        tint = theme.textSecondaryColor,
-                        modifier = Modifier.size(15.dp)
+                        tint = Color(0xFFAAA4B9),
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
 
-            // Cloud Count Badge
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(theme.surfaceVariantColor)
-                    .padding(horizontal = 6.dp, vertical = 3.dp)
-            ) {
-                val displayCount = when (activeSubFilter) {
-                    CloudSubFilter.SONGS -> "${filteredTracks.size}/${cloudTracks.size}"
-                    CloudSubFilter.ALBUMS -> "${filteredAlbums.size}/${cloudAlbums.size}"
-                    CloudSubFilter.ARTISTS -> "${filteredArtists.size}/${cloudArtists.size}"
-                }
-                Text(
-                    text = displayCount,
-                    color = theme.accentColor,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
+            // Cloud Count Indicator
+            val displayCount = when (activeSubFilter) {
+                CloudSubFilter.SONGS -> "${filteredTracks.size}/${cloudTracks.size}"
+                CloudSubFilter.ALBUMS -> "${filteredAlbums.size}/${cloudAlbums.size}"
+                CloudSubFilter.ARTISTS -> "${filteredArtists.size}/${cloudArtists.size}"
             }
-
-            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = displayCount,
+                color = Color(0xFFC7A5FF),
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 6.dp)
+            )
 
             IconButton(
                 onClick = {
@@ -2965,20 +3041,20 @@ private fun CloudLibraryView(
                         telegramRepository?.syncLibrary(force = true)
                     }
                 },
-                modifier = Modifier.size(28.dp),
+                modifier = Modifier.size(32.dp),
                 enabled = !isSyncing && !isWaking
             ) {
                 if (isSyncing || isWaking) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(16.dp),
                         strokeWidth = 2.dp,
-                        color = theme.accentColor
+                        color = Color(0xFFC7A5FF)
                     )
                 } else {
                     Icon(
                         imageVector = Icons.Default.Sync,
                         contentDescription = "Sync Cloud",
-                        tint = theme.accentColor,
+                        tint = Color(0xFFAAA4B9),
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -2987,15 +3063,16 @@ private fun CloudLibraryView(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Sub-Tabs Bar: SONGS, ALBUMS, ARTISTS + Sort Pill Capsule
+        // Compact Command/Filter Row
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Sub-Tabs
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 CloudSubFilter.entries.forEach { sub ->
@@ -3005,69 +3082,60 @@ private fun CloudLibraryView(
                         CloudSubFilter.ALBUMS -> cloudAlbums.size
                         CloudSubFilter.ARTISTS -> cloudArtists.size
                     }
-                    Box(
+                    Column(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(
-                                if (isTabActive) theme.accentColor.copy(alpha = 0.22f)
-                                else theme.surfaceVariantColor
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = if (isTabActive) theme.accentColor.copy(alpha = 0.8f) else Color.Transparent,
-                                shape = RoundedCornerShape(6.dp)
-                            )
                             .clickable { activeSubFilter = sub }
-                            .padding(horizontal = 8.dp, vertical = 5.dp)
+                            .padding(vertical = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             Text(
                                 text = sub.label,
-                                color = if (isTabActive) theme.accentColor else theme.textSecondaryColor,
-                                fontSize = 10.5.sp,
+                                color = if (isTabActive) Color(0xFFF2EFF8) else Color(0xFF696473),
+                                fontSize = 12.sp,
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = if (isTabActive) FontWeight.Bold else FontWeight.Medium
                             )
                             Text(
-                                text = "($count)",
-                                color = if (isTabActive) theme.accentColor.copy(alpha = 0.8f) else theme.textSecondaryColor.copy(alpha = 0.6f),
-                                fontSize = 9.sp,
+                                text = "$count",
+                                color = if (isTabActive) Color(0xFFC7A5FF) else Color(0xFF696473),
+                                fontSize = 10.sp,
                                 fontFamily = FontFamily.Monospace
                             )
                         }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Box(
+                            modifier = Modifier
+                                .width(if (isTabActive) 20.dp else 0.dp)
+                                .height(2.dp)
+                                .background(
+                                    if (isTabActive) Color(0xFFC7A5FF) else Color.Transparent,
+                                    shape = RoundedCornerShape(1.dp)
+                                )
+                        )
                     }
                 }
             }
 
-            // Sort Pill Capsule
-            val currentSortChip = when (activeSubFilter) {
-                CloudSubFilter.SONGS -> trackSort.chipText
-                CloudSubFilter.ALBUMS -> albumSort.chipText
-                CloudSubFilter.ARTISTS -> artistSort.chipText
-            }
-            Box(
+            // SORT ↕ command button
+            Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(theme.surfaceVariantColor)
-                    .border(1.dp, theme.accentColor.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                    .clip(RoundedCornerShape(4.dp))
                     .clickable { showSortDialog = true }
-                    .padding(horizontal = 7.dp, vertical = 4.dp)
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    Text(
-                        text = "⇅ $currentSortChip ▼",
-                        color = theme.accentColor,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                Text(
+                    text = "SORT ↕",
+                    color = Color(0xFFAAA4B9),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
 
@@ -3296,25 +3364,13 @@ private fun CloudLibraryView(
                 }
 
                 CloudSubFilter.ALBUMS -> {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        state = albumsGridState,
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(bottom = 90.dp)
-                    ) {
-                        items(
-                            items = filteredAlbums,
-                            key = { "cloud_alb_${it.id}" }
-                        ) { album ->
-                            HyprCloudAlbumCard(
-                                theme = theme,
-                                album = album,
-                                onClick = { selectedCloudAlbum = album }
-                            )
-                        }
-                    }
+                    AlbumRackView(
+                        theme = theme,
+                        albums = filteredAlbums,
+                        playbackState = playbackState,
+                        onOpenAlbum = { album -> selectedCloudAlbum = album },
+                        state = albumsRackState
+                    )
                 }
 
                 CloudSubFilter.ARTISTS -> {
