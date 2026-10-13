@@ -133,17 +133,33 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            com.example.hyprmusic.ui.elovaire.theme.ElovaireTheme(darkTheme = true) {
+            var isDapMode by remember { mutableStateOf(true) }
+
+            if (isDapMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = com.example.hyprmusic.ui.elovaire.theme.ElovaireColors.Night
+                    color = com.example.hyprmusic.ui.dap.theme.DapColors.ChassisGraphite
                 ) {
-                    com.example.hyprmusic.ui.elovaire.screens.ElovaireShell(
+                    com.example.hyprmusic.ui.dap.screens.DapShell(
                         audioPlayer = audioPlayer,
                         musicRepository = musicRepository,
-                        telegramRepository = telegramRepository,
-                        playlistRepository = playlistRepository
+                        playlistRepository = playlistRepository,
+                        onSwitchUi = { isDapMode = false }
                     )
+                }
+            } else {
+                com.example.hyprmusic.ui.elovaire.theme.ElovaireTheme(darkTheme = true) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = com.example.hyprmusic.ui.elovaire.theme.ElovaireColors.Night
+                    ) {
+                        com.example.hyprmusic.ui.elovaire.screens.ElovaireShell(
+                            audioPlayer = audioPlayer,
+                            musicRepository = musicRepository,
+                            telegramRepository = telegramRepository,
+                            playlistRepository = playlistRepository
+                        )
+                    }
                 }
             }
         }
