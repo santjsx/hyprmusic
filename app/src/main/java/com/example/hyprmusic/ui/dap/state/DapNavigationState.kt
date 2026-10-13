@@ -4,6 +4,7 @@ enum class DapScreen {
     NOW_PLAYING,
     MAIN_MENU,
     TRACKS_LIST,
+    FAVORITES_LIST,
     ALBUMS_LIST,
     ARTISTS_LIST,
     PLAYLISTS_LIST,

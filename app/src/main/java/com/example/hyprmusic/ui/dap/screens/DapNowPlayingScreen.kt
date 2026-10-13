@@ -1,13 +1,7 @@
 package com.example.hyprmusic.ui.dap.screens
 
-import android.content.Context
 import android.content.Intent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,30 +12,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -62,9 +44,9 @@ import com.example.hyprmusic.ui.dap.theme.DapMotion
 import com.example.hyprmusic.ui.dap.theme.DapTypography
 
 /**
- * Phase 3 Flagship Reference-Accurate Now Playing LCD Display.
- * Matches all 13 callout elements from the reference design with pixel accuracy,
- * Level 4 sub-animation micro-interactions, and high-fidelity audio telemetry.
+ * Pixel-Accurate iPod-Inspired Now Playing Card.
+ * Matches reference design with naked unboxed controls, atmospheric ambient glow,
+ * clean typography, tabular lining timers, and live audio telemetry.
  */
 @Composable
 fun DapNowPlayingDisplay(
@@ -93,7 +75,7 @@ fun DapNowPlayingDisplay(
     var showMoreMenu by remember { mutableStateOf(false) }
     var showAudioSpecsDialog by remember { mutableStateOf(false) }
 
-    // Level 4 Favorite Star Scale Pop
+    // Favorite Star Scale Pop
     var favoriteScaleTarget by remember { mutableFloatStateOf(1f) }
     val favoriteScale by animateFloatAsState(
         targetValue = favoriteScaleTarget,
@@ -101,69 +83,78 @@ fun DapNowPlayingDisplay(
         label = "FavoriteStarScale"
     )
 
-    Column(
+    // Atmospheric Deep Ocean / Midnight Gradient Card
+    Box(
         modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.SpaceBetween
-    ) {
-        // ==========================================
-        // UPPER HALF: Artwork (1) + Track Info (2,3,4) + Buttons (6,7)
-        // ==========================================
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top
-        ) {
-            // [1] Square Album Art with Multi-Layer Neon Glow Border (Callout 1)
-            Box(
-                modifier = Modifier
-                    .size(114.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(DapColors.ScreenCard)
-                    .border(
-                        width = 1.5.dp,
-                        brush = Brush.linearGradient(
-                            listOf(
-                                Color(0xFFC084FC), // Neon lavender highlight
-                                DapColors.AccentIceBlue, // Ice-blue cyan
-                                Color(0xFF818CF8)  // Indigo
-                            )
-                        ),
-                        shape = RoundedCornerShape(14.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF14243D), // Atmospheric ambient glow
+                        Color(0xFF0C1628),
+                        Color(0xFF060B14)
                     ),
-                contentAlignment = Alignment.Center
+                    center = Offset(200f, 150f),
+                    radius = 900f
+                )
+            )
+            .border(
+                width = 1.dp,
+                color = Color(0xFF1E2D4A).copy(alpha = 0.5f),
+                shape = RoundedCornerShape(22.dp)
+            )
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // ==========================================
+            // TOP ROW: Artwork + Title + Artist + Album
+            // ==========================================
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
             ) {
-                if (!track.albumArtUri.isNullOrBlank()) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(track.albumArtUri)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "Cover for ${track.title}",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = DapColors.TextSecondary.copy(alpha = 0.5f),
-                        modifier = Modifier.size(46.dp)
-                    )
+                // Square Album Art with Soft Corners & Subtle Shadow (NO cartoon neon border)
+                Box(
+                    modifier = Modifier
+                        .size(112.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF0E1726))
+                        .border(1.dp, Color(0xFF1E2D4A).copy(alpha = 0.6f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (!track.albumArtUri.isNullOrBlank()) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(track.albumArtUri)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Cover for ${track.title}",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = null,
+                            tint = Color(0xFF8EA2C6).copy(alpha = 0.5f),
+                            modifier = Modifier.size(44.dp)
+                        )
+                    }
                 }
-            }
 
-            Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(14.dp))
 
-            // Metadata Column
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(114.dp),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    // [2] Song Title with Explicit [E] Badge (Callout 2)
+                // Title, Artist, Album Column
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(top = 2.dp)
+                ) {
+                    // Song Title with [E] Explicit Badge
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
@@ -171,106 +162,129 @@ fun DapNowPlayingDisplay(
                         Text(
                             text = track.title,
                             style = DapTypography.TrackTitle,
-                            color = DapColors.TextPrimary,
+                            color = Color.White,
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
                         )
 
-                        // Explicit badge
+                        // Explicit [E] Pill Badge
                         Spacer(modifier = Modifier.width(6.dp))
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(3.dp))
-                                .background(DapColors.AccentIceBlue.copy(alpha = 0.25f))
-                                .border(0.8.dp, DapColors.AccentIceBlue.copy(alpha = 0.6f), RoundedCornerShape(3.dp))
-                                .padding(horizontal = 4.dp, vertical = 0.5.dp)
+                                .background(Color(0xFF24334E))
+                                .border(0.8.dp, Color(0xFF384F75), RoundedCornerShape(3.dp))
+                                .padding(horizontal = 4.5.dp, vertical = 1.dp)
                         ) {
                             Text(
                                 text = "E",
                                 style = DapTypography.ExplicitBadge,
-                                color = DapColors.AccentIceBlue
+                                color = Color(0xFF94A9CF),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(3.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                    // [3] Artist Name (Callout 3)
+                    // Artist Name
                     Text(
                         text = track.artist.ifBlank { "Unknown Artist" },
                         style = DapTypography.TrackArtist,
-                        color = DapColors.TextSecondary,
+                        color = Color(0xFF8EA2C6),
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    // [4] Album Name (Callout 4)
+                    Spacer(modifier = Modifier.height(2.dp))
+
+                    // Album Name
                     Text(
                         text = track.album.ifBlank { "Unknown Album" },
                         style = DapTypography.TrackAlbum,
-                        color = DapColors.TextSecondary.copy(alpha = 0.8f),
+                        color = Color(0xFF62789E),
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Normal,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+            }
 
-                // [6] Favorite Star & [7] More Options Row
+            // ==========================================
+            // MIDDLE ROW: Dolby Atmos (Left) + Star + More (Right)
+            // Completely NAKED / Unboxed Controls
+            // ==========================================
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Dolby Atmos Naked Vector Glyph & Text
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable {
+                        haptic.buttonClick()
+                        showAudioSpecsDialog = true
+                    }
                 ) {
-                    // [6] Favorite / Star Button
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(DapColors.ScreenCard)
-                            .border(1.dp, DapColors.ScreenCardBorder, RoundedCornerShape(8.dp))
-                            .clickable {
-                                haptic.buttonClick()
-                                favoriteScaleTarget = 1.25f
-                                onToggleFavorite(track.id)
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        LaunchedEffect(favoriteScaleTarget) {
-                            if (favoriteScaleTarget > 1f) {
-                                kotlinx.coroutines.delay(100)
-                                favoriteScaleTarget = 1f
-                            }
+                    DolbyDoubleDGlyph(tint = Color(0xFF9CB1D6))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Dolby Atmos",
+                        style = DapTypography.AudioBadge,
+                        color = Color(0xFF9CB1D6),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                // Favorite Star & More Options (Naked Icons)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Naked Favorite Star
+                    LaunchedEffect(favoriteScaleTarget) {
+                        if (favoriteScaleTarget > 1f) {
+                            kotlinx.coroutines.delay(120)
+                            favoriteScaleTarget = 1f
                         }
-                        Icon(
-                            imageVector = if (track.isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
-                            contentDescription = if (track.isFavorite) "Remove Favorite" else "Add Favorite",
-                            tint = if (track.isFavorite) DapColors.AccentIceBlue else DapColors.TextPrimary,
-                            modifier = Modifier
-                                .size(18.dp)
-                                .graphicsLayer(scaleX = favoriteScale, scaleY = favoriteScale)
-                        )
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    // [7] More Options Button with Dropdown
-                    Box(
+                    Icon(
+                        imageVector = if (track.isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                        contentDescription = if (track.isFavorite) "Remove Favorite" else "Add Favorite",
+                        tint = if (track.isFavorite) Color(0xFFFFC107) else Color(0xFF8EA2C6),
                         modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(DapColors.ScreenCard)
-                            .border(1.dp, DapColors.ScreenCardBorder, RoundedCornerShape(8.dp))
+                            .size(21.dp)
+                            .graphicsLayer(scaleX = favoriteScale, scaleY = favoriteScale)
                             .clickable {
                                 haptic.buttonClick()
-                                showMoreMenu = true
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
+                                favoriteScaleTarget = 1.35f
+                                onToggleFavorite(track.id)
+                            }
+                    )
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    // Naked More Options Icon with Dropdown
+                    Box {
                         Icon(
                             imageVector = Icons.Default.MoreHoriz,
                             contentDescription = "More Options",
-                            tint = DapColors.TextPrimary,
-                            modifier = Modifier.size(18.dp)
+                            tint = Color(0xFF8EA2C6),
+                            modifier = Modifier
+                                .size(21.dp)
+                                .clickable {
+                                    haptic.buttonClick()
+                                    showMoreMenu = true
+                                }
                         )
 
                         DropdownMenu(
@@ -307,149 +321,116 @@ fun DapNowPlayingDisplay(
                     }
                 }
             }
-        }
 
-        // ==========================================
-        // [5] Audio Quality Indicator with Dolby Double-D Glyph (Callout 5)
-        // Positioned directly beneath artwork
-        // ==========================================
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(DapColors.ScreenCard)
-                .border(1.dp, DapColors.ScreenCardBorder, RoundedCornerShape(6.dp))
-                .clickable {
-                    haptic.buttonClick()
-                    showAudioSpecsDialog = true
-                }
-                .padding(horizontal = 9.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            DolbyDoubleDGlyph(tint = DapColors.TextPrimary)
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = "Dolby Atmos",
-                style = DapTypography.AudioBadge,
-                color = DapColors.TextPrimary
-            )
-        }
+            // ==========================================
+            // TIMELINE ROW: Naked Elapsed (Left), Naked Remaining (Right), Scrubber
+            // ==========================================
+            Column(modifier = Modifier.fillMaxWidth()) {
+                val remainingMs = (playbackState.durationMs - playbackState.currentPositionMs).coerceAtLeast(0L)
 
-        // ==========================================
-        // TIMELINE: Elapsed (8), Seek Bar (9), Remaining (10)
-        // ==========================================
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // [8] Elapsed Time
-                Text(
-                    text = formatDuration(playbackState.currentPositionMs),
-                    style = DapTypography.TimeCounter,
-                    color = DapColors.TextPrimary
-                )
-
-                // [10] Remaining Time in Rounded Badge
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(DapColors.ScreenCard)
-                        .border(1.dp, DapColors.ScreenCardBorder, RoundedCornerShape(6.dp))
-                        .padding(horizontal = 7.dp, vertical = 2.5.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val remainingMs = (playbackState.durationMs - playbackState.currentPositionMs).coerceAtLeast(0L)
+                    // Naked Elapsed Time
+                    Text(
+                        text = formatDuration(playbackState.currentPositionMs),
+                        style = DapTypography.TimeCounter,
+                        color = Color(0xFF62789E),
+                        fontSize = 12.sp
+                    )
+
+                    // Naked Remaining Time (NO outlined box)
                     Text(
                         text = "-${formatDuration(remainingMs)}",
                         style = DapTypography.TimeCounter,
-                        color = DapColors.TextPrimary
+                        color = Color(0xFF62789E),
+                        fontSize = 12.sp
                     )
                 }
-            }
 
-            Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(3.dp))
 
-            // [9] Playback Progress Scrubber
-            DapSeekBar(
-                progress = playbackState.progress,
-                durationMs = playbackState.durationMs,
-                onSeekTo = onSeekTo
-            )
-        }
-
-        // ==========================================
-        // BOTTOM ROW: Connected Device (11), Lyrics (12), Queue (13)
-        // ==========================================
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // [11] Connected Device Pill with Earbuds Glyph
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(DapColors.ScreenCard)
-                    .border(1.dp, DapColors.ScreenCardBorder, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                EarbudsDoubleGlyph(tint = DapColors.TextPrimary)
-                Spacer(modifier = Modifier.width(7.dp))
-                Text(
-                    text = connectedDevice,
-                    style = DapTypography.DeviceLabel,
-                    color = DapColors.TextPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                // Playback Scrubber Bar
+                DapSeekBar(
+                    progress = playbackState.progress,
+                    durationMs = playbackState.durationMs,
+                    onSeekTo = onSeekTo
                 )
             }
 
-            // Action Buttons: [12] Lyrics & [13] Queue
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // [12] Lyrics Button with Quote Bubble Glyph
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(DapColors.ScreenCard)
-                        .border(1.dp, DapColors.ScreenCardBorder, RoundedCornerShape(8.dp))
-                        .clickable {
-                            haptic.buttonClick()
-                            onOpenLyrics()
-                        },
-                    contentAlignment = Alignment.Center
+            // ==========================================
+            // BOTTOM ROW: Connected Device (Left) + Lyrics & Queue (Right)
+            // Completely NAKED / Unboxed Controls
+            // ==========================================
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Naked Connected Device with Earbuds Glyph
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f, fill = false)
                 ) {
-                    QuoteChatBubbleGlyph(tint = DapColors.TextPrimary)
+                    EarbudsDoubleGlyph(tint = Color(0xFF8EA2C6))
+                    Spacer(modifier = Modifier.width(7.dp))
+                    Text(
+                        text = connectedDevice,
+                        style = DapTypography.DeviceLabel,
+                        color = Color(0xFF8EA2C6),
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
-                // [13] Queue / Playlist Button
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(DapColors.ScreenCard)
-                        .border(1.dp, DapColors.ScreenCardBorder, RoundedCornerShape(8.dp))
-                        .clickable {
-                            haptic.buttonClick()
-                            onOpenQueue()
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.FormatListBulleted,
-                        contentDescription = "Queue",
-                        tint = DapColors.TextPrimary,
-                        modifier = Modifier.size(17.dp)
-                    )
+                // Naked Action Buttons: Lyrics & Queue
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Naked Lyrics Button
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clickable {
+                                haptic.buttonClick()
+                                onOpenLyrics()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        QuoteChatBubbleGlyph(tint = Color(0xFF8EA2C6))
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    // Naked Queue Button
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clickable {
+                                haptic.buttonClick()
+                                onOpenQueue()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.FormatListBulleted,
+                            contentDescription = "Queue",
+                            tint = Color(0xFF8EA2C6),
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
                 }
             }
         }
     }
 
-    // Audiophile Audio Specs Dialog (Behavioral Contrast Effect)
+    // Audio Telemetry Modal
     if (showAudioSpecsDialog) {
         Dialog(onDismissRequest = { showAudioSpecsDialog = false }) {
             Box(
@@ -512,7 +493,7 @@ private fun AudioSpecRow(label: String, value: String) {
 }
 
 /**
- * Authentic Dolby Atmos double-D vector glyph (Callout 5).
+ * Authentic Dolby Atmos double-D vector glyph matching reference.
  */
 @Composable
 fun DolbyDoubleDGlyph(
@@ -557,14 +538,14 @@ fun DolbyDoubleDGlyph(
 }
 
 /**
- * Two Earbuds / AirPods glyph matching Callout 11.
+ * Two Earbuds / AirPods glyph matching reference.
  */
 @Composable
 fun EarbudsDoubleGlyph(
     tint: Color = DapColors.TextPrimary,
     modifier: Modifier = Modifier
 ) {
-    Canvas(modifier = modifier.size(14.dp, 14.dp)) {
+    Canvas(modifier = modifier.size(15.dp, 15.dp)) {
         val w = size.width
         val h = size.height
 
@@ -591,7 +572,7 @@ fun EarbudsDoubleGlyph(
 }
 
 /**
- * Quote chat bubble glyph matching Callout 12.
+ * Quote chat bubble glyph matching reference.
  */
 @Composable
 fun QuoteChatBubbleGlyph(

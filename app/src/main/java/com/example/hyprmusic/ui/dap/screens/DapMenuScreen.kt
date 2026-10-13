@@ -43,13 +43,14 @@ fun DapMenuDisplay(
     val menuItems = listOf(
         DapMenuItem("Now Playing", "Active Track", DapScreen.NOW_PLAYING),
         DapMenuItem("Tracks", "All Audio Files", DapScreen.TRACKS_LIST),
+        DapMenuItem("Favorites", "Liked Tracks", DapScreen.FAVORITES_LIST),
         DapMenuItem("Albums", "By Collection", DapScreen.ALBUMS_LIST),
         DapMenuItem("Artists", "Discographies", DapScreen.ARTISTS_LIST),
         DapMenuItem("Playlists", "Custom Mixes", DapScreen.PLAYLISTS_LIST),
         DapMenuItem("Queue", "Up Next", DapScreen.QUEUE),
         DapMenuItem("Lyrics", "Synchronized LRC", DapScreen.LYRICS),
         DapMenuItem("Equalizer", "10-Band DSP", DapScreen.EQUALIZER),
-        DapMenuItem("Settings", "Preferences & Scan", DapScreen.SETTINGS)
+        DapMenuItem("Settings", "Preferences & OTA", DapScreen.SETTINGS)
     )
 
     Column(

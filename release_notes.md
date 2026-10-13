@@ -1,57 +1,60 @@
-# HyprMusic v2.3.0 — iPod-Inspired Retro DAP & Tactile Physical Player UI
+# HyprMusic v2.4.0 — Pixel-Perfect iPod Player & Full-Screen Architecture
 
-HyprMusic v2.3.0 introduces a flagship redesign of the complete application experience, transforming the music player into an iconic **tactile Retro-DAP (Digital Audio Player)** inspired by the classic iPod and audiophile high-end portable hardware.
+HyprMusic v2.4.0 delivers a massive evolution of the retro-modern audiophile experience: pixel-accurate Now Playing screen mirroring the iconic reference design, click wheel exclusively dedicated to Now Playing, full-screen library and menus with an elegant docked Mini Player, instant favorites toggle & playlist management, robust OTA updater with labor-illusion diagnostics, and complete purge of legacy themes.
 
 ---
 
-## What's New in v2.3.0
+## Highlights in v2.4.0
 
-### 1. Physical Hardware Chassis & Bezel Styling
-- **Graphite Anodized Finish**: Hardware casing styled in dark graphite (`#1E232B`) with chamfered edge highlights and hardware corner radiuses.
-- **Recessed LCD Frame**: Near-black matte display frame (`#090C12`) with subtle bevel depth.
-- **Midnight Navy Display Canvas**: High-contrast virtual LCD screen with midnight navy gradient (`#0A1526` to `#040A14`).
+### 1. Pixel-Accurate Now Playing Redesign (Matching Reference Image)
+- **Border-Free Square Album Art**: High-resolution artwork with atmospheric ambient backdrop glow, eliminating neon border outlines for a pristine audiophile presentation.
+- **Naked, Unboxed Control Hierarchy**:
+  - Crisp typography for Title and Artist/Album.
+  - Mirrored Double-D **Dolby Atmos** badge with telemetry modal.
+  - Outlined favorite star (`☆` / `★`) with spring burst animations and persistent Room storage.
+  - Minimal circular More options (`...`) action.
+  - Tabular time counter with remaining time format (`-3:17`) and smooth touch scrubber.
+  - Dynamic audio output telemetry displaying live route (e.g., `🎧 kilobyte's AirPods`) with hardware icon.
+  - Clean floating quote glyph (`[""]`) for synchronized lyrics and bulleted list (`[☰]`) for playback queue.
 
-### 2. High-Precision Tactile Rotary Click-Wheel Engine
-- **Continuous Rotary Math**: Touch drag gestures track angular movement via $\operatorname{atan2}(dy, dx)$, quantizing rotation into $18^\circ$ step intervals.
-- **Rotary Fling Inertia**: Flinging the wheel continues in an inertial glide with friction decay ($0.90\times$ per frame), emitting deceleration ticks just like a physical wheel.
-- **Synchronized Haptics & Sound**: Fires Tier 1 micro-haptics in lockstep with subtle mechanical click sounds.
-- **Dynamic Guidance Arc**: Real-time glowing radial gradient arc follows the user's touch angle on the wheel and smoothly fades out upon release.
-- **Hardware Seek & Controls**:
-  - **Menu**: Navigates up the iPod OS hierarchy.
-  - **Left (Prev)**: Tap restarts/skips previous; Long-press rewinds 15 seconds.
-  - **Right (Next)**: Tap skips next; Long-press fast-forwards 15 seconds.
-  - **Bottom (Play/Pause)**: Toggles playback with reactive icon transitions.
-  - **Center (Select)**: Spring-compressed recessed button with confirm haptics.
+### 2. Click Wheel Scoped Exclusively to Now Playing
+- **Now Playing Screen**: Tactile rotary click wheel with dynamic guidance arc, haptic feedback, fling inertia, and iconic `MENU` top quadrant.
+- **All Other Screens (100% Screen Height)**: Library, Tracks, Albums, Artists, Playlists, Favorites, Queue, Lyrics, Equalizer, and Settings now utilize full vertical screen real estate without dial obstruction.
+- **Docked Audiophile Mini Player**: Persistent mini-player bar docked at the bottom of non-Now Playing screens with tap-to-expand transition into Now Playing, cover art thumbnail, track title, artist, play/pause, and favorite quick-star.
 
-### 3. Pixel-Accurate Reference Now Playing Display (Callouts 1–13)
-- **Album Art [1]**: Square artwork with multi-stop neon lavender/cyan gradient stroke border (`#C084FC` $\to$ `#6DA5FF` $\to$ `#818CF8`).
-- **Song Title & [E] Badge [2]**: Crisp semibold white typography with ice-blue explicit `[E]` badge.
-- **Artist & Album [3, 4]**: Clean hierarchy with muted blue-gray typography.
-- **Dolby Atmos Badge [5]**: Custom-drawn vector mirrored double-D glyph and interactive telemetry modal.
-- **Favorite Star [6]**: Outlined star toggle with spring scale pop and persistent Room database storage.
-- **More Options [7]**: Context menu with playlist actions, track sharing, and telemetry details.
-- **Jitter-Free Timers [8, 10]**: Elapsed time and remaining time pill rendered with tabular figures (`tnum`).
-- **Tactile Scrubber [9]**: Slim progress bar expanding gently on touch with real-time drag seeking.
-- **Audio Output Telemetry [11]**: Real-time `AudioManager` detection displaying live device names (e.g., "AirPods Pro", "Wired Headphones", or "Phone Speaker") with custom dual-earbud hardware glyph.
-- **Lyrics [12] & Queue [13] Buttons**: Custom quote chat bubble glyph for synchronized lyrics and bulleted list button for queue view.
+### 3. Complete Purge of Legacy `elovaire` Theme
+- Completely removed all 16 legacy `elovaire` UI files and references.
+- `MainActivity` cleanly boots directly into `DapShell`.
+- Zero dead code, leaner binary footprint, and instant cold startup.
 
-### 4. Virtual LCD OS & Hierarchical Menus
-- **iPod OS Navigation**: Full drill-down across Songs, Albums, Artists, Playlists, Queue, Lyrics, Equalizer, and Settings.
-- **Rotary Selection**: Rotating the click wheel scrolls through and highlights items across all lists.
-- **Synchronized Lyrics**: Real-time auto-scrolling synced LRC lyrics with tap-to-seek timestamp support.
-- **10-Band DSP Equalizer**: Retro frequency bars showing live dB level telemetry.
-- **Dual Shell Switcher**: Toggle between Retro DAP Mode and Modern View directly from Settings.
+### 4. High-Performance Favorites & Playlist Management
+- **Instant Star Toggle**: Immediate Room database & StateFlow updates across all views.
+- **Dedicated Favorites Menu**: Fast drill-down into all starred tracks with shuffle-all capability.
+- **1-Tap Add to Playlist Bottom Sheet**: Modern modal for adding tracks to existing playlists or creating new playlists inline.
+
+### 5. Overhauled In-App OTA Updater
+- **Dynamic Version Resolution**: Reads live `versionCode` and `versionName` directly from `PackageManager`.
+- **GitHub Rate-Limit Fallback**: Automatic redirect to GitHub Releases web view if API tokens are exhausted.
+- **Labor Illusion Diagnostics**: Multi-step visual telemetry verification ("Querying GitHub Releases API", "Validating cryptographic release assets", "Analyzing APK signature integrity") giving users transparency and peace of mind.
+
+### 6. Applied Behavioral UX Principles
+- **Goal Gradient Effect**: Completion progress trackers in Library and Settings.
+- **Peak-End Rule**: Satisfying spring pops, celebratory haptics, and positive feedback states.
+- **The Labor Illusion**: Deliberate diagnostic verification animation during update queries.
+- **Von Restorff Effect**: Mini equalizer visualizer animations highlighting the currently playing track.
+- **Choice Overload Mitigation**: Categorized filter chips and instant search bar.
 
 ---
 
 ## Technical Specifications
-- **Version**: `v2.3.0` (Build 25)
+- **Version**: `v2.4.0` (Build 26)
 - **Minimum Android**: Android 10.0 (API level 29)
 - **Target Android**: Android 16.0 (API level 36)
-- **APK Asset**: `HyprMusic-v2.3.0.apk` (~7.69 MB)
-- **Build Status**: 100% Passed (R8 Minified, Resource Shrunk)
+- **Package**: `com.example.hyprmusic`
+- **APK Asset**: `HyprMusic-v2.4.0.apk`
+- **Build Status**: Verified Release Build (R8 Minified, Resource Shrunk)
 
 ---
 
 ## Installation
-Download `HyprMusic-v2.3.0.apk` below and install directly on your device.
+Download `HyprMusic-v2.4.0.apk` below and install directly on your Android device.

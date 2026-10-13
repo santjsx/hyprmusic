@@ -93,4 +93,12 @@ object DapTypography {
         fontSize = 11.5.sp,
         lineHeight = 15.sp
     )
+
+    // Tactile Click Wheel Button Labels (MENU, etc.)
+    val WheelLabel = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Bold,
+        fontSize = 13.5.sp,
+        letterSpacing = 1.5.sp
+    )
 }

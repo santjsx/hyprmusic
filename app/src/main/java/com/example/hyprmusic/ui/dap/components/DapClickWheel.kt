@@ -18,9 +18,13 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import com.example.hyprmusic.ui.dap.theme.DapTypography
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -352,18 +356,19 @@ fun DapClickWheel(
             )
         }
 
-        // Top Quadrant — Menu / Home Icon
+        // Top Quadrant — Iconic iPod MENU Text
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.TopCenter
         ) {
-            Icon(
-                imageVector = Icons.Default.GridView,
-                contentDescription = "Menu and Library",
-                tint = if (pressedQuadrant == "TOP") DapColors.AccentIceBlue else DapColors.WheelIcon,
-                modifier = Modifier
-                    .size(46.dp)
-                    .padding(top = 16.dp)
+            Text(
+                text = "MENU",
+                style = DapTypography.WheelLabel,
+                color = if (pressedQuadrant == "TOP") DapColors.AccentIceBlue else DapColors.WheelIcon,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.5.sp,
+                letterSpacing = 1.5.sp,
+                modifier = Modifier.padding(top = 18.dp)
             )
         }
 

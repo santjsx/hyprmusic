@@ -38,6 +38,7 @@ object DapColors {
     val TextPrimary = Color(0xFFF5F7FA)           // Crisp white for song titles & active states
     val TextSecondary = Color(0xFF8296B0)         // Muted cyan/blue-gray for artist/album
     val TextMuted = Color(0xFF4E6078)             // Dim labels & secondary metadata
+    val TextTertiary = Color(0xFF4E6078)          // Tertiary subdued text & icons
     val AccentIceBlue = Color(0xFF6DA5FF)         // Active highlight, Dolby Atmos & star fill
     val ExplicitBadgeBg = Color(0x338296B0)       // [E] badge background
     val ExplicitBadgeText = Color(0xFFB0C4DE)     // [E] badge text

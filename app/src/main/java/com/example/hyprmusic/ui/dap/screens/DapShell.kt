@@ -23,14 +23,16 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.hyprmusic.core.data.CustomPlaylist
 import com.example.hyprmusic.core.data.MusicRepository
 import com.example.hyprmusic.core.data.PlaylistRepository
 import com.example.hyprmusic.core.media.HyprAudioPlayer
 import com.example.hyprmusic.core.model.Album
 import com.example.hyprmusic.core.model.Artist
 import com.example.hyprmusic.core.model.Playlist
+import com.example.hyprmusic.core.model.Track
+import com.example.hyprmusic.ui.dap.components.DapAddToPlaylistSheet
 import com.example.hyprmusic.ui.dap.components.DapClickWheel
+import com.example.hyprmusic.ui.dap.components.DapMiniPlayer
 import com.example.hyprmusic.ui.dap.state.DapScreen
 import com.example.hyprmusic.ui.dap.state.rememberConnectedAudioDevice
 import com.example.hyprmusic.ui.dap.theme.DapColors
@@ -39,15 +41,15 @@ import kotlinx.coroutines.launch
 
 /**
  * Master DAP Hardware Shell.
- * Unifies the upper virtual LCD viewport and the lower physical rotary click-wheel
- * into an authentic, hierarchical portable music player experience.
+ * - When in NOW_PLAYING: Displays the exact iPod card on top + tactile click wheel on bottom.
+ * - In all other screens (Tracks, Albums, Playlists, Favorites, Equalizer, Settings):
+ *   Allocates 100% full screen height (NO wheel) with sticky docked Mini-Player.
  */
 @Composable
 fun DapShell(
     audioPlayer: HyprAudioPlayer,
     musicRepository: MusicRepository,
     playlistRepository: PlaylistRepository,
-    onSwitchUi: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -91,11 +93,14 @@ fun DapShell(
         rawPlaylists.map { Playlist(it.id, it.name, it.trackIds.size, it.createdAt) }
     }
 
-    // Navigation Stack inside Virtual LCD
+    // Navigation Stack
     var currentScreen by remember { mutableStateOf(DapScreen.NOW_PLAYING) }
     var selectedAlbum by remember { mutableStateOf<Album?>(null) }
     var selectedArtist by remember { mutableStateOf<Artist?>(null) }
     var selectedPlaylist by remember { mutableStateOf<Playlist?>(null) }
+
+    // Add to Playlist Bottom Sheet State
+    var trackForPlaylistSheet by remember { mutableStateOf<Track?>(null) }
 
     // Scroll Indices
     var menuSelectedIndex by remember { mutableIntStateOf(0) }
@@ -104,7 +109,7 @@ fun DapShell(
     var playlistSelectedIndex by remember { mutableIntStateOf(0) }
     var trackSelectedIndex by remember { mutableIntStateOf(0) }
 
-    // Lazy List States for rotary auto-scrolling
+    // Lazy List States
     val menuListState = rememberLazyListState()
     val albumListState = rememberLazyListState()
     val artistListState = rememberLazyListState()
@@ -115,6 +120,7 @@ fun DapShell(
     // Filter tracks based on active drill-down context
     val currentFilteredTracks = remember(tracks, selectedAlbum, selectedArtist, selectedPlaylist, currentScreen) {
         when {
+            currentScreen == DapScreen.FAVORITES_LIST -> tracks.filter { it.isFavorite }
             selectedAlbum != null -> tracks.filter { it.album.equals(selectedAlbum?.title, ignoreCase = true) }
             selectedArtist != null -> tracks.filter { it.artist.equals(selectedArtist?.name, ignoreCase = true) }
             selectedPlaylist != null -> {
@@ -172,22 +178,23 @@ fun DapShell(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // ==========================================
-            // UPPER SECTION: Virtual LCD Display (approx 52% height)
-            // ==========================================
+            // =========================================================================
+            // SCREEN CONTENT DISPLAY
+            // If NOW_PLAYING: Height is weighted to accommodate Click Wheel below.
+            // If OTHER SCREEN: Takes 100% of the upper and middle area with NO Wheel!
+            // =========================================================================
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1.15f)
-                    .clip(RoundedCornerShape(26.dp))
+                    .weight(if (currentScreen == DapScreen.NOW_PLAYING) 1.05f else 1f)
+                    .clip(RoundedCornerShape(22.dp))
                     .background(DapColors.BezelBackground)
-                    .border(1.5.dp, DapColors.ChassisBorder, RoundedCornerShape(26.dp))
-                    .padding(5.5.dp) // Outer hardware bezel
-                    .clip(RoundedCornerShape(20.dp))
+                    .border(1.2.dp, DapColors.ChassisBorder, RoundedCornerShape(22.dp))
+                    .padding(4.5.dp) // Outer hardware bezel
+                    .clip(RoundedCornerShape(18.dp))
                     .background(
                         Brush.verticalGradient(
                             listOf(DapColors.ScreenBgTop, DapColors.ScreenBgBottom)
@@ -205,7 +212,7 @@ fun DapShell(
                             animationSpec = DapMotion.lcdSlideExit()
                         )
                     },
-                    label = "DapLcdNavigation"
+                    label = "DapNavigation"
                 ) { targetScreen ->
                     when (targetScreen) {
                         DapScreen.NOW_PLAYING -> {
@@ -215,10 +222,18 @@ fun DapShell(
                                 onToggleFavorite = { trackId ->
                                     val isFav = musicRepository.toggleFavorite(trackId)
                                     audioPlayer.updateFavoriteStatus(trackId, isFav)
+                                    Toast.makeText(
+                                        context,
+                                        if (isFav) "Added to Favorites ⭐" else "Removed from Favorites",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 },
                                 onSeekTo = { audioPlayer.seekTo(it) },
                                 onOpenLyrics = { currentScreen = DapScreen.LYRICS },
-                                onOpenQueue = { currentScreen = DapScreen.QUEUE }
+                                onOpenQueue = { currentScreen = DapScreen.QUEUE },
+                                onAddToPlaylist = { track ->
+                                    trackForPlaylistSheet = track
+                                }
                             )
                         }
 
@@ -231,6 +246,58 @@ fun DapShell(
                                     selectedArtist = null
                                     selectedPlaylist = null
                                     currentScreen = screen
+                                }
+                            )
+                        }
+
+                        DapScreen.TRACKS_LIST -> {
+                            val activeTitle = when {
+                                selectedAlbum != null -> selectedAlbum?.title ?: "Album Tracks"
+                                selectedArtist != null -> selectedArtist?.name ?: "Artist Tracks"
+                                selectedPlaylist != null -> selectedPlaylist?.name ?: "Playlist Tracks"
+                                else -> "All Tracks"
+                            }
+
+                            DapTrackListDisplay(
+                                title = activeTitle,
+                                tracks = currentFilteredTracks,
+                                currentTrackId = playbackState.currentTrack?.id,
+                                selectedIndex = trackSelectedIndex,
+                                listState = trackListState,
+                                onTrackSelect = { selectedTrack, trackList ->
+                                    audioPlayer.playTrack(selectedTrack, trackList)
+                                    currentScreen = DapScreen.NOW_PLAYING
+                                },
+                                onBack = { navigateBackOrUp() },
+                                onToggleFavorite = { trackId ->
+                                    val isFav = musicRepository.toggleFavorite(trackId)
+                                    audioPlayer.updateFavoriteStatus(trackId, isFav)
+                                },
+                                onAddToPlaylist = { track ->
+                                    trackForPlaylistSheet = track
+                                }
+                            )
+                        }
+
+                        DapScreen.FAVORITES_LIST -> {
+                            val favoriteTracks = remember(tracks) { tracks.filter { it.isFavorite } }
+                            DapTrackListDisplay(
+                                title = "⭐ Favorites",
+                                tracks = favoriteTracks,
+                                currentTrackId = playbackState.currentTrack?.id,
+                                selectedIndex = trackSelectedIndex,
+                                listState = trackListState,
+                                onTrackSelect = { selectedTrack, trackList ->
+                                    audioPlayer.playTrack(selectedTrack, trackList)
+                                    currentScreen = DapScreen.NOW_PLAYING
+                                },
+                                onBack = { currentScreen = DapScreen.MAIN_MENU },
+                                onToggleFavorite = { trackId ->
+                                    val isFav = musicRepository.toggleFavorite(trackId)
+                                    audioPlayer.updateFavoriteStatus(trackId, isFav)
+                                },
+                                onAddToPlaylist = { track ->
+                                    trackForPlaylistSheet = track
                                 }
                             )
                         }
@@ -273,28 +340,12 @@ fun DapShell(
                                     trackSelectedIndex = 0
                                     currentScreen = DapScreen.TRACKS_LIST
                                 },
-                                onBack = { currentScreen = DapScreen.MAIN_MENU }
-                            )
-                        }
-
-                        DapScreen.TRACKS_LIST -> {
-                            val listTitle = when {
-                                selectedAlbum != null -> selectedAlbum?.title ?: "Album"
-                                selectedArtist != null -> selectedArtist?.name ?: "Artist"
-                                selectedPlaylist != null -> selectedPlaylist?.name ?: "Playlist"
-                                else -> "All Tracks"
-                            }
-                            DapTrackListDisplay(
-                                title = listTitle,
-                                tracks = currentFilteredTracks,
-                                currentTrackId = playbackState.currentTrack?.id,
-                                selectedIndex = trackSelectedIndex,
-                                listState = trackListState,
-                                onTrackSelect = { track, queue ->
-                                    audioPlayer.playTrack(track, queue)
-                                    currentScreen = DapScreen.NOW_PLAYING
-                                },
-                                onBack = { navigateBackOrUp() }
+                                onBack = { currentScreen = DapScreen.MAIN_MENU },
+                                onCreateNewPlaylist = {
+                                    if (tracks.isNotEmpty()) {
+                                        trackForPlaylistSheet = tracks.first()
+                                    }
+                                }
                             )
                         }
 
@@ -303,13 +354,17 @@ fun DapShell(
                                 title = "Playback Queue",
                                 tracks = playbackState.queue,
                                 currentTrackId = playbackState.currentTrack?.id,
-                                selectedIndex = playbackState.currentIndex.coerceAtLeast(0),
+                                selectedIndex = trackSelectedIndex,
                                 listState = trackListState,
-                                onTrackSelect = { track, queue ->
-                                    audioPlayer.playTrack(track, queue)
+                                onTrackSelect = { selectedTrack, queueList ->
+                                    audioPlayer.playTrack(selectedTrack, queueList)
                                     currentScreen = DapScreen.NOW_PLAYING
                                 },
-                                onBack = { currentScreen = DapScreen.NOW_PLAYING }
+                                onBack = { currentScreen = DapScreen.NOW_PLAYING },
+                                onToggleFavorite = { trackId ->
+                                    val isFav = musicRepository.toggleFavorite(trackId)
+                                    audioPlayer.updateFavoriteStatus(trackId, isFav)
+                                }
                             )
                         }
 
@@ -336,206 +391,118 @@ fun DapShell(
                                 onRescan = {
                                     coroutineScope.launch {
                                         musicRepository.scanLocalMedia()
-                                        Toast.makeText(context, "Scanning local storage...", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "Scanning local audio storage...", Toast.LENGTH_SHORT).show()
                                     }
                                 },
-                                onBack = { currentScreen = DapScreen.MAIN_MENU },
-                                onSwitchUi = onSwitchUi
+                                onBack = { currentScreen = DapScreen.MAIN_MENU }
                             )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            // =========================================================================
+            // LOWER VIEWPORT:
+            // 1. If NOW_PLAYING: Display the iconic Rotary Click Wheel!
+            // 2. If OTHER SCREEN: Display the docked Mini Player bar (NO Click Wheel)!
+            // =========================================================================
+            if (currentScreen == DapScreen.NOW_PLAYING) {
+                Spacer(modifier = Modifier.height(8.dp))
 
-            // ==========================================
-            // LOWER SECTION: Tactile Click Wheel (approx 48% height)
-            // ==========================================
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(0.95f),
-                contentAlignment = Alignment.Center
-            ) {
-                DapClickWheel(
-                    isPlaying = playbackState.isPlaying,
-                    onMenuClick = {
-                        navigateBackOrUp()
-                    },
-                    onPrevClick = {
-                        audioPlayer.skipPrevious()
-                    },
-                    onPrevLongPress = {
-                        val newPos = (playbackState.currentPositionMs - 15000L).coerceAtLeast(0L)
-                        audioPlayer.seekTo(newPos)
-                        Toast.makeText(context, "Rewind 15s", Toast.LENGTH_SHORT).show()
-                    },
-                    onNextClick = {
-                        audioPlayer.skipNext()
-                    },
-                    onNextLongPress = {
-                        val newPos = (playbackState.currentPositionMs + 15000L).coerceAtMost(playbackState.durationMs)
-                        audioPlayer.seekTo(newPos)
-                        Toast.makeText(context, "Fast Forward 15s", Toast.LENGTH_SHORT).show()
-                    },
-                    onPlayPauseClick = {
-                        audioPlayer.togglePlayPause(fallbackQueue = tracks)
-                    },
-                    onCenterLongPress = {
-                        playbackState.currentTrack?.let { track ->
-                            val isFav = musicRepository.toggleFavorite(track.id)
-                            audioPlayer.updateFavoriteStatus(track.id, isFav)
-                            Toast.makeText(context, if (isFav) "Added to Favorites" else "Removed from Favorites", Toast.LENGTH_SHORT).show()
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.95f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    DapClickWheel(
+                        isPlaying = playbackState.isPlaying,
+                        onMenuClick = {
+                            navigateBackOrUp()
+                        },
+                        onPrevClick = {
+                            audioPlayer.skipPrevious()
+                        },
+                        onPrevLongPress = {
+                            val newPos = (playbackState.currentPositionMs - 15000L).coerceAtLeast(0L)
+                            audioPlayer.seekTo(newPos)
+                            Toast.makeText(context, "Rewind 15s", Toast.LENGTH_SHORT).show()
+                        },
+                        onNextClick = {
+                            audioPlayer.skipNext()
+                        },
+                        onNextLongPress = {
+                            val newPos = (playbackState.currentPositionMs + 15000L).coerceAtMost(playbackState.durationMs)
+                            audioPlayer.seekTo(newPos)
+                            Toast.makeText(context, "Fast Forward 15s", Toast.LENGTH_SHORT).show()
+                        },
+                        onPlayPauseClick = {
+                            audioPlayer.togglePlayPause(fallbackQueue = tracks)
+                        },
+                        onCenterLongPress = {
+                            playbackState.currentTrack?.let { track ->
+                                val isFav = musicRepository.toggleFavorite(track.id)
+                                audioPlayer.updateFavoriteStatus(track.id, isFav)
+                                Toast.makeText(
+                                    context,
+                                    if (isFav) "Added to Favorites ⭐" else "Removed from Favorites",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        },
+                        onCenterClick = {
+                            audioPlayer.togglePlayPause(fallbackQueue = tracks)
+                        },
+                        onRotateStep = { isClockwise ->
+                            val delta = if (isClockwise) 2000L else -2000L
+                            val newPos = (playbackState.currentPositionMs + delta).coerceIn(0L, playbackState.durationMs)
+                            audioPlayer.seekTo(newPos)
                         }
-                    },
-                    onCenterClick = {
-                        when (currentScreen) {
-                            DapScreen.MAIN_MENU -> {
-                                val destinations = listOf(
-                                    DapScreen.NOW_PLAYING,
-                                    DapScreen.TRACKS_LIST,
-                                    DapScreen.ALBUMS_LIST,
-                                    DapScreen.ARTISTS_LIST,
-                                    DapScreen.PLAYLISTS_LIST,
-                                    DapScreen.QUEUE,
-                                    DapScreen.LYRICS,
-                                    DapScreen.EQUALIZER,
-                                    DapScreen.SETTINGS
-                                )
-                                selectedAlbum = null
-                                selectedArtist = null
-                                selectedPlaylist = null
-                                currentScreen = destinations.getOrElse(menuSelectedIndex) { DapScreen.NOW_PLAYING }
-                            }
-                            DapScreen.ALBUMS_LIST -> {
-                                if (albums.isNotEmpty()) {
-                                    val safeIndex = albumSelectedIndex.coerceIn(0, albums.lastIndex)
-                                    selectedAlbum = albums[safeIndex]
-                                    trackSelectedIndex = 0
-                                    currentScreen = DapScreen.TRACKS_LIST
-                                }
-                            }
-                            DapScreen.ARTISTS_LIST -> {
-                                if (artists.isNotEmpty()) {
-                                    val safeIndex = artistSelectedIndex.coerceIn(0, artists.lastIndex)
-                                    selectedArtist = artists[safeIndex]
-                                    trackSelectedIndex = 0
-                                    currentScreen = DapScreen.TRACKS_LIST
-                                }
-                            }
-                            DapScreen.PLAYLISTS_LIST -> {
-                                if (playlists.isNotEmpty()) {
-                                    val safeIndex = playlistSelectedIndex.coerceIn(0, playlists.lastIndex)
-                                    selectedPlaylist = playlists[safeIndex]
-                                    trackSelectedIndex = 0
-                                    currentScreen = DapScreen.TRACKS_LIST
-                                }
-                            }
-                            DapScreen.TRACKS_LIST -> {
-                                if (currentFilteredTracks.isNotEmpty()) {
-                                    val safeIndex = trackSelectedIndex.coerceIn(0, currentFilteredTracks.lastIndex)
-                                    audioPlayer.playTrack(currentFilteredTracks[safeIndex], currentFilteredTracks)
-                                    currentScreen = DapScreen.NOW_PLAYING
-                                }
-                            }
-                            DapScreen.QUEUE -> {
-                                if (playbackState.queue.isNotEmpty()) {
-                                    val safeIndex = trackSelectedIndex.coerceIn(0, playbackState.queue.lastIndex)
-                                    audioPlayer.playTrack(playbackState.queue[safeIndex], playbackState.queue)
-                                    currentScreen = DapScreen.NOW_PLAYING
-                                }
-                            }
-                            DapScreen.NOW_PLAYING -> {
-                                audioPlayer.togglePlayPause(fallbackQueue = tracks)
-                            }
-                            else -> {}
-                        }
-                    },
-                    onRotateStep = { isClockwise ->
-                        when (currentScreen) {
-                            DapScreen.NOW_PLAYING -> {
-                                // Scrub by 5 seconds
-                                val stepMs = if (isClockwise) 5000L else -5000L
-                                val newPos = (playbackState.currentPositionMs + stepMs).coerceIn(0L, playbackState.durationMs)
-                                audioPlayer.seekTo(newPos)
-                            }
-                            DapScreen.MAIN_MENU -> {
-                                val totalItems = 9
-                                menuSelectedIndex = if (isClockwise) {
-                                    (menuSelectedIndex + 1).coerceAtMost(totalItems - 1)
-                                } else {
-                                    (menuSelectedIndex - 1).coerceAtLeast(0)
-                                }
-                                coroutineScope.launch {
-                                    menuListState.animateScrollToItem(menuSelectedIndex)
-                                }
-                            }
-                            DapScreen.ALBUMS_LIST -> {
-                                if (albums.isNotEmpty()) {
-                                    albumSelectedIndex = if (isClockwise) {
-                                        (albumSelectedIndex + 1).coerceAtMost(albums.lastIndex)
-                                    } else {
-                                        (albumSelectedIndex - 1).coerceAtLeast(0)
-                                    }
-                                    coroutineScope.launch {
-                                        albumListState.animateScrollToItem(albumSelectedIndex)
-                                    }
-                                }
-                            }
-                            DapScreen.ARTISTS_LIST -> {
-                                if (artists.isNotEmpty()) {
-                                    artistSelectedIndex = if (isClockwise) {
-                                        (artistSelectedIndex + 1).coerceAtMost(artists.lastIndex)
-                                    } else {
-                                        (artistSelectedIndex - 1).coerceAtLeast(0)
-                                    }
-                                    coroutineScope.launch {
-                                        artistListState.animateScrollToItem(artistSelectedIndex)
-                                    }
-                                }
-                            }
-                            DapScreen.PLAYLISTS_LIST -> {
-                                if (playlists.isNotEmpty()) {
-                                    playlistSelectedIndex = if (isClockwise) {
-                                        (playlistSelectedIndex + 1).coerceAtMost(playlists.lastIndex)
-                                    } else {
-                                        (playlistSelectedIndex - 1).coerceAtLeast(0)
-                                    }
-                                    coroutineScope.launch {
-                                        playlistListState.animateScrollToItem(playlistSelectedIndex)
-                                    }
-                                }
-                            }
-                            DapScreen.TRACKS_LIST -> {
-                                if (currentFilteredTracks.isNotEmpty()) {
-                                    trackSelectedIndex = if (isClockwise) {
-                                        (trackSelectedIndex + 1).coerceAtMost(currentFilteredTracks.lastIndex)
-                                    } else {
-                                        (trackSelectedIndex - 1).coerceAtLeast(0)
-                                    }
-                                    coroutineScope.launch {
-                                        trackListState.animateScrollToItem(trackSelectedIndex)
-                                    }
-                                }
-                            }
-                            DapScreen.QUEUE -> {
-                                if (playbackState.queue.isNotEmpty()) {
-                                    trackSelectedIndex = if (isClockwise) {
-                                        (trackSelectedIndex + 1).coerceAtMost(playbackState.queue.lastIndex)
-                                    } else {
-                                        (trackSelectedIndex - 1).coerceAtLeast(0)
-                                    }
-                                    coroutineScope.launch {
-                                        trackListState.animateScrollToItem(trackSelectedIndex)
-                                    }
-                                }
-                            }
-                            else -> {}
-                        }
-                    }
-                )
+                    )
+                }
+            } else {
+                // Docked Mini-Player Bar for all other screens (Tracks, Playlists, Albums, Settings, etc.)
+                if (playbackState.currentTrack != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    DapMiniPlayer(
+                        playbackState = playbackState,
+                        onTapMiniPlayer = { currentScreen = DapScreen.NOW_PLAYING },
+                        onPlayPauseClick = { audioPlayer.togglePlayPause(fallbackQueue = tracks) },
+                        onNextClick = { audioPlayer.skipNext() }
+                    )
+                }
             }
+        }
+
+        // =========================================================================
+        // ADD TO PLAYLIST BOTTOM SHEET MODAL
+        // =========================================================================
+        trackForPlaylistSheet?.let { trackToAdd ->
+            DapAddToPlaylistSheet(
+                track = trackToAdd,
+                playlists = playlists,
+                onAddToPlaylist = { playlistId, trackId ->
+                    coroutineScope.launch {
+                        playlistRepository.addTrackToPlaylist(playlistId, trackId)
+                        val pName = playlists.firstOrNull { it.id == playlistId }?.name ?: "Playlist"
+                        Toast.makeText(context, "Added '${trackToAdd.title}' to $pName 🎵", Toast.LENGTH_SHORT).show()
+                        trackForPlaylistSheet = null
+                    }
+                },
+                onCreatePlaylist = { newName, trackId ->
+                    coroutineScope.launch {
+                        val newPl = playlistRepository.createPlaylist(newName)
+                        if (newPl != null) {
+                            playlistRepository.addTrackToPlaylist(newPl.id, trackId)
+                        }
+                        Toast.makeText(context, "Created '$newName' with '${trackToAdd.title}' 🎵", Toast.LENGTH_SHORT).show()
+                        trackForPlaylistSheet = null
+                    }
+                },
+                onDismiss = {
+                    trackForPlaylistSheet = null
+                }
+            )
         }
     }
 }

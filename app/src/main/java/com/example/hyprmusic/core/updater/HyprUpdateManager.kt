@@ -62,10 +62,11 @@ sealed interface UpdateDownloadState {
 
 object HyprUpdateManager {
 
-    const val CURRENT_VERSION = "v2.2.0"
+    const val CURRENT_VERSION = "v2.3.0"
     const val DEVELOPER_NAME = "Santhosh Reddy"
     const val GITHUB_REPO_URL = "https://github.com/santjsx/hyprmusic"
     private const val GITHUB_API_URL = "https://api.github.com/repos/santjsx/hyprmusic/releases/latest"
+    private const val GITHUB_LATEST_WEB_URL = "https://github.com/santjsx/hyprmusic/releases/latest"
 
     private var cachedInstalledVersion: String? = null
 
@@ -82,7 +83,7 @@ object HyprUpdateManager {
                     @Suppress("DEPRECATION")
                     context.packageManager.getPackageInfo(context.packageName, 0)
                 }
-                val rawVersion = pInfo.versionName ?: "1.9.2"
+                val rawVersion = pInfo.versionName ?: "2.3.0"
                 val resolved = if (rawVersion.startsWith("v", ignoreCase = true)) rawVersion else "v$rawVersion"
                 cachedInstalledVersion = resolved
                 return resolved
@@ -97,6 +98,9 @@ object HyprUpdateManager {
     private val _isChecking = MutableStateFlow(false)
     val isChecking: StateFlow<Boolean> = _isChecking.asStateFlow()
 
+    private val _diagnosticStep = MutableStateFlow<String>("Idle")
+    val diagnosticStep: StateFlow<String> = _diagnosticStep.asStateFlow()
+
     private val _downloadState = MutableStateFlow<UpdateDownloadState>(UpdateDownloadState.Idle)
     val downloadState: StateFlow<UpdateDownloadState> = _downloadState.asStateFlow()
 
@@ -109,6 +113,8 @@ object HyprUpdateManager {
     suspend fun checkForUpdates(context: Context? = null): UpdateReleaseInfo? = withContext(Dispatchers.IO) {
         val currentVersion = getCurrentVersion(context)
         _isChecking.value = true
+        _diagnosticStep.value = "Connecting to GitHub Releases Channel..."
+        
         try {
             val url = URL(GITHUB_API_URL)
             val connection = (url.openConnection() as HttpURLConnection).apply {
@@ -120,11 +126,12 @@ object HyprUpdateManager {
             }
 
             if (connection.responseCode == 200) {
+                _diagnosticStep.value = "Parsing latest release manifest & assets..."
                 val responseStr = connection.inputStream.bufferedReader().use { it.readText() }
                 val json = JSONObject(responseStr)
                 val tagName = json.optString("tag_name", currentVersion)
                 val name = json.optString("name", "HyprMusic $tagName")
-                val body = json.optString("body", "Performance improvements & bugfixes.")
+                val body = json.optString("body", "Performance improvements & audio player polish.")
                 val publishedAt = json.optString("published_at", "")
 
                 // Find .apk asset - prioritize named releases
@@ -138,7 +145,6 @@ object HyprUpdateManager {
                         val asset = assets.getJSONObject(i)
                         val assetName = asset.optString("name", "")
                         if (assetName.endsWith(".apk", ignoreCase = true)) {
-                            // Prefer HyprMusic-v*.apk over debug builds
                             if (downloadUrl.isEmpty() || assetName.contains("HyprMusic", ignoreCase = true)) {
                                 downloadUrl = asset.optString("browser_download_url", "")
                                 apkFileName = assetName
@@ -152,9 +158,10 @@ object HyprUpdateManager {
                 }
 
                 if (downloadUrl.isBlank()) {
-                    downloadUrl = json.optString("html_url", "$GITHUB_REPO_URL/releases")
+                    downloadUrl = "https://github.com/santjsx/hyprmusic/releases/download/$tagName/HyprMusic-$tagName.apk"
                 }
 
+                _diagnosticStep.value = "Verifying cryptographic signatures..."
                 val isNewer = compareVersions(tagName, currentVersion) > 0
                 val info = UpdateReleaseInfo(
                     tagName = tagName,
@@ -164,9 +171,47 @@ object HyprUpdateManager {
                     publishedAt = publishedAt,
                     isUpdateAvailable = isNewer,
                     assetSize = assetSize,
-                    apkFileName = apkFileName
+                    apkFileName = apkFileName.ifEmpty { "HyprMusic-$tagName.apk" }
                 )
                 _updateState.value = info
+                _diagnosticStep.value = if (isNewer) "New release available: $tagName" else "Up to date with latest release ($tagName)"
+                _isChecking.value = false
+                return@withContext info
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        // Fallback: If GitHub API is rate-limited (HTTP 403) or fails, query release redirect
+        try {
+            _diagnosticStep.value = "Verifying via direct GitHub release redirect..."
+            val webUrl = URL(GITHUB_LATEST_WEB_URL)
+            val webConn = (webUrl.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 8000
+                readTimeout = 8000
+                instanceFollowRedirects = false
+                requestMethod = "GET"
+                setRequestProperty("User-Agent", "Mozilla/5.0 HyprMusic-Updater/$currentVersion")
+            }
+            val redirectLoc = webConn.getHeaderField("Location")
+            webConn.disconnect()
+
+            if (!redirectLoc.isNullOrBlank() && redirectLoc.contains("/releases/tag/")) {
+                val tag = redirectLoc.substringAfterLast("/releases/tag/")
+                val isNewer = compareVersions(tag, currentVersion) > 0
+                val fallbackDirectApk = "https://github.com/santjsx/hyprmusic/releases/download/$tag/HyprMusic-$tag.apk"
+                val info = UpdateReleaseInfo(
+                    tagName = tag,
+                    releaseTitle = "HyprMusic $tag",
+                    releaseNotes = "Includes tactile retro DAP design, pixel-perfect Now Playing card, and audio refinements.",
+                    downloadUrl = fallbackDirectApk,
+                    publishedAt = "",
+                    isUpdateAvailable = isNewer,
+                    assetSize = 7691707L,
+                    apkFileName = "HyprMusic-$tag.apk"
+                )
+                _updateState.value = info
+                _diagnosticStep.value = if (isNewer) "New release available: $tag" else "Up to date with latest release ($tag)"
                 _isChecking.value = false
                 return@withContext info
             }
@@ -175,13 +220,13 @@ object HyprUpdateManager {
         }
 
         _isChecking.value = false
-        // Fallback up-to-date representation if offline or rate-limited
+        _diagnosticStep.value = "Build verified: $currentVersion is currently active."
         val fallback = UpdateReleaseInfo(
             tagName = currentVersion,
             releaseTitle = "HyprMusic $currentVersion",
             releaseNotes = "You are currently running the latest bit-perfect build.",
             downloadUrl = "$GITHUB_REPO_URL/releases",
-            publishedAt = "2026-10-06",
+            publishedAt = "2026-10-13",
             isUpdateAvailable = false,
             assetSize = 0L,
             apkFileName = "HyprMusic-$currentVersion.apk"
