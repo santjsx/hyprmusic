@@ -93,8 +93,15 @@ fun DapShell(
         rawPlaylists.map { Playlist(it.id, it.name, it.trackIds.size, it.createdAt) }
     }
 
-    // Navigation Stack
-    var currentScreen by remember { mutableStateOf(DapScreen.NOW_PLAYING) }
+    // Navigation Stack - Defaults directly to LIBRARY on startup!
+    val initialScreen = remember {
+        if (audioPlayer.playbackState.value.isPlaying) {
+            DapScreen.NOW_PLAYING
+        } else {
+            DapScreen.LIBRARY
+        }
+    }
+    var currentScreen by remember { mutableStateOf(initialScreen) }
     var selectedAlbum by remember { mutableStateOf<Album?>(null) }
     var selectedArtist by remember { mutableStateOf<Artist?>(null) }
     var selectedPlaylist by remember { mutableStateOf<Playlist?>(null) }
@@ -147,16 +154,19 @@ fun DapShell(
                 currentScreen = DapScreen.PLAYLISTS_LIST
             }
             currentScreen == DapScreen.NOW_PLAYING -> {
+                currentScreen = DapScreen.LIBRARY
+            }
+            currentScreen == DapScreen.LIBRARY -> {
                 currentScreen = DapScreen.MAIN_MENU
             }
             currentScreen != DapScreen.MAIN_MENU -> {
-                currentScreen = DapScreen.MAIN_MENU
+                currentScreen = DapScreen.LIBRARY
             }
             currentScreen == DapScreen.MAIN_MENU -> {
                 if (playbackState.currentTrack != null) {
                     currentScreen = DapScreen.NOW_PLAYING
                 } else {
-                    Toast.makeText(context, "Press home to exit", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Press back again to exit", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -233,6 +243,12 @@ fun DapShell(
                                 onOpenQueue = { currentScreen = DapScreen.QUEUE },
                                 onAddToPlaylist = { track ->
                                     trackForPlaylistSheet = track
+                                },
+                                onBrowseLibrary = { currentScreen = DapScreen.LIBRARY },
+                                onShuffleAll = {
+                                    if (tracks.isNotEmpty()) {
+                                        audioPlayer.playRandomMix(tracks)
+                                    }
                                 }
                             )
                         }
@@ -250,7 +266,7 @@ fun DapShell(
                             )
                         }
 
-                        DapScreen.TRACKS_LIST -> {
+                        DapScreen.TRACKS_LIST, DapScreen.LIBRARY -> {
                             val activeTitle = when {
                                 selectedAlbum != null -> selectedAlbum?.title ?: "Album Tracks"
                                 selectedArtist != null -> selectedArtist?.name ?: "Artist Tracks"
@@ -409,6 +425,7 @@ fun DapShell(
             if (currentScreen == DapScreen.NOW_PLAYING) {
                 Spacer(modifier = Modifier.height(8.dp))
 
+                val wheelPrefs = remember { context.getSharedPreferences("dap_wheel_prefs", android.content.Context.MODE_PRIVATE) }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -417,6 +434,7 @@ fun DapShell(
                 ) {
                     DapClickWheel(
                         isPlaying = playbackState.isPlaying,
+                        enableAuditoryClick = wheelPrefs.getBoolean("wheel_sound_enabled", true),
                         onMenuClick = {
                             navigateBackOrUp()
                         },

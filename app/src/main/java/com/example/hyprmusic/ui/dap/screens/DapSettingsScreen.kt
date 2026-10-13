@@ -1,5 +1,6 @@
 package com.example.hyprmusic.ui.dap.screens
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -402,7 +403,76 @@ fun DapSettingsDisplay(
         Spacer(modifier = Modifier.height(16.dp))
 
         // ==========================================
-        // 3. Audio Pipeline Telemetry
+        // 3. Hardware Rotary Click Wheel Preferences
+        // ==========================================
+        Text(
+            text = "ROTARY CLICK WHEEL CONTROLS",
+            style = DapTypography.MenuSecondary,
+            color = DapColors.TextSecondary,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 4.dp, start = 2.dp)
+        )
+
+        val wheelPrefs = remember { context.getSharedPreferences("dap_wheel_prefs", Context.MODE_PRIVATE) }
+        var wheelSoundEnabled by remember { mutableStateOf(wheelPrefs.getBoolean("wheel_sound_enabled", true)) }
+        var wheelHapticsEnabled by remember { mutableStateOf(wheelPrefs.getBoolean("wheel_haptics_enabled", true)) }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(DapColors.ScreenCard)
+                .border(1.dp, DapColors.ScreenCardBorder, RoundedCornerShape(10.dp))
+                .padding(horizontal = 14.dp, vertical = 8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Rotary Click Audio", style = DapTypography.MenuItem, color = DapColors.TextPrimary)
+                    Text("Play mechanical iPod audio click on rotation", style = DapTypography.MenuSecondary, color = DapColors.TextSecondary)
+                }
+                Switch(
+                    checked = wheelSoundEnabled,
+                    onCheckedChange = {
+                        haptic.buttonClick()
+                        wheelSoundEnabled = it
+                        wheelPrefs.edit().putBoolean("wheel_sound_enabled", it).apply()
+                    },
+                    colors = SwitchDefaults.colors(checkedThumbColor = DapColors.TextPrimary, checkedTrackColor = DapColors.AccentIceBlue)
+                )
+            }
+
+            HorizontalDivider(color = DapColors.ScreenCardBorder.copy(alpha = 0.5f), thickness = 0.8.dp)
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Tactile Haptics", style = DapTypography.MenuItem, color = DapColors.TextPrimary)
+                    Text("Emit physical vibration ticks on rotary steps", style = DapTypography.MenuSecondary, color = DapColors.TextSecondary)
+                }
+                Switch(
+                    checked = wheelHapticsEnabled,
+                    onCheckedChange = {
+                        haptic.heavyPulse()
+                        wheelHapticsEnabled = it
+                        wheelPrefs.edit().putBoolean("wheel_haptics_enabled", it).apply()
+                    },
+                    colors = SwitchDefaults.colors(checkedThumbColor = DapColors.TextPrimary, checkedTrackColor = DapColors.AccentIceBlue)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ==========================================
+        // 4. Audio Pipeline Telemetry
         // ==========================================
         Text(
             text = "HARDWARE AUDIO ENGINE",

@@ -132,7 +132,12 @@ object HyprEqualizer {
     private val _currentPreset = MutableStateFlow("Flat")
     val currentPreset: StateFlow<String> = _currentPreset.asStateFlow()
 
+    // AutoEq Headphone Correction Engine
+    private val _activeAutoEqProfile = MutableStateFlow<com.example.hyprmusic.core.autoeq.AutoEqProfile?>(null)
+    val activeAutoEqProfile: StateFlow<com.example.hyprmusic.core.autoeq.AutoEqProfile?> = _activeAutoEqProfile.asStateFlow()
+
     val availablePresets = listOf(
+        "AutoEq Match",
         "Dolby Cinema",
         "Spatial Theater",
         "Vocal Clarity",
@@ -205,6 +210,11 @@ object HyprEqualizer {
 
         val savedPreset = p.getString("preset", "Flat") ?: "Flat"
         _currentPreset.value = savedPreset
+
+        val savedAutoEqId = p.getString("active_autoeq_id", null)
+        if (savedAutoEqId != null) {
+            _activeAutoEqProfile.value = com.example.hyprmusic.core.autoeq.AutoEqDatabase.getById(savedAutoEqId)
+        }
 
         val savedBass = p.getInt("bass_boost", 0).coerceIn(0, 1000)
         _bassBoostStrength.value = savedBass
@@ -355,6 +365,12 @@ object HyprEqualizer {
             return _currentDolbyProfile.value.preCutGain
         }
 
+        val autoEqPreamp = _activeAutoEqProfile.value?.preampDb
+        if (autoEqPreamp != null && autoEqPreamp < 0f) {
+            val factor = 10.0.pow(autoEqPreamp.toDouble() / 20.0).toFloat()
+            return factor.coerceIn(0.25f, 1.0f)
+        }
+
         val maxBoostMb = _bands.value.maxOfOrNull { it.levelMb.toInt() }?.coerceAtLeast(0) ?: 0
         val bassBoostMb = if (_bassBoostStrength.value > 0) (_bassBoostStrength.value * 5 / 10) else 0
         val totalPositiveGainMb = maxBoostMb + bassBoostMb
@@ -474,10 +490,12 @@ object HyprEqualizer {
         _bands.value = _bands.value.map {
             if (it.bandIndex == bandIndex) it.copy(levelMb = levelMb) else it
         }
+        _activeAutoEqProfile.value = null
         _currentPreset.value = "Custom"
         prefs?.edit()?.apply {
             putInt("band_$bandIndex", levelMb.toInt())
             putString("preset", "Custom")
+            remove("active_autoeq_id")
             apply()
         }
         try {
@@ -582,6 +600,52 @@ object HyprEqualizer {
             applyEffectsToSession(currentAttachedSessionId)
         }
     }
+
+    /**
+     * Applies a calibrated AutoEq profile to the 10-band DSP matrix and engages headroom limiter.
+     */
+    fun applyAutoEqProfile(profile: com.example.hyprmusic.core.autoeq.AutoEqProfile) {
+        _activeAutoEqProfile.value = profile
+        _currentPreset.value = "AutoEq: ${profile.displayName}"
+        _isDolbyEnabled.value = false
+        prefs?.edit()?.apply {
+            putString("active_autoeq_id", profile.id)
+            putString("preset", "AutoEq: ${profile.displayName}")
+            putBoolean("dolby_enabled", false)
+            apply()
+        }
+
+        if (!_isEnabled.value) {
+            _isEnabled.value = true
+            prefs?.edit()?.putBoolean("eq_enabled", true)?.apply()
+        }
+
+        // Map the 10-band profile to the equalizer bands
+        _bands.value = _bands.value.mapIndexed { idx, band ->
+            val gainDb = profile.bandGainsDb.getOrElse(idx) { 0f }
+            val levelMb = (gainDb * 100).toInt().toShort()
+            prefs?.edit()?.putInt("band_${band.bandIndex}", levelMb.toInt())?.apply()
+            try {
+                equalizer?.setBandLevel(band.bandIndex, levelMb)
+            } catch (_: Exception) {}
+            band.copy(levelMb = levelMb)
+        }
+
+        if (currentAttachedSessionId != 0 && _isEnabled.value) {
+            applyEffectsToSession(currentAttachedSessionId)
+        }
+    }
+
+    /**
+     * Disengages the active AutoEq profile and resets to Flat baseline.
+     */
+    fun clearAutoEqProfile() {
+        _activeAutoEqProfile.value = null
+        prefs?.edit()?.remove("active_autoeq_id")?.apply()
+        applyPreset("Flat")
+    }
+
+    fun setPreset(presetName: String) = applyPreset(presetName)
 
     private fun releaseEffects() {
         try {

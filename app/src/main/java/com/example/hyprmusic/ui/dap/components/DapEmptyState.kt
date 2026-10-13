@@ -2,19 +2,22 @@ package com.example.hyprmusic.ui.dap.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Headphones
-import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -25,13 +28,17 @@ import com.example.hyprmusic.ui.dap.theme.DapTypography
 
 /**
  * Custom illustrated mascot state for empty libraries, empty queues, and offline tracks.
- * Replaces generic empty text screens with visual character and friendly tone.
+ * Replaces generic empty text screens with visual character, friendly tone, and instant action buttons.
  */
 @Composable
 fun DapEmptyState(
     title: String,
     message: String,
     icon: ImageVector = Icons.Default.GraphicEq,
+    actionText: String? = null,
+    onActionClick: (() -> Unit)? = null,
+    secondaryActionText: String? = null,
+    onSecondaryActionClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -76,5 +83,34 @@ fun DapEmptyState(
             textAlign = TextAlign.Center,
             lineHeight = 16.sp
         )
+
+        if (actionText != null || secondaryActionText != null) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (actionText != null && onActionClick != null) {
+                    Button(
+                        onClick = onActionClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = DapColors.AccentIceBlue),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text(actionText, color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+
+                if (secondaryActionText != null && onSecondaryActionClick != null) {
+                    OutlinedButton(
+                        onClick = onSecondaryActionClick,
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text(secondaryActionText, color = DapColors.TextPrimary, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
     }
 }

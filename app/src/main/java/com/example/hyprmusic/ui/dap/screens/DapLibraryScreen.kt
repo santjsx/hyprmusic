@@ -178,6 +178,19 @@ fun DapTrackListDisplay(
                     selectedBorderColor = Color(0xFFFFC107)
                 )
             )
+
+            SuggestionChip(
+                onClick = {
+                    if (filteredTracks.isNotEmpty()) {
+                        haptic.heavyPulse()
+                        val shuffled = filteredTracks.shuffled()
+                        onTrackSelect(shuffled.first(), shuffled)
+                    }
+                },
+                label = { Text("🔀 Shuffle", fontSize = 11.5.sp, color = Color.White) },
+                colors = SuggestionChipDefaults.suggestionChipColors(containerColor = DapColors.AccentIceBlue.copy(alpha = 0.3f)),
+                border = SuggestionChipDefaults.suggestionChipBorder(enabled = true, borderColor = DapColors.AccentIceBlue)
+            )
         }
 
         HorizontalDivider(
