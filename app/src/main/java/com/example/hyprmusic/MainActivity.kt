@@ -133,15 +133,12 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            val designSpec by ThemeManager.designSpec.collectAsStateWithLifecycle()
-            val themeConfig by ThemeManager.themeConfig.collectAsStateWithLifecycle()
-
-            HyprThemeProvider(designSpec = designSpec, themeConfig = themeConfig) {
+            com.example.hyprmusic.ui.elovaire.theme.ElovaireTheme(darkTheme = true) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = designSpec.bg
+                    color = com.example.hyprmusic.ui.elovaire.theme.ElovaireColors.Night
                 ) {
-                    HyprMusicApp(
+                    com.example.hyprmusic.ui.elovaire.screens.ElovaireShell(
                         audioPlayer = audioPlayer,
                         musicRepository = musicRepository,
                         telegramRepository = telegramRepository,
